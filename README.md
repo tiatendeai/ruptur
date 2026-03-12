@@ -13,3 +13,8 @@ Sistema e biblioteca (Markdown-first) para estruturar e automatizar operação c
 
 - Blueprint oficial do projeto: `docs/blueprint/ruptur-blueprint.md`
 - Plano de execução fase 1: `docs/jornada/proximos_passos_fase1.md`
+
+## Preview local (Console + API)
+
+- Backend: `backend/README-PREVIEW.md`
+- Console: `web/README-RUPTUR.md`
