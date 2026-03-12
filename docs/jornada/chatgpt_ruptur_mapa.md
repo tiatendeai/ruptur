@@ -16,6 +16,6 @@ Arquivos:
 
 ## Pontos que viram backlog
 
-- Definir “primitivas” do Ruptura (as 5 mínimas): captura de leads, memória, follow-up, qualificação, pipeline.
+- Definir “primitivas” do Ruptur (as 5 mínimas): captura de leads, memória, follow-up, qualificação, pipeline.
 - Decidir o core (backend) vs cola (`n8n`) desde o começo.
 - Escolher a API como produto (o dashboard como cliente).

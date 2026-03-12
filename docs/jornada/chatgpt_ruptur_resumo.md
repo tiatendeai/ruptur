@@ -3,7 +3,7 @@
 Este PDF (`docs/jornada/ChatGPT - Ruptur.pdf`) é, na prática, um *registro de jornada* com:
 
 1) Trechos de documentação (ex.: AbacatePay) e uma análise do “porquê” por trás do design.
-2) Uma conversa de blueprint/roadmap para construir o projeto **Ruptura** (produto + narrativa + execução).
+2) Uma conversa de blueprint/roadmap para construir o projeto **Ruptur** (produto + narrativa + execução).
 
 ## Núcleo do documento
 
@@ -17,7 +17,7 @@ O texto interpreta a documentação como mais do que “endpoints”: ela expres
 - webhooks/eventos como base de arquitetura
 - sandbox e integração sem burocracia
 
-### 2) O que o “Ruptura” quer ser
+### 2) O que o “Ruptur” quer ser
 
 O documento aponta para um sistema que resolve o caos operacional do empresário dentro do WhatsApp:
 

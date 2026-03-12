@@ -18,7 +18,7 @@ SDR outbound
 qualificação  
 pipeline organizado
 
-## Conexão com Ruptura
+## Conexão com Ruptur
 
 Nosso sistema será a máquina operacional
 que executa esse processo automaticamente.
