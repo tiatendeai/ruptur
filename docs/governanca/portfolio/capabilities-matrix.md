@@ -25,6 +25,8 @@ Legenda:
 ## Interativos (botões/menus)
 
 - Botão com link “renderizado”: UAZAPI ✅ | Baileys ⚠️ (no Baileys puro costuma “virar texto”; melhora muito usando `nativeFlowMessage` + helper que injeta nodes)
+- Quick replies (botão de resposta): UAZAPI ✅ | Baileys ✅ (via `nativeFlowMessage.quick_reply`)
+- Lista (single select/seções): UAZAPI ✅ | Baileys ✅ (via `nativeFlowMessage.single_select` ou fallback `listMessage`)
 - Fallback garantido (link clicável no texto): UAZAPI ✅ | Baileys ✅ (deve sempre enviar URL no corpo)
 
 ## IA (opcional)
