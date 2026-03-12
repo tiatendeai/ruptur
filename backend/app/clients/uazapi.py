@@ -98,6 +98,35 @@ class UazapiClient:
     def _headers(self) -> dict[str, str]:
         return {"token": self.token}
 
+    def chat_check(self, *, numbers: list[str]) -> list[dict[str, Any]]:
+        url = f"{self.base_url.rstrip('/')}/chat/check"
+        payload = {"numbers": numbers}
+        try:
+            with httpx.Client(timeout=30) as client:
+                resp = client.post(url, json=payload, headers=self._headers())
+        except httpx.TimeoutException as exc:
+            raise UazapiError("uazapi_timeout", url=url) from exc
+        except httpx.RequestError as exc:
+            raise UazapiError("uazapi_request_error", url=url) from exc
+
+        if resp.is_error:
+            body = (resp.text or "")[:2000]
+            raise UazapiError(
+                "uazapi_http_error",
+                status_code=resp.status_code,
+                body=body,
+                url=str(resp.request.url),
+            )
+
+        try:
+            data = resp.json()
+        except Exception:
+            raise UazapiError("uazapi_invalid_json", body=(resp.text or "")[:2000], url=str(resp.request.url))
+
+        if isinstance(data, list):
+            return [v for v in data if isinstance(v, dict)]
+        raise UazapiError("uazapi_unexpected_response", body=str(data)[:2000], url=str(resp.request.url))
+
     def send_text(self, *, number: str, text: str) -> dict[str, Any]:
         url = f"{self.base_url.rstrip('/')}/send/text"
         payload = {"number": number, "text": text}

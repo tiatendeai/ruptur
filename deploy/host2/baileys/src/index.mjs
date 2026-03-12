@@ -75,6 +75,42 @@ function normalizeRecipient(value) {
   return `${v}@s.whatsapp.net`;
 }
 
+function brVariants(number) {
+  const digits = String(number || "").replace(/[^\d]/g, "");
+  if (!digits.startsWith("55")) return [digits];
+  // 55 + DDD(2) + subscriber
+  if (digits.length === 12) {
+    // missing 9 (likely mobile): 55 DD XXXXXXXX -> 55 DD 9XXXXXXXX
+    return [digits, `${digits.slice(0, 4)}9${digits.slice(4)}`];
+  }
+  if (digits.length === 13 && digits[4] === "9") {
+    // has 9: 55 DD 9XXXXXXXX -> 55 DD XXXXXXXX
+    return [digits, `${digits.slice(0, 4)}${digits.slice(5)}`];
+  }
+  return [digits];
+}
+
+async function resolveJid(inst, raw) {
+  const v = String(raw || "").trim();
+  if (!v || /\s/.test(v)) return null;
+  if (v.includes("@")) return v;
+  if (!inst?.socket) return normalizeRecipient(v);
+
+  // Prefer provider confirmation (handles BR 9-digit inconsistencies).
+  for (const candidate of brVariants(v)) {
+    if (!candidate) continue;
+    try {
+      const r = await inst.socket.onWhatsApp(candidate);
+      const item = Array.isArray(r) && r.length ? r[0] : null;
+      if (item?.exists && item?.jid) return item.jid;
+    } catch {
+      // ignore and try next variant
+    }
+  }
+
+  return normalizeRecipient(v);
+}
+
 function clampInt(value, min, max) {
   const n = Number.parseInt(String(value || ""), 10);
   if (Number.isNaN(n)) return null;
@@ -335,7 +371,7 @@ app.post("/send/text", async (req, res) => {
   if (!(await waitForOpen(inst))) return res.status(503).json({ ok: false, error: "not_connected" });
 
   try {
-    const jid = normalizeRecipient(to);
+    const jid = await resolveJid(inst, to);
     if (!jid) return res.status(400).json({ ok: false, error: "to_invalid" });
     const r = await inst.socket.sendMessage(jid, { text });
     return res.json({ ok: true, instance: inst.id, result: r });
@@ -415,7 +451,7 @@ app.post("/send/menu", async (req, res) => {
   const inst = await ensureStarted(instanceId);
   if (!inst.socket) return res.status(503).json({ ok: false, error: "not_ready" });
 
-  const jid = normalizeRecipient(number);
+  const jid = await resolveJid(inst, number);
   if (!jid) return res.status(400).json({ ok: false, error: "number_invalid" });
 
   if (type !== "button") return res.status(400).json({ ok: false, error: "type_not_supported" });
@@ -517,7 +553,7 @@ app.post("/send/media", async (req, res) => {
   if (!inst.socket) return res.status(503).json({ ok: false, error: "not_ready" });
   if (!(await waitForOpen(inst))) return res.status(503).json({ ok: false, error: "not_connected" });
 
-  const jid = normalizeRecipient(to);
+  const jid = await resolveJid(inst, to);
   if (!jid) return res.status(400).json({ ok: false, error: "to_invalid" });
 
   try {
@@ -568,7 +604,7 @@ app.post("/send/button-url", async (req, res) => {
   if (!inst.socket) return res.status(503).json({ ok: false, error: "not_ready" });
   if (!(await waitForOpen(inst))) return res.status(503).json({ ok: false, error: "not_connected" });
 
-  const jid = normalizeRecipient(to);
+  const jid = await resolveJid(inst, to);
   if (!jid) return res.status(400).json({ ok: false, error: "to_invalid" });
 
   try {
