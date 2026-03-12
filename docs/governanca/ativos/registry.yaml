@@ -1,0 +1,39 @@
+# CMDB-lite (inventário de ativos) — Ruptur
+#
+# Diretriz: manter simples, mas suficiente para replicar e operar.
+
+portfolio:
+  providers:
+    uazapi:
+      role: primary
+      base_url: https://tiatendeai.uazapi.com
+      auth:
+        # Não versionar tokens aqui; apenas referenciar onde ficam.
+        admin_token_ref: env:RUPTUR_UAZAPI_ADMIN_TOKEN
+    baileys:
+      role: secondary
+      base_url: https://baileys.statuspersianas.com.br
+
+  hosts:
+    host1:
+      name: oracle-micro-1
+      ip: 129.148.17.85
+      role: traefik + ruptur-backend
+    host2:
+      name: oracle-micro-2
+      ip: 167.234.228.71
+      role: traefik + baileys + whisper
+
+  domains:
+    api:
+      hostname: api.statuspersianas.com.br
+      host: host1
+    webhook:
+      hostname: webhook.statuspersianas.com.br
+      host: host1
+    baileys:
+      hostname: baileys.statuspersianas.com.br
+      host: host2
+
+tenants: []
+
