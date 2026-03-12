@@ -25,5 +25,8 @@ class Settings(BaseSettings):
     uazapi_token: str | None = Field(default=None, alias="RUPTUR_UAZAPI_TOKEN")
     uazapi_admin_token: str | None = Field(default=None, alias="RUPTUR_UAZAPI_ADMIN_TOKEN")
 
+    asaas_base_url: str = Field(default="https://api.asaas.com", alias="RUPTUR_ASAAS_BASE_URL")
+    asaas_token: str | None = Field(default=None, alias="RUPTUR_ASAAS_TOKEN")
+
 
 settings = Settings()

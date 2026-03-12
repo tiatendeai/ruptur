@@ -12,6 +12,7 @@ from app.api.health import router as health_router
 from app.api.uazapi_webhook import router as uazapi_webhook_router
 from app.api.uazapi_instance import router as uazapi_instance_router
 from app.api.growth import router as growth_router
+from app.api.billing import router as billing_router
 
 
 def create_app() -> FastAPI:
@@ -39,6 +40,7 @@ def create_app() -> FastAPI:
     app.include_router(crm_router)
     app.include_router(sendflow_router)
     app.include_router(growth_router)
+    app.include_router(billing_router)
     return app
 
 

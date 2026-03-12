@@ -76,4 +76,4 @@ KPIs:
 - **Growth** guarda leadscore, hand raise e healthscore do canal.
 - **Campaigns** controlam execuções 1:1 e para grupos.
 - **Rules** roteiam leads para grupos/comunidades quando aplicável.
-
+- **Billing (Asaas)**: checkout interno (console) + webhook atualiza status e libera recursos.

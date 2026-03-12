@@ -152,3 +152,33 @@ CREATE TABLE IF NOT EXISTS group_routing_rules (
   payload jsonb, -- template de mensagem, link, etc.
   created_at timestamptz NOT NULL DEFAULT now()
 );
+
+-- Billing (MVP): checkout e eventos (Asaas)
+CREATE TABLE IF NOT EXISTS billing_checkouts (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  provider text NOT NULL DEFAULT 'asaas',
+  external_id text NOT NULL, -- checkout id no provedor
+  status text NOT NULL DEFAULT 'active', -- active|paid|canceled|expired|failed
+  plan_key text NOT NULL, -- basic|professional|enterprise
+  period text NOT NULL, -- annual|quarterly
+  attendants int NOT NULL DEFAULT 2,
+  amount_cents int NOT NULL DEFAULT 0,
+  currency text NOT NULL DEFAULT 'BRL',
+  company_name text,
+  email text,
+  phone text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (provider, external_id)
+);
+
+CREATE TABLE IF NOT EXISTS billing_events (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  provider text NOT NULL DEFAULT 'asaas',
+  event_type text NOT NULL,
+  external_id text,
+  payload jsonb,
+  received_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS billing_events_type_idx ON billing_events (event_type, received_at DESC);

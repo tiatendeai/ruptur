@@ -22,3 +22,6 @@ backend/.venv/
 .npm-cache/
 web/node_modules/
 web/.next/
+
+# Screenshots
+Captura de Tela*.png

@@ -234,6 +234,10 @@ Menu principal (v1):
 - OUTPUT: scheduler/worker para cadências por tempo (sem resposta em X, reativar em Y dias, etc.)
 - VERIFY: regras configuráveis disparam e geram `campaign_targets`
 
+**C9. Billing (Asaas)**
+- OUTPUT: catálogo de planos (seat-based), checkout interno, webhook de pagamento
+- VERIFY: criar checkout no console e receber `CHECKOUT_PAID` atualizando status e liberando recursos
+
 ### Fase D — Frontend (Dashboard)
 
 **D1. Setup do app**

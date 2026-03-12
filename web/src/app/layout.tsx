@@ -56,6 +56,9 @@ export default function RootLayout({
                 <Link className="rounded-lg px-3 py-2 text-sm hover:bg-white/5" href="/metrics">
                   Métricas
                 </Link>
+                <Link className="rounded-lg px-3 py-2 text-sm hover:bg-white/5" href="/billing">
+                  Planos
+                </Link>
               </nav>
               <div className="mt-6 hidden text-xs text-zinc-500 md:block">
                 UAZAPI primário • Baileys contingência
