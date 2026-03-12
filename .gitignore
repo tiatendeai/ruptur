@@ -17,3 +17,8 @@ backend/.venv/
 
 # Scratch / exports
 0WbsZjA4yKfY.br/
+
+# Node / web app
+.npm-cache/
+web/node_modules/
+web/.next/

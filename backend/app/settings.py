@@ -15,6 +15,12 @@ class Settings(BaseSettings):
 
     database_url: str | None = Field(default=None, alias="RUPTUR_DATABASE_URL")
 
+    cors_origins: str | None = Field(
+        default="*",
+        alias="RUPTUR_CORS_ORIGINS",
+        description="Lista separada por vírgula de origins permitidos (ou *).",
+    )
+
     uazapi_base_url: str | None = Field(default=None, alias="RUPTUR_UAZAPI_BASE_URL")
     uazapi_token: str | None = Field(default=None, alias="RUPTUR_UAZAPI_TOKEN")
     uazapi_admin_token: str | None = Field(default=None, alias="RUPTUR_UAZAPI_ADMIN_TOKEN")

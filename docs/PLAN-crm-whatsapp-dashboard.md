@@ -12,6 +12,10 @@ Construir a camada **Dashboard + CRM + Operação de WhatsApp** do Ruptur, com f
 - **Disparos** (broadcast/campanhas) com warmup/delay
 - **Conexões** (multi‑instâncias UAZAPI nativas + Baileys contingência)
 - **Templates/treinamento** (base de conhecimento e playbooks)
+- **Agentes de IA (SDR)** (qualificação, follow-up, handoff humano)
+- **Construtor de fluxo** (orquestração de automações)
+- **Enriquecimento de leads** (fontes externas + dados nacionais)
+- **Web scraping / MCP / A2A** (capabilities adicionais via ferramentas)
 - **Governança** (POPs, runbooks, assets portfolio) para replicação
 
 Diretriz do projeto: **usar o que já existe (UAZAPI) e apenas orquestrar gaps**. Baileys é contingência/expansão.
@@ -67,9 +71,13 @@ Chaves/token devem ficar em `.env` / secrets manager (nunca em git).
 
 - Automação de follow‑up (jobs) + métricas.
 - Catálogo/listas interativas (menus) e quick replies como playbook.
-- Extração de contatos de grupos (*avaliar compliance e termos*).
+- Controle de grupos (metadados, moderação, segmentação) (*avaliar compliance e termos*).
+- Extração de contatos de grupos (*alto risco de compliance/termos; só com decisão explícita*).
 - Relatórios: taxa de resposta, funil por estágio, SLA.
 - “Treinamento” do agente: editor de prompt/playbook + versões.
+- Construtor de fluxo (visual ou YAML) para SDR/marketing/CS.
+- Enriquecimento de leads (Lusha/Apollo-like + provedores nacionais) com cache e auditoria.
+- Web scraper service (Playwright) como ferramenta opcional via MCP + filas.
 
 ## 3) Arquitetura (alto nível)
 
@@ -80,6 +88,10 @@ Chaves/token devem ficar em `.env` / secrets manager (nunca em git).
 - **Supabase (Postgres + Auth + Storage)**: dados multi‑tenant, RLS, storage de mídia/arquivos.
 - **UAZAPI (primário)**: envio, instâncias, webhooks.
 - **Baileys (contingência)**: envio, interativos, transcrição (Whisper local).
+- **Agent Runtime (SDR)**: execução de agentes (tools, memória, policies, avaliação) — inicialmente no backend.
+- **Flow Runtime**: engine de fluxos (gatilhos → ações) com fila e idempotência.
+- **Enrichment Connectors**: provedores externos (B2B e dados nacionais) com rate-limit/cache.
+- **Scraper/MCP Tools**: serviços opcionais (scraping, search, browser) chamados via A2A/MCP.
 
 ### 3.2 Modelo multi‑tenant (proposta)
 
@@ -96,6 +108,12 @@ Tabelas com `tenant_id` e RLS no Supabase.
 - `broadcasts`
 - `broadcast_recipients`
 - `tags` + `contact_tags`
+- `agent_profiles` (persona, prompt, policies)
+- `agent_runs` (trace, input/output, custos)
+- `flows` (definição)
+- `flow_runs` (execuções)
+- `enrichment_jobs` (requests, status, fonte, auditoria)
+- `enrichment_cache` (resultado normalizado + TTL)
 
 ## 4) UX/IA (mapa do produto)
 
@@ -106,6 +124,10 @@ Menu principal (v1):
 - **Disparos**
 - **Conexões**
 - **Templates**
+- **Agentes**
+- **Fluxos**
+- **Grupos**
+- **Sendflow** (grupos/comunidades + opt-in + conectores tipo ManyChat)
 - **Configurações** (estágios, tags, usuários)
 
 ## 5) Plano de execução (tarefas verificáveis)
@@ -121,6 +143,21 @@ Menu principal (v1):
 - INPUT: vídeo + notas do time
 - OUTPUT: checklist “capabilities parity” (Inbox/CRM/Disparos/Conexões)
 - VERIFY: doc `docs/research/capabilities-parity.md`
+
+**A3. SDR + Growth Machine (escopo e cadência)**
+- INPUT: objetivos comerciais (SDR/closer, segmentos, oferta)
+- OUTPUT: playbooks (cadências, objeções, handoff, SLA) + métricas
+- VERIFY: doc `docs/jornada/sdr-growth-machine.md`
+
+**A4. Compliance (LGPD/WhatsApp)**
+- INPUT: canais e estratégia (inbound/outbound), consentimento
+- OUTPUT: checklist de compliance + políticas (opt-out, limites, auditoria)
+- VERIFY: doc `docs/governanca/processos/compliance-whatsapp-lgpd.md`
+
+**A5. Sendflow (grupos/comunidades + opt-in)**
+- INPUT: canais (grupos/comunidades, ManyChat, formulários, landing)
+- OUTPUT: modelo de dados e fluxo “lead com consentimento” (origem, prova, opt-out)
+- VERIFY: doc `docs/research/sendflow-spec.md`
 
 ### Fase B — Dados (Supabase)
 
@@ -138,6 +175,22 @@ Menu principal (v1):
 - UAZAPI webhook → persistir `message`, atualizar `conversation`, `contact.last_seen`
 - Baileys events → persistir via webhook interno
 - VERIFY: mensagem real entra no Inbox
+
+**C3. Agent Runtime (SDR)**
+- OUTPUT: modelos `agent_profiles` + endpoint para executar “next best action”
+- VERIFY: dado um lead + contexto, retornar sugestão e/ou ação de envio
+
+**C4. Flow Runtime**
+- OUTPUT: engine simples (gatilhos → ações) + execuções idempotentes
+- VERIFY: fluxo “sem resposta em X horas” dispara follow-up
+
+**C5. Enrichment**
+- OUTPUT: interfaces de conectores + fila + cache + auditoria
+- VERIFY: lead com telefone/email gera enriquecimento e atualiza campos
+
+**C6. Sendflow**
+- OUTPUT: entidades `sendflow_sources` + `opt_in_events` + endpoints (listar, registrar opt-in, tags)
+- VERIFY: import de lead via webhook ManyChat (opt-in) aparece no Inbox/CRM
 
 ### Fase D — Frontend (Dashboard)
 
@@ -158,6 +211,22 @@ Menu principal (v1):
 - Criar campanha + preview + fila
 - VERIFY: envio controlado e logging do resultado
 
+**D5. Agentes**
+- UI para criar/editar “perfil de SDR” (persona, tom, regras, objetivos)
+- VERIFY: preview + execução manual em um lead
+
+**D6. Fluxos**
+- UI (MVP) para criar fluxo por templates (gatilhos e ações)
+- VERIFY: ativar/desativar e ver histórico
+
+**D7. Enrichment**
+- UI para ver “dados enriquecidos”, fonte, confiança e histórico
+- VERIFY: executar enrichment em lead e ver campos atualizados
+
+**D8. Sendflow**
+- UI para: fontes (grupos/comunidades/canais), entradas opt-in, status de sincronização
+- VERIFY: lead importado aparece e fica rastreável (origem/consentimento)
+
 ### Fase E — Integrações (UAZAPI/Baileys)
 
 **E1. Conexões UAZAPI (nativo)**
@@ -167,6 +236,10 @@ Menu principal (v1):
 **E2. Conexões Baileys**
 - Listar instâncias + QR
 - VERIFY: conectar e enviar interativos
+
+**E3. Grupos**
+- OUTPUT: leitura de metadados de grupos + segmentação (quando permitido)
+- VERIFY: listar grupos associados à instância e tags (sem extração massiva)
 
 ### Fase F — Governança (replicação)
 
@@ -190,4 +263,6 @@ Menu principal (v1):
 1. **Direito de uso** do conteúdo/ativos do `0WbsZjA4yKfY.br/` (sim/não).
 2. **Stack do frontend**: Next.js (recomendado) vs manter estático + API (não recomendado para dashboard).
 3. **MVP exato**: quais telas primeiro (Inbox vs Kanban vs Conexões).
-
+4. **Outbound vs Inbound**: política de consentimento e limites por chip.
+5. **Enrichment providers**: quais conectores (B2B + nacional) entram primeiro.
+6. **Scraping**: permitido? (fontes, escopo, throttling, auditoria).
