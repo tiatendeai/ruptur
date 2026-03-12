@@ -188,6 +188,19 @@ ruptur/
 
 > Plano operacional detalhado: `docs/jornada/proximos_passos_fase1.md`.
 
+## 10.1) Princípios de priorização (aprendizados de vídeos)
+
+Para a Fase 1, a prioridade do Ruptur é reduzir **tempo de resposta** e **tempo até o próximo passo** (o “dinheiro espera” quando o lead está pronto e ninguém responde).
+
+Frameworks práticos para decidir o que automatizar primeiro:
+
+- **Automate proven processes only**: automatizar apenas processos que já funcionam (não usar IA para “criar demanda”).
+- **WAIT**: mapear a jornada, auditar atrasos, estimar impacto, e automatizar o que se repete como uma receita.
+- **Filtro de oportunidade**: já existe dinheiro fluindo? há gargalo humano? velocidade aumenta o resultado?
+- **Agentes especialistas**: preferir agentes por função (ex.: qualificação, agenda, follow-up) em vez de um “assistente genérico”.
+
+Resumo e aplicação no Ruptur: `docs/jornada/aprendizados_videos.md`.
+
 ## 11) Roadmap
 
 ### Fase 1 — Ruptur Core
