@@ -31,6 +31,14 @@ O MVP está pronto quando, de ponta a ponta:
 - existe uma rotina de follow-up para contatos sem resposta;
 - existe uma visão simples de pipeline por estágio.
 
+## Princípios de priorização (aprendizados de vídeos)
+
+- Priorizar “onde o dinheiro espera”: reduzir **tempo de resposta** e gargalos humanos no meio do funil (speed-to-lead).
+- Automatizar apenas o que já é repetível e comprovado (processo que funciona “como receita”).
+- Usar o framework **WAIT** para escolher o que entra primeiro no backlog (mapa → atrasos → impacto → repetição).
+
+Detalhe e aplicação no Ruptur: `docs/jornada/aprendizados_videos.md`.
+
 ## Backlog priorizado
 
 ## Sprint 0 — Fundamentos
