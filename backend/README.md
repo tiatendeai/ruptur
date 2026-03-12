@@ -22,6 +22,7 @@ Healthcheck: `GET http://localhost:8000/health`
 
 Webhook (uazapi): `POST http://localhost:8000/webhook/uazapi`
 Enviar texto (via uazapi): `POST http://localhost:8000/send/text`
+Próximo passo (heurístico): `POST http://localhost:8000/actions/next-step`
 
 ## Subir Postgres local (opcional)
 
@@ -45,4 +46,20 @@ Para enviar mensagens via uazapi, configure:
 ```bash
 RUPTUR_UAZAPI_BASE_URL=https://free.uazapi.com
 RUPTUR_UAZAPI_TOKEN=...
+```
+
+## Follow-up (Sprint 2)
+
+Lista (dry-run):
+
+```bash
+cd backend
+python -m app.jobs.followup --hours 24 --limit 50
+```
+
+Enviar follow-up (cuidado com volume):
+
+```bash
+cd backend
+python -m app.jobs.followup --hours 24 --limit 50 --send
 ```
