@@ -25,6 +25,13 @@ const logger = pino({ level: logLevel });
 
 const instances = new Map(); // instanceId -> {id, authDir, socket, lastConnection, lastQr, startPromise}
 
+process.on("unhandledRejection", (reason) => {
+  logger.error({ reason }, "Unhandled promise rejection");
+});
+process.on("uncaughtException", (err) => {
+  logger.error({ err }, "Uncaught exception");
+});
+
 const jobs = new Map(); // jobId -> {status,total,sent,failed,createdAt,startedAt,finishedAt,errors}
 let bulkQueue = []; // [{jobId, instanceId, jid, text}]
 let bulkWorkerRunning = false;
@@ -97,6 +104,15 @@ function randomDelayMs(minMs, maxMs) {
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+async function waitForOpen(inst, timeoutMs = 15000) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    if (inst.lastConnection?.connection === "open") return true;
+    await sleep(250);
+  }
+  return inst.lastConnection?.connection === "open";
 }
 
 async function runBulkWorker() {
@@ -269,6 +285,7 @@ app.post("/send/presence", async (req, res) => {
   if (!presence) return res.status(400).json({ ok: false, error: "presence_required" });
   const inst = await ensureStarted(instanceId);
   if (!inst.socket) return res.status(503).json({ ok: false, error: "not_ready" });
+  if (!(await waitForOpen(inst))) return res.status(503).json({ ok: false, error: "not_connected" });
 
   const jid = normalizeRecipient(number);
   if (!jid) return res.status(400).json({ ok: false, error: "number_invalid" });
@@ -315,6 +332,7 @@ app.post("/send/text", async (req, res) => {
   if (!text) return res.status(400).json({ ok: false, error: "text_required" });
   const inst = await ensureStarted(instanceId);
   if (!inst.socket) return res.status(503).json({ ok: false, error: "not_ready" });
+  if (!(await waitForOpen(inst))) return res.status(503).json({ ok: false, error: "not_connected" });
 
   try {
     const jid = normalizeRecipient(to);
@@ -403,49 +421,80 @@ app.post("/send/menu", async (req, res) => {
   if (type !== "button") return res.status(400).json({ ok: false, error: "type_not_supported" });
 
   // Expect choices like: "Label|https://..." or "Label|url:https://..."
-  const buttons = choicesRaw
+  const parsedChoices = choicesRaw
     .map((c) => String(c || "").trim())
     .filter(Boolean)
-    .map((c, idx) => {
+    .map((c) => {
       const [label, right] = c.split("|", 2).map((s) => (s || "").trim());
       let url = right || "";
       if (url.toLowerCase().startsWith("url:")) url = url.slice(4).trim();
       if (!label || !/^https?:\/\//i.test(url)) return null;
-      return {
-        name: "cta_url",
-        buttonParamsJson: JSON.stringify({
-          id: `cta_${idx + 1}`,
-          display_text: label,
-          url,
-          disabled: false,
-        }),
-      };
+      return { label, url };
     })
     .filter(Boolean);
 
-  if (!buttons.length) return res.status(400).json({ ok: false, error: "no_valid_buttons" });
+  if (!parsedChoices.length) return res.status(400).json({ ok: false, error: "no_valid_buttons" });
+
+  const buttons = parsedChoices.map((c, idx) => ({
+    name: "cta_url",
+    buttonParamsJson: JSON.stringify({
+      id: `cta_${idx + 1}`,
+      display_text: c.label,
+      url: c.url,
+      disabled: false,
+    }),
+  }));
+
+  const fallbackUrl = parsedChoices[0]?.url;
+  const bodyText = fallbackUrl ? `${text}\n\n${fallbackUrl}` : text;
 
   try {
+    if (!(await waitForOpen(inst))) return res.status(503).json({ ok: false, error: "not_connected" });
     // NativeFlowMessage (closest to what uazapi sends).
-    const content = proto.Message.fromObject({
-      viewOnceMessage: {
-        message: {
-          interactiveMessage: {
-            body: { text },
-            footer: footerText ? { text: footerText } : undefined,
-            nativeFlowMessage: { buttons },
+    // Some clients only render when wrapped in viewOnceMessage; others may accept direct interactiveMessage.
+    const candidates = [
+      proto.Message.fromObject({
+        viewOnceMessage: {
+          message: {
+            interactiveMessage: {
+              body: { text: bodyText },
+              footer: footerText ? { text: footerText } : undefined,
+              nativeFlowMessage: { buttons },
+            },
           },
         },
-      },
-    });
+      }),
+      proto.Message.fromObject({
+        interactiveMessage: {
+          body: { text: bodyText },
+          footer: footerText ? { text: footerText } : undefined,
+          nativeFlowMessage: { buttons },
+        },
+      }),
+    ];
 
-    const msg = generateWAMessageFromContent(jid, content, { userJid: inst.socket.user?.id });
-    await inst.socket.relayMessage(jid, msg.message, { messageId: msg.key.id });
-    return res.json({ ok: true, instance: inst.id, result: msg, format: "nativeFlowMessage.cta_url" });
+    let lastErr = null;
+    for (const content of candidates) {
+      try {
+        const msg = generateWAMessageFromContent(jid, content, { userJid: inst.socket.user?.id });
+        await inst.socket.relayMessage(jid, msg.message, { messageId: msg.key.id });
+        return res.json({
+          ok: true,
+          instance: inst.id,
+          result: msg,
+          format: "nativeFlowMessage.cta_url",
+          note: "If the client still doesn't render a button, it should at least show a clickable URL in the text.",
+        });
+      } catch (err) {
+        lastErr = err;
+      }
+    }
+
+    throw lastErr || new Error("nativeflow_send_failed");
   } catch (err) {
     logger.error({ err }, "Falha ao enviar menu/button (nativeFlow)");
     // Fallback: send as plain text with URLs
-    const fallback = `${text}\n\n${choicesRaw.map((c) => String(c)).join("\n")}`;
+    const fallback = `${bodyText}\n\n${choicesRaw.map((c) => String(c)).join("\n")}`;
     const r = await inst.socket.sendMessage(jid, { text: fallback });
     return res.json({ ok: true, instance: inst.id, result: r, format: "fallback_text" });
   }
@@ -466,6 +515,7 @@ app.post("/send/media", async (req, res) => {
   if (!decoded) return res.status(400).json({ ok: false, error: "file_invalid" });
   const inst = await ensureStarted(instanceId);
   if (!inst.socket) return res.status(503).json({ ok: false, error: "not_ready" });
+  if (!(await waitForOpen(inst))) return res.status(503).json({ ok: false, error: "not_connected" });
 
   const jid = normalizeRecipient(to);
   if (!jid) return res.status(400).json({ ok: false, error: "to_invalid" });
@@ -516,6 +566,7 @@ app.post("/send/button-url", async (req, res) => {
   if (!url || !/^https?:\/\//i.test(url)) return res.status(400).json({ ok: false, error: "url_invalid" });
   const inst = await ensureStarted(instanceId);
   if (!inst.socket) return res.status(503).json({ ok: false, error: "not_ready" });
+  if (!(await waitForOpen(inst))) return res.status(503).json({ ok: false, error: "not_connected" });
 
   const jid = normalizeRecipient(to);
   if (!jid) return res.status(400).json({ ok: false, error: "to_invalid" });
@@ -578,6 +629,7 @@ app.post("/status/text", async (req, res) => {
   if (!text) return res.status(400).json({ ok: false, error: "text_required" });
   const inst = await ensureStarted(instanceId);
   if (!inst.socket) return res.status(503).json({ ok: false, error: "not_ready" });
+  if (!(await waitForOpen(inst))) return res.status(503).json({ ok: false, error: "not_connected" });
 
   try {
     const statusJidList = audience.length
@@ -607,6 +659,7 @@ app.post("/send/status", async (req, res) => {
   if (!type) return res.status(400).json({ ok: false, error: "type_required" });
   const inst = await ensureStarted(instanceId);
   if (!inst.socket) return res.status(503).json({ ok: false, error: "not_ready" });
+  if (!(await waitForOpen(inst))) return res.status(503).json({ ok: false, error: "not_connected" });
 
   try {
     if (type === "text") {
@@ -631,6 +684,7 @@ app.post("/chat/check", async (req, res) => {
   const instanceId = getInstanceId(req);
   const inst = await ensureStarted(instanceId);
   if (!inst.socket) return res.status(503).json({ ok: false, error: "not_ready" });
+  if (!(await waitForOpen(inst))) return res.status(503).json({ ok: false, error: "not_connected" });
   const numbers = Array.isArray(req.body?.numbers) ? req.body.numbers : null;
   if (!numbers) return res.status(400).json({ ok: false, error: "numbers_required" });
 
