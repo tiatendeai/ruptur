@@ -15,6 +15,8 @@ class Settings(BaseSettings):
 
     database_url: str | None = Field(default=None, alias="RUPTUR_DATABASE_URL")
 
+    uazapi_base_url: str | None = Field(default=None, alias="RUPTUR_UAZAPI_BASE_URL")
+    uazapi_token: str | None = Field(default=None, alias="RUPTUR_UAZAPI_TOKEN")
+
 
 settings = Settings()
-
