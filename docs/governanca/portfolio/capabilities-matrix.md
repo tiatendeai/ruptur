@@ -24,7 +24,7 @@ Legenda:
 
 ## Interativos (botões/menus)
 
-- Botão com link “renderizado”: UAZAPI ✅ | Baileys ⚠️ (varia por cliente)
+- Botão com link “renderizado”: UAZAPI ✅ | Baileys ⚠️ (no Baileys puro costuma “virar texto”; melhora muito usando `nativeFlowMessage` + helper que injeta nodes)
 - Fallback garantido (link clicável no texto): UAZAPI ✅ | Baileys ✅ (deve sempre enviar URL no corpo)
 
 ## IA (opcional)
@@ -39,4 +39,3 @@ Legenda:
 2) Se a feature é “interativo” e precisa renderização perfeita:
    - preferir UAZAPI
    - em Baileys, enviar interativo + URL no texto como fallback
-
