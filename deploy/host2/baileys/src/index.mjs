@@ -450,11 +450,14 @@ app.post("/jobs/:id/cancel", (req, res) => {
 
 app.post("/send/menu", async (req, res) => {
   const instanceId = getInstanceId(req);
-  // Minimal compatibility with uazapi `/send/menu` (type=button).
+  // Compatibility with uazapi `/send/menu` for:
+  // - type=button: quick reply, url, call, copy
+  // - type=list: sections/rows (single select)
   const number = String(req.body?.number || "").trim();
   const type = String(req.body?.type || "").trim();
   const text = String(req.body?.text || "").trim();
   const footerText = String(req.body?.footerText || "").trim();
+  const listButton = String(req.body?.listButton || "").trim();
   const choicesRaw = Array.isArray(req.body?.choices) ? req.body.choices : [];
 
   if (!number || /\s/.test(number)) return res.status(400).json({ ok: false, error: "number_invalid" });
@@ -466,103 +469,227 @@ app.post("/send/menu", async (req, res) => {
   const jid = await resolveJid(inst, number);
   if (!jid) return res.status(400).json({ ok: false, error: "number_invalid" });
 
-  if (type !== "button") return res.status(400).json({ ok: false, error: "type_not_supported" });
-
-  // Expect choices like: "Label|https://..." or "Label|url:https://..."
-  const parsedChoices = choicesRaw
-    .map((c) => String(c || "").trim())
-    .filter(Boolean)
-    .map((c) => {
-      const [label, right] = c.split("|", 2).map((s) => (s || "").trim());
-      let url = right || "";
-      if (url.toLowerCase().startsWith("url:")) url = url.slice(4).trim();
-      if (!label || !/^https?:\/\//i.test(url)) return null;
-      return { label, url };
-    })
-    .filter(Boolean);
-
-  if (!parsedChoices.length) return res.status(400).json({ ok: false, error: "no_valid_buttons" });
-
-  const buttons = parsedChoices.map((c, idx) => ({
-    name: "cta_url",
-    buttonParamsJson: JSON.stringify({
-      id: `cta_${idx + 1}`,
-      display_text: c.label,
-      url: c.url,
-      merchant_url: c.url,
-      disabled: false,
-    }),
-  }));
-
-  const fallbackUrl = parsedChoices[0]?.url;
-  const bodyText = fallbackUrl ? `${text}\n\n${fallbackUrl}` : text;
+  const choiceStrings = choicesRaw.map((c) => String(c || "").trim()).filter(Boolean);
+  if (!choiceStrings.length) return res.status(400).json({ ok: false, error: "choices_required" });
 
   try {
     if (!(await waitForOpen(inst))) return res.status(503).json({ ok: false, error: "not_connected" });
 
-    // Preferred path: baileys_helper (adds required nodes for better button rendering).
-    if (baileysHelper?.sendInteractiveMessage) {
-      const interactiveMessage = {
-        body: { text: bodyText },
-        footer: footerText ? { text: footerText } : undefined,
-        nativeFlowMessage: { buttons },
-      };
-      const r = await baileysHelper.sendInteractiveMessage(inst.socket, jid, { interactiveMessage });
-      return res.json({
-        ok: true,
-        instance: inst.id,
-        result: r,
-        format: "nativeFlowMessage.cta_url",
-        transport: "baileys_helper.sendInteractiveMessage",
-        note: "If the client still doesn't render a button, the URL is included in the message body as fallback.",
-      });
-    }
+    if (type === "button") {
+      const parsed = choiceStrings
+        .map((c) => {
+          const [labelRaw, rightRaw] = c.split("|", 2);
+          const label = String(labelRaw || "").trim();
+          const right = String(rightRaw || "").trim();
+          if (!label) return null;
 
-    // Fallback: NativeFlowMessage manual (legacy).
-    const candidates = [
-      proto.Message.fromObject({
-        viewOnceMessage: {
-          message: {
-            interactiveMessage: {
-              body: { text: bodyText },
-              footer: footerText ? { text: footerText } : undefined,
-              nativeFlowMessage: { buttons },
-            },
-          },
-        },
-      }),
-      proto.Message.fromObject({
-        interactiveMessage: {
+          if (!right) return { kind: "quick_reply", label, id: label };
+
+          const lower = right.toLowerCase();
+          if (lower.startsWith("url:")) {
+            const url = right.slice(4).trim();
+            if (!/^https?:\/\//i.test(url)) return null;
+            return { kind: "cta_url", label, url };
+          }
+          if (/^https?:\/\//i.test(right)) return { kind: "cta_url", label, url: right };
+          if (lower.startsWith("call:")) {
+            const phone = right.slice(5).trim();
+            if (!phone) return null;
+            return { kind: "cta_call", label, phone };
+          }
+          if (lower.startsWith("copy:")) {
+            const code = right.slice(5).trim();
+            if (!code) return null;
+            return { kind: "cta_copy", label, code };
+          }
+          return { kind: "quick_reply", label, id: right || label };
+        })
+        .filter(Boolean);
+
+      if (!parsed.length) return res.status(400).json({ ok: false, error: "no_valid_buttons" });
+
+      const firstUrl = parsed.find((p) => p.kind === "cta_url")?.url;
+      const bodyText = firstUrl ? `${text}\n\n${firstUrl}` : text;
+
+      const buttons = parsed.map((p, idx) => {
+        if (p.kind === "cta_url") {
+          return {
+            name: "cta_url",
+            buttonParamsJson: JSON.stringify({
+              id: `cta_${idx + 1}`,
+              display_text: p.label,
+              url: p.url,
+              merchant_url: p.url,
+              disabled: false,
+            }),
+          };
+        }
+        if (p.kind === "cta_call") {
+          return {
+            name: "cta_call",
+            buttonParamsJson: JSON.stringify({
+              id: `call_${idx + 1}`,
+              display_text: p.label,
+              phone_number: p.phone,
+              disabled: false,
+            }),
+          };
+        }
+        if (p.kind === "cta_copy") {
+          return {
+            name: "cta_copy",
+            buttonParamsJson: JSON.stringify({
+              id: `copy_${idx + 1}`,
+              display_text: p.label,
+              copy_code: p.code,
+              disabled: false,
+            }),
+          };
+        }
+        return {
+          name: "quick_reply",
+          buttonParamsJson: JSON.stringify({
+            display_text: p.label,
+            id: p.id,
+            disabled: false,
+          }),
+        };
+      });
+
+      if (baileysHelper?.sendInteractiveMessage) {
+        const interactiveMessage = {
           body: { text: bodyText },
           footer: footerText ? { text: footerText } : undefined,
           nativeFlowMessage: { buttons },
-        },
-      }),
-    ];
-
-    let lastErr = null;
-    for (const content of candidates) {
-      try {
-        const msg = generateWAMessageFromContent(jid, content, { userJid: inst.socket.user?.id });
-        await inst.socket.relayMessage(jid, msg.message, { messageId: msg.key.id });
+        };
+        const r = await baileysHelper.sendInteractiveMessage(inst.socket, jid, { interactiveMessage });
         return res.json({
           ok: true,
           instance: inst.id,
-          result: msg,
-          format: "nativeFlowMessage.cta_url",
-          transport: "legacy.generateWAMessageFromContent",
-          note: "If the client still doesn't render a button, the URL is included in the message body as fallback.",
+          result: r,
+          format: "nativeFlowMessage.buttons",
+          transport: "baileys_helper.sendInteractiveMessage",
+          note:
+            firstUrl ? "URL included in the body as fallback for clients that don't render URL buttons." : undefined,
         });
-      } catch (err) {
-        lastErr = err;
       }
+
+      const candidates = [
+        proto.Message.fromObject({
+          viewOnceMessage: {
+            message: {
+              interactiveMessage: {
+                body: { text: bodyText },
+                footer: footerText ? { text: footerText } : undefined,
+                nativeFlowMessage: { buttons },
+              },
+            },
+          },
+        }),
+        proto.Message.fromObject({
+          interactiveMessage: {
+            body: { text: bodyText },
+            footer: footerText ? { text: footerText } : undefined,
+            nativeFlowMessage: { buttons },
+          },
+        }),
+      ];
+
+      let lastErr = null;
+      for (const content of candidates) {
+        try {
+          const msg = generateWAMessageFromContent(jid, content, { userJid: inst.socket.user?.id });
+          await inst.socket.relayMessage(jid, msg.message, { messageId: msg.key.id });
+          return res.json({
+            ok: true,
+            instance: inst.id,
+            result: msg,
+            format: "nativeFlowMessage.buttons",
+            transport: "legacy.generateWAMessageFromContent",
+            note: firstUrl ? "URL included in the body as fallback for clients that don't render URL buttons." : undefined,
+          });
+        } catch (err) {
+          lastErr = err;
+        }
+      }
+
+      throw lastErr || new Error("nativeflow_send_failed");
     }
 
-    throw lastErr || new Error("nativeflow_send_failed");
+    if (type === "list") {
+      if (!listButton) return res.status(400).json({ ok: false, error: "listButton_required" });
+
+      const sections = [];
+      let current = { title: "Opções", rows: [] };
+      for (const c of choiceStrings) {
+        const isSection = c.startsWith("[") && c.endsWith("]") && c.length >= 3;
+        if (isSection) {
+          if (current.rows.length) sections.push(current);
+          current = { title: c.slice(1, -1).trim() || "Opções", rows: [] };
+          continue;
+        }
+        const [titleRaw, idRaw, descRaw] = c.split("|", 3);
+        const title = String(titleRaw || "").trim();
+        const id = String(idRaw || "").trim() || title;
+        const description = String(descRaw || "").trim();
+        if (!title) continue;
+        current.rows.push({ id, title, description: description || undefined });
+      }
+      if (current.rows.length) sections.push(current);
+      if (!sections.length) return res.status(400).json({ ok: false, error: "no_valid_rows" });
+
+      if (baileysHelper?.sendInteractiveMessage) {
+        const buttons = [
+          {
+            name: "single_select",
+            buttonParamsJson: JSON.stringify({
+              title: listButton,
+              sections: sections.map((s) => ({
+                title: s.title,
+                rows: s.rows.map((r) => ({
+                  id: r.id,
+                  title: r.title,
+                  description: r.description,
+                })),
+              })),
+            }),
+          },
+        ];
+        const interactiveMessage = {
+          body: { text },
+          footer: footerText ? { text: footerText } : undefined,
+          nativeFlowMessage: { buttons },
+        };
+        const r = await baileysHelper.sendInteractiveMessage(inst.socket, jid, { interactiveMessage });
+        return res.json({
+          ok: true,
+          instance: inst.id,
+          result: r,
+          format: "nativeFlowMessage.single_select",
+          transport: "baileys_helper.sendInteractiveMessage",
+        });
+      }
+
+      const r = await inst.socket.sendMessage(jid, {
+        text,
+        footer: footerText || undefined,
+        buttonText: listButton,
+        sections: sections.map((s) => ({
+          title: s.title,
+          rows: s.rows.map((row) => ({
+            title: row.title,
+            rowId: row.id,
+            description: row.description,
+          })),
+        })),
+      });
+      return res.json({ ok: true, instance: inst.id, result: r, format: "listMessage" });
+    }
+
+    return res.status(400).json({ ok: false, error: "type_not_supported" });
   } catch (err) {
-    logger.error({ err }, "Falha ao enviar menu/button (nativeFlow)");
-    // Fallback: send as plain text with URLs
-    const fallback = `${bodyText}\n\n${choicesRaw.map((c) => String(c)).join("\n")}`;
+    logger.error({ err }, "Falha ao enviar menu (interactive)");
+    const fallback = `${text}\n\n${choiceStrings.join("\n")}`;
     const r = await inst.socket.sendMessage(jid, { text: fallback });
     return res.json({ ok: true, instance: inst.id, result: r, format: "fallback_text" });
   }
