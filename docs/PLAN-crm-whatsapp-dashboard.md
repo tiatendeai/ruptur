@@ -17,6 +17,7 @@ Construir a camada **Dashboard + CRM + Operação de WhatsApp** do Ruptur, com f
 - **Enriquecimento de leads** (fontes externas + dados nacionais)
 - **Web scraping / MCP / A2A** (capabilities adicionais via ferramentas)
 - **Governança** (POPs, runbooks, assets portfolio) para replicação
+- **Receita Previsível na prática**: motions SDR/BDR/híbrido, inbound+outbound, remarketing, ativação e reativação
 
 Diretriz do projeto: **usar o que já existe (UAZAPI) e apenas orquestrar gaps**. Baileys é contingência/expansão.
 
@@ -43,6 +44,22 @@ O Ruptur precisa suportar muitos chips/instâncias.
 ### 1.3 Dados sensíveis
 
 Chaves/token devem ficar em `.env` / secrets manager (nunca em git).
+
+### 1.4 Não engessar o modelo (SDR/BDR/híbrido)
+
+No dia a dia, inbound e outbound coexistem. O Ruptur deve suportar:
+
+- **Inbound SDR** (responder leads que chegaram)
+- **Outbound BDR** (prospectar e reativar)
+- **Híbrido** (mesma equipe/instância alternando motions)
+
+Estratégia: modelar “motion” como **configuração**, não como código fixo.
+
+### 1.5 Multi‑canal (futuro)
+
+WhatsApp é o foco, mas o core deve aceitar outros canais (email, Instagram, webchat) sem reescrever CRM.
+
+Estratégia: eventos e conversas com `channel` e “provider adapters”.
 
 ## 2) Escopo (MVP e depois)
 
@@ -78,6 +95,8 @@ Chaves/token devem ficar em `.env` / secrets manager (nunca em git).
 - Construtor de fluxo (visual ou YAML) para SDR/marketing/CS.
 - Enriquecimento de leads (Lusha/Apollo-like + provedores nacionais) com cache e auditoria.
 - Web scraper service (Playwright) como ferramenta opcional via MCP + filas.
+- Webhooks + remarketing + reativação (gatilhos por evento/tempo).
+- “Motions” configuráveis (SDR inbound, BDR outbound, reativação, pós-venda).
 
 ## 3) Arquitetura (alto nível)
 
@@ -92,6 +111,20 @@ Chaves/token devem ficar em `.env` / secrets manager (nunca em git).
 - **Flow Runtime**: engine de fluxos (gatilhos → ações) com fila e idempotência.
 - **Enrichment Connectors**: provedores externos (B2B e dados nacionais) com rate-limit/cache.
 - **Scraper/MCP Tools**: serviços opcionais (scraping, search, browser) chamados via A2A/MCP.
+- **Webhook Router**: camada unificada para receber webhooks multicanal e normalizar em eventos internos.
+- **Queue/Workers**: execução de cadências, reativação, enrichment e scraping (Redis opcional).
+
+### 3.3 Event model (C‑ready)
+
+Mesmo em A (backend-first), tratar o sistema como “event-friendly”:
+
+- `message_in`, `message_out`
+- `lead_created`, `lead_updated`
+- `stage_changed`
+- `opt_in_received`, `opt_out_received`
+- `campaign_enqueued`, `campaign_sent`, `campaign_failed`
+- `hand_raise` (levantada de mão)
+- `channel_health_updated`
 
 ### 3.2 Modelo multi‑tenant (proposta)
 
@@ -129,6 +162,7 @@ Menu principal (v1):
 - **Grupos**
 - **Sendflow** (grupos/comunidades + opt-in + conectores tipo ManyChat)
 - **Configurações** (estágios, tags, usuários)
+- **Webhooks** (integrações e saúde)
 
 ## 5) Plano de execução (tarefas verificáveis)
 
@@ -158,6 +192,11 @@ Menu principal (v1):
 - INPUT: canais (grupos/comunidades, ManyChat, formulários, landing)
 - OUTPUT: modelo de dados e fluxo “lead com consentimento” (origem, prova, opt-out)
 - VERIFY: doc `docs/research/sendflow-spec.md`
+
+**A6. Motions Receita Previsível**
+- INPUT: segmento(s), ICP, oferta, regras de opt-in, limites por chip
+- OUTPUT: catálogo de motions (inbound SDR, outbound BDR, reativação, remarketing) + KPIs
+- VERIFY: doc `docs/jornada/receita-previsivel-motions.md`
 
 ### Fase B — Dados (Supabase)
 
@@ -191,6 +230,14 @@ Menu principal (v1):
 **C6. Sendflow**
 - OUTPUT: entidades `sendflow_sources` + `opt_in_events` + endpoints (listar, registrar opt-in, tags)
 - VERIFY: import de lead via webhook ManyChat (opt-in) aparece no Inbox/CRM
+
+**C7. Webhook Router (multi-canal)**
+- OUTPUT: endpoint(s) genéricos para receber webhooks (com assinatura/secret), normalizar e persistir
+- VERIFY: registrar 2 provedores (ex.: UAZAPI + ManyChat) e ver eventos entrando
+
+**C8. Remarketing / ativação / reativação**
+- OUTPUT: scheduler/worker para cadências por tempo (sem resposta em X, reativar em Y dias, etc.)
+- VERIFY: regras configuráveis disparam e geram `campaign_targets`
 
 ### Fase D — Frontend (Dashboard)
 
@@ -245,6 +292,7 @@ Menu principal (v1):
 
 **F1. POPs e runbooks**
 - POP: “Conectar instância”, “Disparos com warmup”, “Interativos (botões/lista)”
+- POP: “Motions SDR/BDR”, “Opt-in/Opt-out”, “Remarketing/Reativação”, “Webhooks”
 - VERIFY: docs em `docs/governanca/pops/` e `docs/governanca/runbooks/`
 
 ## 6) Agentes do kit (.agent) e responsabilidades
@@ -266,3 +314,5 @@ Menu principal (v1):
 4. **Outbound vs Inbound**: política de consentimento e limites por chip.
 5. **Enrichment providers**: quais conectores (B2B + nacional) entram primeiro.
 6. **Scraping**: permitido? (fontes, escopo, throttling, auditoria).
+7. **Infra alvo**: Vercel (web), Render (workers/cron) vs VPS (Swarm) vs híbrido.
+8. **Redis**: usar (Upstash/Redis Cloud) para filas e rate-limit ou manter fila no Postgres no MVP.
