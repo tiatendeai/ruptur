@@ -5,12 +5,12 @@ Branch alvo: `work`
 
 ## 0) Objetivo
 
-Construir a camada **Dashboard + CRM + Operação de WhatsApp** do Ruptur, com foco em:
+Construir a camada **Dashboard + CRM + Operação de canais** do Ruptur, com foco em:
 
 - **Inbox** (bate‑papo ao vivo / timeline)
 - **CRM Kanban** (pipeline por estágios)
 - **Disparos** (broadcast/campanhas) com warmup/delay
-- **Conexões** (multi‑instâncias UAZAPI nativas + Baileys contingência)
+- **Conexões** (multi‑instâncias no canal primário + contingência)
 - **Templates/treinamento** (base de conhecimento e playbooks)
 - **Agentes de IA (SDR)** (qualificação, follow-up, handoff humano)
 - **Construtor de fluxo** (orquestração de automações)
@@ -19,7 +19,7 @@ Construir a camada **Dashboard + CRM + Operação de WhatsApp** do Ruptur, com f
 - **Governança** (POPs, runbooks, assets portfolio) para replicação
 - **Receita Previsível na prática**: motions SDR/BDR/híbrido, inbound+outbound, remarketing, ativação e reativação
 
-Diretriz do projeto: **usar o que já existe (UAZAPI) e apenas orquestrar gaps**. Baileys é contingência/expansão.
+Diretriz do projeto: **usar o que já existe no canal primário** e apenas orquestrar gaps. Contingência entra para redundância/expansão.
 
 ## 1) Contexto & restrições
 
@@ -33,8 +33,8 @@ Checkpoint: garantir que **todo o UI/UX** e o conteúdo publicado são do Ruptur
 
 O Ruptur precisa suportar muitos chips/instâncias.
 
-- UAZAPI: usar **controle nativo** (listar/criar/conectar/status) via admin token.
-- Baileys: manter camada multi‑instância existente, apenas estender para suportar features necessárias.
+- Canal primário: usar **controle nativo** (listar/criar/conectar/status).
+- Canal contingência: manter camada multi‑instância existente, apenas estender para suportar features necessárias.
 
 ### 1.3 Dados sensíveis
 
@@ -61,8 +61,8 @@ Estratégia: eventos e conversas com `channel` e “provider adapters”.
 ### 2.1 MVP (entrega 1)
 
 **Conexões**
-- Tela para listar instâncias UAZAPI (status + número) e abrir QR quando `connecting`.
-- Tela para listar instâncias Baileys e conectar por QR quando necessário.
+- Tela para listar conexões do canal primário (status + número) e abrir QR quando `connecting`.
+- Tela para listar conexões do canal contingência e conectar por QR quando necessário.
 
 **Inbox**
 - Lista de conversas + timeline de mensagens por contato (paginado).
@@ -76,8 +76,8 @@ Estratégia: eventos e conversas com `channel` e “provider adapters”.
 **Disparos (básico)**
 - Criar campanha com template (texto/URL).
 - Selecionar audiência (tags/estágio) e enviar com delay.
-- Para UAZAPI: preferir delay/warmup **nativo** (se disponível).
-- Para Baileys: usar fila/delay já existente (bulk worker).
+- Preferir delay/warmup **nativo** (se disponível) no canal primário.
+- No canal contingência: usar fila/delay já existente (bulk worker).
 
 ### 2.2 Próximas entregas (entrega 2+)
 
@@ -98,10 +98,10 @@ Estratégia: eventos e conversas com `channel` e “provider adapters”.
 ### 3.1 Componentes
 
 - **Frontend Web (Dashboard)**: app web (recomendado: Next.js) com autenticação e UI do CRM.
-- **Ruptur Backend (FastAPI)**: API de orquestração (UAZAPI/Baileys) + endpoints do CRM.
+- **Ruptur Backend (FastAPI)**: API de orquestração (canais) + endpoints do CRM.
 - **Supabase (Postgres + Auth + Storage)**: dados multi‑tenant, RLS, storage de mídia/arquivos.
-- **UAZAPI (primário)**: envio, instâncias, webhooks.
-- **Baileys (contingência)**: envio, interativos, transcrição (Whisper local).
+- **Canal primário**: envio, instâncias, webhooks.
+- **Canal contingência**: envio, interativos, transcrição (Whisper local).
 - **Agent Runtime (SDR)**: execução de agentes (tools, memória, policies, avaliação) — inicialmente no backend.
 - **Flow Runtime**: engine de fluxos (gatilhos → ações) com fila e idempotência.
 - **Enrichment Connectors**: provedores externos (B2B e dados nacionais) com rate-limit/cache.
@@ -127,7 +127,7 @@ Tabelas com `tenant_id` e RLS no Supabase.
 
 - `tenants`
 - `tenant_users` (papéis)
-- `wa_instances` (provider=uazapi|baileys, instance_id, status, phone)
+- `wa_instances` (provider interno, instance_id, status, phone)
 - `contacts` (leads)
 - `conversations`
 - `messages`
@@ -206,8 +206,8 @@ Menu principal (v1):
 - VERIFY: `curl` + testes unitários mínimos
 
 **C2. Webhook ingest**
-- UAZAPI webhook → persistir `message`, atualizar `conversation`, `contact.last_seen`
-- Baileys events → persistir via webhook interno
+- Webhook do canal primário → persistir `message`, atualizar `conversation`, `contact.last_seen`
+- Eventos do canal contingência → persistir via webhook interno
 - VERIFY: mensagem real entra no Inbox
 
 **C3. Agent Runtime (SDR)**
@@ -228,7 +228,7 @@ Menu principal (v1):
 
 **C7. Webhook Router (multi-canal)**
 - OUTPUT: endpoint(s) genéricos para receber webhooks (com assinatura/secret), normalizar e persistir
-- VERIFY: registrar 2 provedores (ex.: UAZAPI + ManyChat) e ver eventos entrando
+- VERIFY: registrar 2 provedores (ex.: canal primário + ManyChat) e ver eventos entrando
 
 **C8. Remarketing / ativação / reativação**
 - OUTPUT: scheduler/worker para cadências por tempo (sem resposta em X, reativar em Y dias, etc.)
@@ -273,13 +273,13 @@ Menu principal (v1):
 - UI para: fontes (grupos/comunidades/canais), entradas opt-in, status de sincronização
 - VERIFY: lead importado aparece e fica rastreável (origem/consentimento)
 
-### Fase E — Integrações (UAZAPI/Baileys)
+### Fase E — Integrações (canais)
 
-**E1. Conexões UAZAPI (nativo)**
+**E1. Conexões do canal primário (nativo)**
 - Listar instâncias, status, QR connect
 - VERIFY: conectar novo chip via dashboard
 
-**E2. Conexões Baileys**
+**E2. Conexões do canal contingência**
 - Listar instâncias + QR
 - VERIFY: conectar e enviar interativos
 

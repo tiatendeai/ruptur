@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Ruptur Console",
-  description: "Inbox, CRM e operação de WhatsApp (UAZAPI + Baileys)",
+  description: "Inbox, CRM e operação de canais",
 };
 
 export default function RootLayout({
@@ -61,7 +61,7 @@ export default function RootLayout({
                 </Link>
               </nav>
               <div className="mt-6 hidden text-xs text-zinc-500 md:block">
-                UAZAPI primário • Baileys contingência
+                Canal primário • canal contingência
               </div>
             </aside>
             <main className="col-span-12 bg-zinc-950 px-4 py-6 md:col-span-9 md:px-6">{children}</main>

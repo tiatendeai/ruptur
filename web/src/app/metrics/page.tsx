@@ -63,7 +63,7 @@ export default function MetricsPage() {
               channels.map((c) => (
                 <div key={`${c.provider}:${c.instance_id}`} className="flex items-center justify-between gap-2">
                   <div className="truncate">
-                    {c.provider}:{c.instance_id} <span className="text-zinc-400">({c.status})</span>
+                    {c.instance_id} <span className="text-zinc-400">({c.status})</span>
                   </div>
                   <div className="rounded bg-white/10 px-2 py-0.5">{c.score}</div>
                 </div>
@@ -77,4 +77,3 @@ export default function MetricsPage() {
     </div>
   );
 }
-
