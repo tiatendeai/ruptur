@@ -31,7 +31,7 @@ def list_leadscores(limit: int = Query(default=50, ge=1, le=200)) -> dict[str, A
             rows = growth_repo.list_lead_scores(conn, limit=limit)
             return {"ok": True, "items": [LeadScore(**r.__dict__).model_dump() for r in rows]}
     except DatabaseNotConfiguredError:
-        raise HTTPException(status_code=503, detail="database_not_configured")
+        return {"ok": True, "items": [], "reason": "database_not_configured"}
 
 
 @router.post("/leadscores")
@@ -85,7 +85,7 @@ def list_channels_health(limit: int = Query(default=50, ge=1, le=200)) -> dict[s
             rows = growth_repo.list_channel_health(conn, limit=limit)
             return {"ok": True, "items": [ChannelHealth(**r.__dict__).model_dump() for r in rows]}
     except DatabaseNotConfiguredError:
-        raise HTTPException(status_code=503, detail="database_not_configured")
+        return {"ok": True, "items": [], "reason": "database_not_configured"}
 
 
 @router.post("/channels/health")
@@ -128,7 +128,7 @@ def list_campaigns(limit: int = Query(default=50, ge=1, le=200)) -> dict[str, An
             rows = growth_repo.list_campaigns(conn, limit=limit)
             return {"ok": True, "items": [Campaign(**r.__dict__).model_dump() for r in rows]}
     except DatabaseNotConfiguredError:
-        raise HTTPException(status_code=503, detail="database_not_configured")
+        return {"ok": True, "items": [], "reason": "database_not_configured"}
 
 
 @router.post("/campaigns")
@@ -171,7 +171,7 @@ def list_routing_rules(limit: int = Query(default=50, ge=1, le=200)) -> dict[str
             rows = growth_repo.list_routing_rules(conn, limit=limit)
             return {"ok": True, "items": [RoutingRule(**r.__dict__).model_dump() for r in rows]}
     except DatabaseNotConfiguredError:
-        raise HTTPException(status_code=503, detail="database_not_configured")
+        return {"ok": True, "items": [], "reason": "database_not_configured"}
 
 
 @router.post("/routing/rules")
@@ -190,4 +190,3 @@ def create_routing_rule(req: CreateRoutingRuleRequest) -> dict[str, Any]:
             return {"ok": True, "id": rule_id}
     except DatabaseNotConfiguredError:
         raise HTTPException(status_code=503, detail="database_not_configured")
-

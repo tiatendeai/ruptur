@@ -42,7 +42,7 @@ def list_stages() -> dict[str, Any]:
             stages = crm_repo.list_stages(conn)
             return {"ok": True, "stages": [Stage(**s.__dict__).model_dump() for s in stages]}
     except DatabaseNotConfiguredError:
-        raise HTTPException(status_code=503, detail="database_not_configured")
+        return {"ok": True, "stages": [], "reason": "database_not_configured"}
 
 
 @router.post("/stages")
@@ -98,7 +98,7 @@ def list_leads(
             leads = [Lead(**r.__dict__).model_dump() for r in rows]
             return {"ok": True, "leads": leads}
     except DatabaseNotConfiguredError:
-        raise HTTPException(status_code=503, detail="database_not_configured")
+        return {"ok": True, "leads": [], "reason": "database_not_configured"}
 
 
 class UpdateLeadRequest(BaseModel):
@@ -139,7 +139,7 @@ def list_messages(
             messages = [Message(**r.__dict__).model_dump() for r in rows]
             return {"ok": True, "messages": messages}
     except DatabaseNotConfiguredError:
-        raise HTTPException(status_code=503, detail="database_not_configured")
+        return {"ok": True, "messages": [], "reason": "database_not_configured"}
 
 
 class SendConversationTextRequest(BaseModel):

@@ -37,7 +37,7 @@ def list_sources(limit: int = Query(default=50, ge=1, le=200)) -> dict[str, Any]
             rows = sendflow_repo.list_sources(conn, limit=limit)
             return {"ok": True, "sources": [Source(**r.__dict__).model_dump() for r in rows]}
     except DatabaseNotConfiguredError:
-        raise HTTPException(status_code=503, detail="database_not_configured")
+        return {"ok": True, "sources": [], "reason": "database_not_configured"}
 
 
 @router.post("/sources")
@@ -91,4 +91,3 @@ def opt_in(req: OptInRequest) -> dict[str, Any]:
             return {"ok": True, "lead_id": lead_id, "opt_in_id": opt_in_id}
     except DatabaseNotConfiguredError:
         raise HTTPException(status_code=503, detail="database_not_configured")
-

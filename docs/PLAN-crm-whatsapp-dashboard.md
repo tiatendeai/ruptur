@@ -23,16 +23,11 @@ Diretriz do projeto: **usar o que já existe (UAZAPI) e apenas orquestrar gaps**
 
 ## 1) Contexto & restrições
 
-### 1.1 “Idêntico ao Front Zap”
+### 1.1 Referências externas (UI/branding)
 
-Requisito de *“idêntico e fidedigno”* (UI/fluxos) é **risco de copyright/branding**.
+Diretriz: implementar **em nossos termos** (Ruptur), evitando dependência de stacks/temas externos (ex.: WordPress/Elementor) e qualquer acoplamento a marca/identidade de terceiros.
 
-Plano assume:
-
-- Vamos entregar **paridade funcional** (mesmas “capabilities”), mas com **marca e UI próprias** do Ruptur.
-- O diretório `0WbsZjA4yKfY.br/` parece ser um export de site WordPress/Elementor (landing). Ele pode ser usado como **referência** ou como “base de landing” **somente se** o time tiver direito de uso.
-
-Checkpoint: confirmar **direito de uso** do conteúdo/ativos antes de publicar.
+Checkpoint: garantir que **todo o UI/UX** e o conteúdo publicado são do Ruptur (ou devidamente licenciados).
 
 ### 1.2 Multi‑tenant (obrigatório)
 
@@ -169,7 +164,7 @@ Menu principal (v1):
 ### Fase A — Descoberta + spec
 
 **A1. Auditoria do conteúdo “front”**
-- INPUT: `0WbsZjA4yKfY.br/`
+- INPUT: qualquer material de referência interno (screenshots, fluxos, copy)
 - OUTPUT: inventário (landing vs app), lista de assets reutilizáveis, riscos de licenciamento
 - VERIFY: doc `docs/research/frontzap-ui-inventory.md`
 
@@ -308,7 +303,7 @@ Menu principal (v1):
 
 ## 7) Checkpoints de aprovação (antes de codar pesado)
 
-1. **Direito de uso** do conteúdo/ativos do `0WbsZjA4yKfY.br/` (sim/não).
+1. **Licenciamento**: garantir que UI/copy/ativos publicados são do Ruptur (ou licenciados).
 2. **Stack do frontend**: Next.js (recomendado) vs manter estático + API (não recomendado para dashboard).
 3. **MVP exato**: quais telas primeiro (Inbox vs Kanban vs Conexões).
 4. **Outbound vs Inbound**: política de consentimento e limites por chip.
