@@ -5,6 +5,7 @@ __pycache__/
 
 # Audio samples (do not commit)
 *.opus
+/local/
 
 # Local env / venvs
 .env
