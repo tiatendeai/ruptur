@@ -5,6 +5,7 @@ import pino from "pino";
 import crypto from "node:crypto";
 import path from "node:path";
 import fs from "node:fs/promises";
+import { createRequire } from "node:module";
 
 import makeWASocket, {
   DisconnectReason,
@@ -24,6 +25,17 @@ const bulkMaxDelayMs = Number.parseInt(process.env.BAILEYS_BULK_MAX_DELAY_MS || 
 const logger = pino({ level: logLevel });
 
 const instances = new Map(); // instanceId -> {id, authDir, socket, lastConnection, lastQr, startPromise}
+
+const require = createRequire(import.meta.url);
+let baileysHelper = null;
+try {
+  // Optional dependency: improves interactive/button rendering by adding required nodes.
+  // If not installed, we keep our legacy implementations.
+  baileysHelper = require("baileys_helper");
+  logger.info("baileys_helper carregado (interactive/buttons helper).");
+} catch {
+  // ignore
+}
 
 process.on("unhandledRejection", (reason) => {
   logger.error({ reason }, "Unhandled promise rejection");
@@ -486,8 +498,26 @@ app.post("/send/menu", async (req, res) => {
 
   try {
     if (!(await waitForOpen(inst))) return res.status(503).json({ ok: false, error: "not_connected" });
-    // NativeFlowMessage (closest to what uazapi sends).
-    // Some clients only render when wrapped in viewOnceMessage; others may accept direct interactiveMessage.
+
+    // Preferred path: baileys_helper (adds required nodes for better button rendering).
+    if (baileysHelper?.sendInteractiveMessage) {
+      const interactiveMessage = {
+        body: { text: bodyText },
+        footer: footerText ? { text: footerText } : undefined,
+        nativeFlowMessage: { buttons },
+      };
+      const r = await baileysHelper.sendInteractiveMessage(inst.socket, jid, { interactiveMessage });
+      return res.json({
+        ok: true,
+        instance: inst.id,
+        result: r,
+        format: "nativeFlowMessage.cta_url",
+        transport: "baileys_helper.sendInteractiveMessage",
+        note: "If the client still doesn't render a button, the URL is included in the message body as fallback.",
+      });
+    }
+
+    // Fallback: NativeFlowMessage manual (legacy).
     const candidates = [
       proto.Message.fromObject({
         viewOnceMessage: {
@@ -519,7 +549,8 @@ app.post("/send/menu", async (req, res) => {
           instance: inst.id,
           result: msg,
           format: "nativeFlowMessage.cta_url",
-          note: "If the client still doesn't render a button, it should at least show a clickable URL in the text.",
+          transport: "legacy.generateWAMessageFromContent",
+          note: "If the client still doesn't render a button, the URL is included in the message body as fallback.",
         });
       } catch (err) {
         lastErr = err;
