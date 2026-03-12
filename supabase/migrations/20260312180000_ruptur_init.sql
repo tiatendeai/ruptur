@@ -1,4 +1,4 @@
--- Ruptur (Sprint 0/1): schema mínimo para Inbox/CRM
+-- Ruptur: initial schema (generated from backend/db/schema.sql)
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
@@ -69,14 +69,13 @@ CREATE TABLE IF NOT EXISTS pipeline_events (
 
 CREATE INDEX IF NOT EXISTS pipeline_events_lead_idx ON pipeline_events (lead_id, created_at DESC);
 
--- Sendflow: fontes (grupos/comunidades/canais) + opt-in (consentimento)
 CREATE TABLE IF NOT EXISTS sendflow_sources (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  provider text NOT NULL, -- e.g. whatsapp_group, whatsapp_community, manychat, landing, form
-  external_id text, -- id do grupo/comunidade/canal/plataforma
+  provider text NOT NULL,
+  external_id text,
   name text,
-  instance_provider text, -- uazapi|baileys (opcional)
-  instance_id text, -- id/nome da instância (opcional)
+  instance_provider text,
+  instance_id text,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
@@ -88,13 +87,12 @@ CREATE TABLE IF NOT EXISTS opt_in_events (
   source_id uuid REFERENCES sendflow_sources(id) ON DELETE SET NULL,
   channel text NOT NULL DEFAULT 'whatsapp',
   consent boolean NOT NULL DEFAULT true,
-  proof jsonb, -- evidência (payload do provedor, timestamp, campanha, etc.)
+  proof jsonb,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
 CREATE INDEX IF NOT EXISTS opt_in_events_lead_idx ON opt_in_events (lead_id, created_at DESC);
 
--- Growth machine: leadscore, hand raise, healthscore de canal, campanhas e roteamento para grupos
 CREATE TABLE IF NOT EXISTS lead_scores (
   lead_id uuid PRIMARY KEY REFERENCES leads(id) ON DELETE CASCADE,
   score int NOT NULL DEFAULT 0,
@@ -114,10 +112,10 @@ CREATE INDEX IF NOT EXISTS hand_raise_lead_idx ON hand_raise_events (lead_id, cr
 
 CREATE TABLE IF NOT EXISTS channel_health (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  provider text NOT NULL, -- uazapi|baileys
+  provider text NOT NULL,
   instance_id text NOT NULL,
   score int NOT NULL DEFAULT 100,
-  status text NOT NULL DEFAULT 'unknown', -- open|connecting|disconnected|unknown
+  status text NOT NULL DEFAULT 'unknown',
   metrics jsonb,
   updated_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (provider, instance_id)
@@ -126,9 +124,9 @@ CREATE TABLE IF NOT EXISTS channel_health (
 CREATE TABLE IF NOT EXISTS campaigns (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name text NOT NULL,
-  kind text NOT NULL, -- one_to_one|group
-  provider_preference text NOT NULL DEFAULT 'auto', -- auto|uazapi|baileys
-  payload jsonb NOT NULL, -- template + params (texto, mídia, interativos)
+  kind text NOT NULL,
+  provider_preference text NOT NULL DEFAULT 'auto',
+  payload jsonb NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
@@ -137,7 +135,7 @@ CREATE TABLE IF NOT EXISTS campaign_targets (
   campaign_id uuid NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
   lead_id uuid REFERENCES leads(id) ON DELETE CASCADE,
   group_source_id uuid REFERENCES sendflow_sources(id) ON DELETE SET NULL,
-  status text NOT NULL DEFAULT 'queued', -- queued|sent|failed|canceled
+  status text NOT NULL DEFAULT 'queued',
   result jsonb,
   created_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (campaign_id, lead_id, group_source_id)
@@ -146,21 +144,20 @@ CREATE TABLE IF NOT EXISTS campaign_targets (
 CREATE TABLE IF NOT EXISTS group_routing_rules (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name text NOT NULL,
-  match jsonb NOT NULL, -- regras (status, tags, score, origem, etc.)
+  match jsonb NOT NULL,
   target_source_id uuid NOT NULL REFERENCES sendflow_sources(id) ON DELETE CASCADE,
-  action text NOT NULL DEFAULT 'invite', -- invite|notify_group
-  payload jsonb, -- template de mensagem, link, etc.
+  action text NOT NULL DEFAULT 'invite',
+  payload jsonb,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
--- Billing (MVP): checkout e eventos (Asaas)
 CREATE TABLE IF NOT EXISTS billing_checkouts (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   provider text NOT NULL DEFAULT 'asaas',
-  external_id text NOT NULL, -- checkout id no provedor
-  status text NOT NULL DEFAULT 'active', -- active|paid|canceled|expired|failed
-  plan_key text NOT NULL, -- basic|professional|enterprise
-  period text NOT NULL, -- annual|quarterly
+  external_id text NOT NULL,
+  status text NOT NULL DEFAULT 'active',
+  plan_key text NOT NULL,
+  period text NOT NULL,
   attendants int NOT NULL DEFAULT 2,
   amount_cents int NOT NULL DEFAULT 0,
   currency text NOT NULL DEFAULT 'BRL',
@@ -183,16 +180,15 @@ CREATE TABLE IF NOT EXISTS billing_events (
 
 CREATE INDEX IF NOT EXISTS billing_events_type_idx ON billing_events (event_type, received_at DESC);
 
--- Comercial (Receita Previsível): funil e marcos (múltiplos motions)
 CREATE TABLE IF NOT EXISTS opportunities (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   lead_id uuid NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
-  motion text NOT NULL DEFAULT 'sdr_inbound', -- sdr_inbound|bdr_outbound|hybrid|closer|...
-  stage text NOT NULL DEFAULT 'prospect', -- ver catálogo abaixo
+  motion text NOT NULL DEFAULT 'sdr_inbound',
+  stage text NOT NULL DEFAULT 'prospect',
   title text,
   value_cents int,
   currency text NOT NULL DEFAULT 'BRL',
-  owner text, -- usuário responsável (closer/sdr) quando aplicável
+  owner text,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
@@ -200,15 +196,12 @@ CREATE TABLE IF NOT EXISTS opportunities (
 CREATE INDEX IF NOT EXISTS opportunities_lead_idx ON opportunities (lead_id, updated_at DESC);
 CREATE INDEX IF NOT EXISTS opportunities_stage_idx ON opportunities (stage, updated_at DESC);
 
--- Estágios recomendados (texto livre no MVP; padronizar depois):
--- prospect -> lead -> oportunidade -> agendamento -> proposta -> contrato -> sinal_pago -> entrega -> ganho|perdido
-
 CREATE TABLE IF NOT EXISTS appointments (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   opportunity_id uuid NOT NULL REFERENCES opportunities(id) ON DELETE CASCADE,
-  kind text NOT NULL DEFAULT 'visit', -- visit|call
+  kind text NOT NULL DEFAULT 'visit',
   scheduled_at timestamptz NOT NULL,
-  status text NOT NULL DEFAULT 'scheduled', -- scheduled|done|canceled|no_show
+  status text NOT NULL DEFAULT 'scheduled',
   notes text,
   created_at timestamptz NOT NULL DEFAULT now()
 );
@@ -218,7 +211,7 @@ CREATE INDEX IF NOT EXISTS appointments_opportunity_idx ON appointments (opportu
 CREATE TABLE IF NOT EXISTS proposals (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   opportunity_id uuid NOT NULL REFERENCES opportunities(id) ON DELETE CASCADE,
-  status text NOT NULL DEFAULT 'draft', -- draft|sent|accepted|rejected
+  status text NOT NULL DEFAULT 'draft',
   amount_cents int,
   currency text NOT NULL DEFAULT 'BRL',
   payload jsonb,
@@ -231,7 +224,7 @@ CREATE INDEX IF NOT EXISTS proposals_opportunity_idx ON proposals (opportunity_i
 CREATE TABLE IF NOT EXISTS contracts (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   opportunity_id uuid NOT NULL REFERENCES opportunities(id) ON DELETE CASCADE,
-  status text NOT NULL DEFAULT 'draft', -- draft|signed|canceled
+  status text NOT NULL DEFAULT 'draft',
   signed_at timestamptz,
   payload jsonb,
   created_at timestamptz NOT NULL DEFAULT now(),
@@ -245,10 +238,10 @@ CREATE TABLE IF NOT EXISTS touchpoints (
   lead_id uuid NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
   opportunity_id uuid REFERENCES opportunities(id) ON DELETE SET NULL,
   channel text NOT NULL DEFAULT 'whatsapp',
-  kind text NOT NULL, -- message|call|visit|note
-  direction text, -- in|out quando kind=message
+  kind text NOT NULL,
+  direction text,
   template_key text,
-  outcome text, -- sent|delivered|replied|failed|done|...
+  outcome text,
   metadata jsonb,
   created_at timestamptz NOT NULL DEFAULT now()
 );
@@ -256,14 +249,13 @@ CREATE TABLE IF NOT EXISTS touchpoints (
 CREATE INDEX IF NOT EXISTS touchpoints_lead_idx ON touchpoints (lead_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS touchpoints_opportunity_idx ON touchpoints (opportunity_id, created_at DESC);
 
--- Workflow engine (MVP): esteiras e triggers com cauda longa
 CREATE TABLE IF NOT EXISTS workflows (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  key text NOT NULL UNIQUE, -- ex: imob_visita_v1, agencia_call_v1
+  key text NOT NULL UNIQUE,
   name text NOT NULL,
-  motion text NOT NULL, -- sdr_inbound|bdr_outbound|closer|...
+  motion text NOT NULL,
   channel text NOT NULL DEFAULT 'whatsapp',
-  definition jsonb NOT NULL, -- steps/conditions/guards (config-driven)
+  definition jsonb NOT NULL,
   is_active boolean NOT NULL DEFAULT true,
   created_at timestamptz NOT NULL DEFAULT now()
 );
@@ -273,8 +265,8 @@ CREATE TABLE IF NOT EXISTS workflow_runs (
   workflow_id uuid NOT NULL REFERENCES workflows(id) ON DELETE CASCADE,
   lead_id uuid NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
   opportunity_id uuid REFERENCES opportunities(id) ON DELETE SET NULL,
-  state jsonb NOT NULL DEFAULT '{}'::jsonb, -- cursor, vars, cooldowns
-  status text NOT NULL DEFAULT 'running', -- running|paused|done|canceled
+  state jsonb NOT NULL DEFAULT '{}'::jsonb,
+  status text NOT NULL DEFAULT 'running',
   next_due_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
@@ -282,3 +274,4 @@ CREATE TABLE IF NOT EXISTS workflow_runs (
 );
 
 CREATE INDEX IF NOT EXISTS workflow_runs_due_idx ON workflow_runs (status, next_due_at);
+
