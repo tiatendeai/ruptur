@@ -20,6 +20,8 @@ uvicorn app.main:app --reload --port 8000
 
 Healthcheck: `GET http://localhost:8000/health`
 
+Webhook (uazapi): `POST http://localhost:8000/webhook/uazapi`
+
 ## Subir Postgres local (opcional)
 
 ```bash
@@ -29,3 +31,10 @@ docker compose up -d
 
 O schema inicial é aplicado automaticamente via `db/schema.sql`.
 
+## Persistência (Sprint 1)
+
+Para persistir webhooks no Postgres, preencha `RUPTUR_DATABASE_URL` no seu `.env`:
+
+```bash
+RUPTUR_DATABASE_URL=postgres://ruptur:ruptur@localhost:5432/ruptur
+```
