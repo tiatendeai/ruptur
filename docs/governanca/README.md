@@ -29,6 +29,7 @@ Este diretório consolida **governança operacional** (processos, padrões, cont
 - `portfolio/`:
   - `portfolio-ativos.md`: mapa de ativos (uazapi, baileys, ruptur, infra) e como se relacionam
   - `capabilities-matrix.md`: capacidade por provedor e regra de roteamento (uazapi → baileys)
+  - `agent-kits.md`: kits de agentes/workflows (ex.: Antigravity Kit) e como usar sem conflitar com governança
 - `processos/`:
   - `mudancas.md`: fluxo mínimo de mudança (PR, revisão, deploy, rollback)
   - `incidentes.md`: fluxo mínimo de incidentes (triagem, mitigação, postmortem)
