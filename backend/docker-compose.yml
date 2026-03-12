@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ruptur
+      POSTGRES_USER: ruptur
+      POSTGRES_PASSWORD: ruptur
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/001_schema.sql:ro
+
+volumes:
+  db_data:
+
