@@ -48,9 +48,10 @@ function getOrCreateInstance(instanceId) {
   const id = sanitizeInstanceId(instanceId);
   const existing = instances.get(id);
   if (existing) return existing;
+  const authDir = id === "default" ? baseAuthDir : path.join(baseAuthDir, id);
   const inst = {
     id,
-    authDir: path.join(baseAuthDir, id),
+    authDir,
     socket: null,
     lastConnection: { status: "starting" },
     lastQr: null,
@@ -172,7 +173,12 @@ async function startWhatsApp(inst) {
 
   inst.socket.ev.on("connection.update", (update) => {
     const { connection, lastDisconnect, qr } = update;
-    inst.lastConnection = { connection, lastDisconnect, hasQr: Boolean(qr) };
+    const next = { ...(inst.lastConnection || {}) };
+    if (typeof connection === "string") next.connection = connection;
+    if (lastDisconnect !== undefined) next.lastDisconnect = lastDisconnect;
+    if (qr) next.hasQr = true;
+    else if (typeof connection === "string") next.hasQr = false;
+    inst.lastConnection = next;
 
     if (qr) {
       inst.lastQr = qr;
@@ -663,7 +669,7 @@ app.post("/ai/transcribe", async (req, res) => {
   if (whisperBaseUrl) {
     try {
       if (decoded.kind === "url") {
-        const r = await fetch(`${whisperBaseUrl.replace(/\\/+$/, "")}/transcribe/url`, {
+        const r = await fetch(`${whisperBaseUrl.replace(/\/+$/, "")}/transcribe/url`, {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ url: decoded.value }),
@@ -679,7 +685,7 @@ app.post("/ai/transcribe", async (req, res) => {
       form.append("model", "whisper"); // ignored by our server (compat)
       form.append("file", new Blob([decoded.value], { type: mime }), "audio");
 
-      const r = await fetch(`${whisperBaseUrl.replace(/\\/+$/, "")}/v1/audio/transcriptions`, {
+      const r = await fetch(`${whisperBaseUrl.replace(/\/+$/, "")}/v1/audio/transcriptions`, {
         method: "POST",
         body: form,
       });
