@@ -7,6 +7,8 @@ from typing import Any
 from psycopg import Connection
 from psycopg.types.json import Jsonb
 
+from app.services.qualification import qualify_text_v1
+
 
 @dataclass(frozen=True)
 class IngestResult:
@@ -145,5 +147,22 @@ def ingest_uazapi_webhook(conn: Connection, payload: dict[str, Any]) -> IngestRe
     else:
         message_id = None
 
-    return IngestResult(stored=True, lead_id=lead_id, conversation_id=conversation_id, message_id=message_id)
+    if direction == "in" and lead_id:
+        q = qualify_text_v1(fields["body"])
+        if q:
+            row = conn.execute("SELECT status FROM leads WHERE id = %s", (lead_id,)).fetchone()
+            previous = row[0] if row else None
+            if previous != q.status:
+                conn.execute(
+                    "UPDATE leads SET status = %s, updated_at = now() WHERE id = %s",
+                    (q.status, lead_id),
+                )
+                conn.execute(
+                    """
+                    INSERT INTO pipeline_events (lead_id, event_type, payload)
+                    VALUES (%s, 'lead_status_changed', %s)
+                    """,
+                    (lead_id, Jsonb({"from": previous, "to": q.status, "reason": q.reason})),
+                )
 
+    return IngestResult(stored=True, lead_id=lead_id, conversation_id=conversation_id, message_id=message_id)
