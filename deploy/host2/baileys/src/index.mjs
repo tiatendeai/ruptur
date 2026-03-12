@@ -489,6 +489,7 @@ app.post("/send/menu", async (req, res) => {
       id: `cta_${idx + 1}`,
       display_text: c.label,
       url: c.url,
+      merchant_url: c.url,
       disabled: false,
     }),
   }));
@@ -639,6 +640,39 @@ app.post("/send/button-url", async (req, res) => {
   if (!jid) return res.status(400).json({ ok: false, error: "to_invalid" });
 
   try {
+    // Prefer Native Flow CTA URL (more reliable rendering with helper).
+    if (baileysHelper?.sendInteractiveMessage) {
+      const bodyText = `${text}\n\n${url}`;
+      const interactiveMessage = {
+        body: { text: bodyText },
+        footer: footerText ? { text: footerText } : undefined,
+        nativeFlowMessage: {
+          buttons: [
+            {
+              name: "cta_url",
+              buttonParamsJson: JSON.stringify({
+                id: "cta_1",
+                display_text: buttonText,
+                url,
+                merchant_url: url,
+                disabled: false,
+              }),
+            },
+          ],
+        },
+      };
+
+      const r = await baileysHelper.sendInteractiveMessage(inst.socket, jid, { interactiveMessage });
+      return res.json({
+        ok: true,
+        instance: inst.id,
+        result: r,
+        format: "nativeFlowMessage.cta_url",
+        transport: "baileys_helper.sendInteractiveMessage",
+        note: "If the client still doesn't render a button, the URL is included in the message body as fallback.",
+      });
+    }
+
     // Prefer "hydrated template" URL button.
     const r = await inst.socket.sendMessage(jid, {
       templateMessage: {
