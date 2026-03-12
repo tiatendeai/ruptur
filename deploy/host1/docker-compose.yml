@@ -1,0 +1,45 @@
+services:
+  traefik:
+    image: traefik:v3.1
+    command:
+      - --api.dashboard=true
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --certificatesresolvers.le.acme.httpchallenge=true
+      - --certificatesresolvers.le.acme.httpchallenge.entrypoint=web
+      - --certificatesresolvers.le.acme.email=${TRAEFIK_ACME_EMAIL}
+      - --certificatesresolvers.le.acme.storage=/letsencrypt/acme.json
+      # Redirect HTTP -> HTTPS
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - letsencrypt:/letsencrypt
+    restart: unless-stopped
+
+  ruptur-backend:
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile
+    environment:
+      RUPTUR_ENV: prod
+      RUPTUR_LOG_LEVEL: INFO
+      RUPTUR_DATABASE_URL: ${RUPTUR_DATABASE_URL}
+      RUPTUR_UAZAPI_BASE_URL: ${RUPTUR_UAZAPI_BASE_URL}
+      RUPTUR_UAZAPI_TOKEN: ${RUPTUR_UAZAPI_TOKEN}
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.ruptur.rule=Host(`api.statuspersianas.com.br`) || Host(`webhook.statuspersianas.com.br`)
+      - traefik.http.routers.ruptur.entrypoints=websecure
+      - traefik.http.routers.ruptur.tls.certresolver=le
+      - traefik.http.services.ruptur.loadbalancer.server.port=8000
+    restart: unless-stopped
+
+volumes:
+  letsencrypt:
+
