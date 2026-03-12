@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+
+.DS_Store
+
+# Audio samples (do not commit)
+*.opus
+
+# Local env / venvs
+.env
+.venv/
+
+# Backend-local
+backend/.env
+backend/.venv/

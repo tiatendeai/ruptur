@@ -1,0 +1,16 @@
+http:
+  routers:
+    baileys:
+      rule: Host(`baileys.statuspersianas.com.br`)
+      entryPoints:
+        - websecure
+      service: baileys
+      tls:
+        certResolver: le
+
+  services:
+    baileys:
+      loadBalancer:
+        servers:
+          - url: http://baileys:3000
+

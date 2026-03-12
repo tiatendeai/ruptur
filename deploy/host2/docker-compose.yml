@@ -1,0 +1,52 @@
+services:
+  traefik:
+    image: traefik:v3.1
+    command:
+      - --api.dashboard=true
+      - --providers.file.filename=/etc/traefik/dynamic.yml
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --certificatesresolvers.le.acme.httpchallenge=true
+      - --certificatesresolvers.le.acme.httpchallenge.entrypoint=web
+      - --certificatesresolvers.le.acme.email=${TRAEFIK_ACME_EMAIL}
+      - --certificatesresolvers.le.acme.storage=/letsencrypt/acme.json
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - ./traefik_dynamic.yml:/etc/traefik/dynamic.yml:ro
+      - traefik_letsencrypt:/letsencrypt
+    restart: unless-stopped
+
+  baileys:
+    build:
+      context: ./baileys
+    environment:
+      - PORT=3000
+      - BAILEYS_AUTH_DIR=/data/auth
+      - BAILEYS_LOG_LEVEL=info
+      - WHISPER_BASE_URL=http://whisper:8001
+    volumes:
+      - baileys_data:/data
+    restart: unless-stopped
+
+  whisper:
+    build:
+      context: ./whisper
+    environment:
+      - WHISPER_MODEL=base
+      - WHISPER_DEVICE=cpu
+      - WHISPER_COMPUTE_TYPE=int8
+      - WHISPER_LANGUAGE=pt
+      - WHISPER_BEAM_SIZE=5
+      - WHISPER_VAD_FILTER=true
+    volumes:
+      - whisper_models:/root/.cache
+    restart: unless-stopped
+
+volumes:
+  traefik_letsencrypt:
+  baileys_data:
+  whisper_models:
