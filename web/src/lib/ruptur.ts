@@ -36,6 +36,13 @@ export type RupturCampaign = {
   created_at: string;
 };
 
+export type RupturStage = {
+  key: string;
+  name: string;
+  position: number;
+  is_terminal: boolean;
+};
+
 async function apiFetch(path: string, init?: RequestInit) {
   const base = rupturApiBaseUrl();
   const url = `${base}${path.startsWith("/") ? path : `/${path}`}`;
@@ -58,7 +65,7 @@ export async function listLeads(params?: { status?: string; q?: string }) {
 
 export async function listStages() {
   const data = await apiFetch("/crm/stages");
-  return (data.stages || []) as { key: string; name: string; position: number; is_terminal: boolean }[];
+  return (data.stages || []) as RupturStage[];
 }
 
 export async function listMessages(conversationId: string) {
@@ -71,6 +78,21 @@ export async function sendConversationText(conversationId: string, text: string)
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ text }),
+  });
+  return data as { ok: boolean };
+}
+
+export async function updateLead(
+  leadId: string,
+  input: {
+    name?: string;
+    status?: string;
+  },
+) {
+  const data = await apiFetch(`/crm/leads/${leadId}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
   });
   return data as { ok: boolean };
 }
