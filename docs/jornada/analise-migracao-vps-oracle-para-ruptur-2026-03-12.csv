@@ -1,0 +1,9 @@
+area,item,valor,decisao,acao_recomendada
+infra,terraform base,alto,trazer_agora,reescrever como base de infra do Ruptur
+infra,scripts de provisionamento,alto,trazer_agora,absorver como scripts/documentacao operacional
+infra,topologia de VPS,alto,trazer_agora,documentar ambiente alvo do Ruptur
+seguranca,terraform state,critico,descartar,nao portar e tratar como sensivel
+seguranca,terraform tfvars,critico,descartar,nao portar e tratar como sensivel
+seguranca,chave SSH privada,critico,descartar,nao portar e tratar como sensivel
+docs,blueprint warmup duplicado,medio,nao_trazer_agora,apenas consultar como referencia
+docs,product paper duplicado,baixo,descartar,nao duplicar no Ruptur

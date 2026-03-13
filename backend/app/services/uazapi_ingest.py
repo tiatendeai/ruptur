@@ -88,18 +88,29 @@ def ingest_uazapi_webhook(conn: Connection, payload: dict[str, Any]) -> IngestRe
 
     lead_id: str | None = None
     if phone:
-        row = conn.execute(
-            """
-            INSERT INTO leads (source, external_id, phone, name, updated_at)
-            VALUES ('uazapi', %s, %s, %s, now())
-            ON CONFLICT (phone) DO UPDATE
-              SET updated_at = now(),
-                  name = COALESCE(EXCLUDED.name, leads.name)
-            RETURNING id::text
-            """,
-            (phone, phone, fields["sender_name"]),
-        ).fetchone()
-        lead_id = row[0] if row else None
+        row = conn.execute("SELECT id::text FROM leads WHERE phone = %s", (phone,)).fetchone()
+        if row:
+            conn.execute(
+                """
+                UPDATE leads
+                SET updated_at = now(),
+                    name = COALESCE(%s, name),
+                    external_id = COALESCE(external_id, %s)
+                WHERE phone = %s
+                """,
+                (fields["sender_name"], phone, phone),
+            )
+            lead_id = row[0]
+        else:
+            row = conn.execute(
+                """
+                INSERT INTO leads (source, external_id, phone, name, updated_at)
+                VALUES ('uazapi', %s, %s, %s, now())
+                RETURNING id::text
+                """,
+                (phone, phone, fields["sender_name"]),
+            ).fetchone()
+            lead_id = row[0] if row else None
     else:
         row = conn.execute(
             """

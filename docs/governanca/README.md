@@ -30,15 +30,20 @@ Este diretório consolida **governança operacional** (processos, padrões, cont
   - `portfolio-ativos.md`: mapa de ativos (uazapi, baileys, ruptur, infra) e como se relacionam
   - `capabilities-matrix.md`: capacidade por provedor e regra de roteamento (uazapi → baileys)
   - `agent-kits.md`: kits de agentes/workflows (ex.: Antigravity Kit) e como usar sem conflitar com governança
+  - `mcp-e-integracoes.md`: mapa das integrações externas e do que vale ligar por MCP/API
 - `processos/`:
   - `mudancas.md`: fluxo mínimo de mudança (PR, revisão, deploy, rollback)
   - `incidentes.md`: fluxo mínimo de incidentes (triagem, mitigação, postmortem)
   - `segredos.md`: regras para armazenar/rotacionar segredos
+  - `orquestracao-a2a.md`: modelo oficial para coordenação ponta a ponta entre agentes e trilhas
 - `pops/` (procedimentos operacionais padrão):
   - `pop-uazapi-nova-instancia.md`: criar/conectar instância uazapi (fluxo nativo)
   - `pop-failover-uazapi-para-baileys.md`: contingência quando uazapi falhar
+  - `pop-preview-local.md`: como subir preview local do backend e web
+  - `pop-rotacao-segredos.md`: como tratar e rotacionar segredos expostos
 - `runbooks/`:
   - `runbook-envio-mensagens.md`: checklist para envio e diagnósticos (texto/mídia/botão)
+  - `runbook-webhook-instancia-preview.md`: diagnóstico rápido de webhook, instância e ambiente local
 - `templates/`:
   - `ADR-template.md`, `POP-template.md`, `RUNBOOK-template.md`, `POSTMORTEM-template.md`
 - `ativos/`:
@@ -50,3 +55,5 @@ Este diretório consolida **governança operacional** (processos, padrões, cont
 2. Para rotinas operacionais: crie/atualize um POP em `docs/governanca/pops/`.
 3. Para incidentes: use `POSTMORTEM-template.md`.
 4. Mantenha o inventário em `docs/governanca/ativos/registry.yaml` atualizado.
+5. Para trabalho com múltiplos agentes: siga `docs/governanca/processos/orquestracao-a2a.md`.
+6. Para integrações externas de gestão/ops: valide antes em `docs/governanca/portfolio/mcp-e-integracoes.md`.

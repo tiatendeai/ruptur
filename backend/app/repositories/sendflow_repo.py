@@ -52,13 +52,24 @@ def create_source(
 
 
 def upsert_lead_by_phone(conn: Connection, *, phone: str, name: str | None, source: str) -> str:
+    row = conn.execute("SELECT id::text FROM leads WHERE phone = %s", (phone,)).fetchone()
+    if row:
+        conn.execute(
+            """
+            UPDATE leads
+            SET updated_at = now(),
+                name = COALESCE(%s, name),
+                external_id = COALESCE(external_id, %s)
+            WHERE phone = %s
+            """,
+            (name, phone, phone),
+        )
+        return row[0]
+
     row = conn.execute(
         """
         INSERT INTO leads (source, external_id, phone, name, updated_at)
         VALUES (%s, %s, %s, %s, now())
-        ON CONFLICT (phone) DO UPDATE
-          SET updated_at = now(),
-              name = COALESCE(EXCLUDED.name, leads.name)
         RETURNING id::text
         """,
         (source, phone, phone, name),
@@ -88,4 +99,3 @@ def insert_opt_in(
         (lead_id, Jsonb({"source_id": source_id, "channel": channel, "consent": consent})),
     )
     return row[0]
-

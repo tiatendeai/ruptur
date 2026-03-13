@@ -3,6 +3,11 @@
 # Diretriz: manter simples, mas suficiente para replicar e operar.
 
 portfolio:
+  product:
+    name: Ruptur
+    primary_domain: ruptur.cloud
+    repository_root: /Users/diego/Downloads/ruptur
+
   providers:
     uazapi:
       role: primary
@@ -13,6 +18,16 @@ portfolio:
     baileys:
       role: secondary
       base_url: https://baileys.statuspersianas.com.br
+    supabase:
+      role: data-platform
+      project_ref: env:SUPABASE_PROJECT_REF
+    asaas:
+      role: billing
+      base_url: https://api.asaas.com
+    cloudflare:
+      role: dns-edge
+      zone_ref: env:CLOUDFLARE_ZONE_ID
+      account_ref: env:CLOUDFLARE_ACCOUNT_ID
 
   hosts:
     host1:
@@ -25,15 +40,61 @@ portfolio:
       role: traefik + baileys + whisper
 
   domains:
+    apex:
+      hostname: ruptur.cloud
+      host: host1
+      provider: cloudflare
+    www:
+      hostname: www.ruptur.cloud
+      target: ruptur.cloud
+      provider: cloudflare
     api:
-      hostname: api.statuspersianas.com.br
+      hostname: api.ruptur.cloud
       host: host1
+      provider: cloudflare
     webhook:
-      hostname: webhook.statuspersianas.com.br
+      hostname: webhook.ruptur.cloud
       host: host1
+      provider: cloudflare
     baileys:
-      hostname: baileys.statuspersianas.com.br
+      hostname: baileys.ruptur.cloud
       host: host2
+      provider: cloudflare
+    app:
+      hostname: app.ruptur.cloud
+      host: host1
+      provider: cloudflare
+    n8n:
+      hostname: n8n.ruptur.cloud
+      host: host2
+      provider: cloudflare
+    portainer:
+      hostname: portainer.ruptur.cloud
+      host: host2
+      provider: cloudflare
+    traefik:
+      hostname: traefik.ruptur.cloud
+      host: host2
+      provider: cloudflare
+    minio:
+      hostname: minio.ruptur.cloud
+      host: host2
+      provider: cloudflare
+    typebot:
+      hostname: typebot.ruptur.cloud
+      host: host2
+      provider: cloudflare
+    redis:
+      hostname: redis.ruptur.cloud
+      host: host2
+      provider: cloudflare
+      note: dns_only_nao_substitui_firewall
+
+  work_management:
+    backlog_source:
+      preferred: notion-or-github-projects
+      status: pending-credential
+    agent_control:
+      source_of_truth: docs/governanca/processos/orquestracao-a2a.md
 
 tenants: []
-

@@ -31,6 +31,21 @@ O MVP está pronto quando, de ponta a ponta:
 - existe uma rotina de follow-up para contatos sem resposta;
 - existe uma visão simples de pipeline por estágio.
 
+## Critério de aceite validado até agora
+
+Já está validado em preview local com PostgreSQL real:
+
+- ingestão de webhook para criação/atualização de lead
+- persistência de conversa e mensagem
+- leitura de inbox pela API
+- leitura de estágios do pipeline
+- mudança de status do lead para outro estágio
+
+Ainda depende de configuração externa para fechar totalmente:
+
+- envio real de resposta via UAZAPI
+- follow-up automático com provider real
+
 ## Backlog priorizado
 
 ## Sprint 0 — Fundamentos

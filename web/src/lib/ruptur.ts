@@ -20,6 +20,22 @@ export type RupturMessage = {
   created_at: string;
 };
 
+export type RupturChannelHealth = {
+  provider: string;
+  instance_id: string;
+  score: number;
+  status: string;
+  updated_at: string;
+};
+
+export type RupturCampaign = {
+  id: string;
+  name: string;
+  kind: string;
+  provider_preference: string;
+  created_at: string;
+};
+
 async function apiFetch(path: string, init?: RequestInit) {
   const base = rupturApiBaseUrl();
   const url = `${base}${path.startsWith("/") ? path : `/${path}`}`;
@@ -62,4 +78,28 @@ export async function sendConversationText(conversationId: string, text: string)
 export async function listUazapiInstances() {
   const data = await apiFetch("/integrations/uazapi/instances");
   return data as { ok?: boolean; instances?: unknown[] } & Record<string, unknown>;
+}
+
+export async function listChannelHealth() {
+  const data = await apiFetch("/growth/channels/health?limit=100");
+  return (data.items || []) as RupturChannelHealth[];
+}
+
+export async function listCampaigns() {
+  const data = await apiFetch("/growth/campaigns?limit=100");
+  return (data.items || []) as RupturCampaign[];
+}
+
+export async function createCampaign(input: {
+  name: string;
+  kind: "one_to_one" | "group";
+  provider_preference: "auto" | "uazapi" | "baileys";
+  payload: Record<string, unknown>;
+}) {
+  const data = await apiFetch("/growth/campaigns", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  return data as { ok: boolean; id: string };
 }

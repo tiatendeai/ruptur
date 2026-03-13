@@ -1,0 +1,17 @@
+trilha,categoria,item,prioridade,estado_atual,proximo_passo,dono_sugerido
+produto,cultura,Fonte unica de verdade,Alta,Parcial,Usar reconnect + review como base viva,product-owner
+produto,escopo,Definir MVP operacional real,Alta,Parcial,Congelar escopo da Fase 1,product-manager
+produto,escopo,Separar MVP vs futuro,Alta,Pendente,Criar backlog MoSCoW,product-owner
+aplicacao,backend,Fluxo minimo ponta a ponta,Alta,Parcial,Fechar conexao->lead->inbox->stage->resposta,backend-specialist
+aplicacao,frontend,Console com dados reais,Alta,Parcial,Ligar paginas principais ao backend funcional,frontend-specialist
+aplicacao,testes,Smoke tests minimos,Alta,Pendente,Criar smoke de backend e console,test-engineer
+dados,schema,Validacao do schema com fluxos reais,Alta,Parcial,Revisar tabelas e queries do fluxo MVP,database-architect
+dados,seguranca,Rotacao de segredos expostos,Alta,Pendente,Rotacionar tokens e rever historicos,security-auditor
+infra,preview,Preview local consistente,Alta,Parcial,Subir backend e web com dependencias corretas,devops-engineer
+infra,deploy,Mapa de ambientes e servicos,Media,Pendente,Documentar local/preview/producao minima,devops-engineer
+infra,operacao,Health checks e verificacao,Media,Pendente,Definir checklists de operacao,devops-engineer
+governanca,organizacao,Backlog por trilhas,Alta,Pendente,Criar backlog separado por produto/aplicacao/dados/infra/governanca,project-planner
+governanca,organizacao,Separacao de projeto paralelo,Alta,Feito,Manter happy-client-messager em standby,orchestrator
+governanca,documentacao,Docs operacionais curtos,Media,Parcial,Manter somente docs vivos e com dono claro,documentation-writer
+governanca,sinergia,Alinhamento UAZAPI primaria + Baileys contingencia,Alta,Claro,Implementar so o necessario para o fluxo MVP,backend-specialist
+governanca,alinhamento,Revisao semanal de foco,Media,Pendente,Estabelecer ritual curto de revisao de trilha,project-planner

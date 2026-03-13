@@ -1,0 +1,13 @@
+area,origem,item,valor,decisao,acao_recomendada
+dispatcher,supabase/functions,run-dispatcher,index.ts,alto,trazer_agora,portar regras e algoritmo para runtime do Ruptur
+instancias,supabase/functions,manage-instance,index.ts,alto,adaptar_agora,unificar lifecycle de instancia com API do Ruptur
+baileys,services,baileys-api/src/index.ts,alto,trazer_agora,extrair codigo fonte e comparar com deploy/host2/baileys
+warmup,src/components,WarmupManager.tsx,alto,trazer_agora,incorporar dominio e regras no backend/schema do Ruptur
+healthscore,blueprint+schema,modelo de saude de canal,alto,trazer_agora,adicionar score e regras operacionais ao core do Ruptur
+campanhas,src/components,CampaignManager.tsx,alto,trazer_agora,absorver regras e campos de campanha por etapas
+dashboard,src/pages,Dashboard.tsx,medio,adaptar_depois,reaproveitar fluxos e arquitetura de navegacao
+schema,supabase/migrations,modelo operacional antigo,alto,adaptar_agora,fundir com schema atual do Ruptur
+billing,dominio antigo,creditos e lotes,medio,nao_trazer_agora,apenas absorver aprendizado de custo e metrica
+landing,src/pages,SafeFlow e paginas de marketing,baixo,descartar,nao priorizar nesta fase
+documentacao,docs,blueprint e product paper,alto,trazer_agora,reescrever em linguagem Ruptur
+realtime,src/components,GlobalRealtimeSync e monitorias,medio,adaptar_depois,avaliar utilidade apos MVP operacional

@@ -33,34 +33,37 @@ export default function RootLayout({
             <aside className="col-span-12 border-b border-white/10 bg-zinc-950/80 px-4 py-3 backdrop-blur md:col-span-3 md:min-h-dvh md:border-b-0 md:border-r">
               <div className="flex items-center justify-between md:block">
                 <div>
-                  <div className="text-sm font-semibold tracking-wide">Ruptur</div>
-                  <div className="text-xs text-zinc-400">Console</div>
+                  <div className="text-base font-semibold tracking-wide">Ruptur</div>
+                  <div className="text-sm text-zinc-400">Console</div>
                 </div>
               </div>
               <nav className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-1">
-                <Link className="rounded-lg px-3 py-2 text-sm hover:bg-white/5" href="/inbox">
-                  Inbox
+                <Link className="rounded-lg px-3 py-2 text-base hover:bg-white/5" href="/inbox">
+                  MyChat
                 </Link>
-                <Link className="rounded-lg px-3 py-2 text-sm hover:bg-white/5" href="/pipeline">
+                <Link className="rounded-lg px-3 py-2 text-base hover:bg-white/5" href="/pipeline">
                   Pipeline
                 </Link>
-                <Link className="rounded-lg px-3 py-2 text-sm hover:bg-white/5" href="/broadcasts">
-                  Disparos
+                <Link className="rounded-lg px-3 py-2 text-base hover:bg-white/5" href="/broadcasts">
+                  Campanhas
                 </Link>
-                <Link className="rounded-lg px-3 py-2 text-sm hover:bg-white/5" href="/connections">
+                <Link className="rounded-lg px-3 py-2 text-base hover:bg-white/5" href="/warmup">
+                  Warmup
+                </Link>
+                <Link className="rounded-lg px-3 py-2 text-base hover:bg-white/5" href="/connections">
                   Conexões
                 </Link>
-                <Link className="rounded-lg px-3 py-2 text-sm hover:bg-white/5" href="/sendflow">
+                <Link className="rounded-lg px-3 py-2 text-base hover:bg-white/5" href="/sendflow">
                   Sendflow
                 </Link>
-                <Link className="rounded-lg px-3 py-2 text-sm hover:bg-white/5" href="/metrics">
+                <Link className="rounded-lg px-3 py-2 text-base hover:bg-white/5" href="/metrics">
                   Métricas
                 </Link>
-                <Link className="rounded-lg px-3 py-2 text-sm hover:bg-white/5" href="/billing">
+                <Link className="rounded-lg px-3 py-2 text-base hover:bg-white/5" href="/billing">
                   Planos
                 </Link>
               </nav>
-              <div className="mt-6 hidden text-xs text-zinc-500 md:block">
+              <div className="mt-6 hidden text-sm text-zinc-500 md:block">
                 Canal primário • canal contingência
               </div>
             </aside>

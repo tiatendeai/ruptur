@@ -16,7 +16,7 @@ backend/.env
 backend/.venv/
 
 # Scratch / exports
-0WbsZjA4yKfY.br/
+/archive/
 
 # Node / web app
 .npm-cache/
