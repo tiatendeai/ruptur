@@ -54,11 +54,14 @@ def extract_message_fields(payload: dict[str, Any]) -> dict[str, Any]:
     sender_name = data.get("senderName") or data.get("pushName")
     chatid = data.get("chatid") or extract_chat_id(payload)
     text = data.get("text")
+    transcription = data.get("transcription")
     from_me = data.get("fromMe")
 
     body = None
     if isinstance(text, str) and text.strip():
         body = text
+    elif isinstance(transcription, str) and transcription.strip():
+        body = f"[Áudio Transcrito]: {transcription}"
     else:
         content = data.get("content")
         if isinstance(content, str) and content.strip():

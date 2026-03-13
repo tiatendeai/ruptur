@@ -24,6 +24,11 @@ class Settings(BaseSettings):
     uazapi_base_url: str | None = Field(default=None, alias="RUPTUR_UAZAPI_BASE_URL")
     uazapi_token: str | None = Field(default=None, alias="RUPTUR_UAZAPI_TOKEN")
     uazapi_admin_token: str | None = Field(default=None, alias="RUPTUR_UAZAPI_ADMIN_TOKEN")
+    
+    openai_api_key: str | None = Field(default=None, alias="RUPTUR_OPENAI_API_KEY")
+
+    baileys_base_url: str = Field(default="https://baileys.ruptur.cloud", alias="RUPTUR_BAILEYS_BASE_URL")
+    baileys_instance_id: str = Field(default="default", alias="RUPTUR_BAILEYS_INSTANCE_ID")
 
     asaas_base_url: str = Field(default="https://api.asaas.com", alias="RUPTUR_ASAAS_BASE_URL")
     asaas_token: str | None = Field(default=None, alias="RUPTUR_ASAAS_TOKEN")
