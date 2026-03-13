@@ -25,3 +25,8 @@ web/.next/
 
 # Screenshots
 Captura de Tela*.png
+
+# Ignored artifacts
+0WbsZjA4yKfY.br/
+backend/uvicorn.log
+
