@@ -98,7 +98,17 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks) ->
             if result.stored and result.lead_id and result.conversation_id:
                 # Verificar se é uma mensagem de entrada (in) para disparar o agente
                 fields = extract_message_fields(payload)
-                if fields.get("from_me") is False:
+                chatid = fields.get("chatid") or ""
+                
+                # Regra de Grupos: 
+                # Se for grupo (@g.us), só responde se estiver na whitelist RUPTUR_ALLOWED_GROUPS_JIDS.
+                # Se for chat privado (s.whatsapp.net), responde normalmente.
+                is_group = "@g.us" in chatid
+                allowed_groups = [jid.strip() for jid in settings.allowed_groups_jids.split(",") if jid.strip()]
+                
+                should_respond = not is_group or chatid in allowed_groups
+                
+                if fields.get("from_me") is False and should_respond:
                    background_tasks.add_task(process_ai_response, payload, result.lead_id, result.conversation_id)
 
             return {
