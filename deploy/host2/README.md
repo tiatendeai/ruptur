@@ -1,6 +1,6 @@
-## Host 2 (Oracle VPS) — Baileys + Traefik
+## Host 2 (Oracle VPS) — Baileys + Ruptur Backend + Traefik
 
-Stack mínima para subir um serviço Baileys (WhatsApp Web) atrás de Traefik com TLS (Let's Encrypt).
+Stack mínima para subir um serviço Baileys (WhatsApp Web), o backend do Ruptur e Traefik com TLS (Let's Encrypt).
 
 Esta stack expõe uma API **parecida** com a uazapi (subset), útil para trocar o provider sem reescrever tudo.
 
@@ -20,7 +20,9 @@ Esta stack expõe uma API **parecida** com a uazapi (subset), útil para trocar 
 
 - Docker Engine + Docker Compose
 - DNS A (DNS-only, por enquanto):
-  - `baileys.statuspersianas.com.br` → IP do Host2
+  - `baileys.ruptur.cloud` → IP do Host2
+  - `api.ruptur.cloud` → IP do Host2
+  - `webhook.ruptur.cloud` → IP do Host2
 
 ### Subir
 
@@ -31,23 +33,42 @@ Esta stack expõe uma API **parecida** com a uazapi (subset), útil para trocar 
 - `OPENAI_API_KEY` (opcional)
 - `WHISPER_BASE_URL` (opcional; recomendado — usa Whisper local e não gasta OpenAI)
 
-2) Rode:
+2) Garanta um arquivo `backend/.env` ao lado do diretório `host2/` na VPS com, no mínimo:
 
 ```bash
-cd deploy/host2
+RUPTUR_ENV=prod
+RUPTUR_LOG_LEVEL=INFO
+RUPTUR_HOST=0.0.0.0
+RUPTUR_PORT=8000
+RUPTUR_DATABASE_URL=postgresql://ruptur:ruptur@ruptur-db:5432/ruptur
+RUPTUR_UAZAPI_BASE_URL=http://baileys:3000
+RUPTUR_UAZAPI_TOKEN=local-baileys
+```
+
+3) Rode:
+
+```bash
+cd host2
 docker compose --env-file .env up -d --build
 docker logs -f host2-baileys-1
 ```
 
-3) Escaneie o QR code que aparece nos logs.
+4) Escaneie o QR code que aparece nos logs.
+
+5) O Baileys encaminhará eventos recebidos para:
+
+```bash
+http://ruptur-backend:8000/webhook/uazapi
+```
 
 ### Teste (HTTP)
 
 Depois de conectado:
 
 ```bash
-curl -sS https://baileys.statuspersianas.com.br/health
-curl -sS -X POST https://baileys.statuspersianas.com.br/send/text \
+curl -sS https://baileys.ruptur.cloud/health
+curl -sS https://api.ruptur.cloud/health
+curl -sS -X POST https://baileys.ruptur.cloud/send/text \
   -H 'content-type: application/json' \
   -d '{"to":"5511999999999","text":"teste baileys"}'
 ```

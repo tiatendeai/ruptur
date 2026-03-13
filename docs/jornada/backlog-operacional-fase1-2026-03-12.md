@@ -67,6 +67,9 @@ Referencia oficial:
 - Elevar `MyChat` para inbox estilo Chatwoot com intervencao operacional.
 - Elevar `Campanhas` para operacao estilo ManyChat/Mlabs.
 - Fechar deploy do backend na VPS Oracle com Traefik e dominio `ruptur.cloud`.
+- Consolidar `host2` em uma unica raiz operacional.
+- Sanear `.env` da VPS e rotacionar segredos reaproveitados.
+- Atualizar a VPS do commit `02387cf` para o estado mais recente do projeto.
 
 ## Bloqueado
 

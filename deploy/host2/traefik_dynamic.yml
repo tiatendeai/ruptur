@@ -1,10 +1,17 @@
 http:
   routers:
     baileys:
-      rule: Host(`baileys.statuspersianas.com.br`)
+      rule: Host(`baileys.statuspersianas.com.br`) || Host(`baileys.ruptur.cloud`)
       entryPoints:
         - websecure
       service: baileys
+      tls:
+        certResolver: le
+    ruptur-backend:
+      rule: Host(`api.ruptur.cloud`) || Host(`webhook.ruptur.cloud`)
+      entryPoints:
+        - websecure
+      service: ruptur-backend
       tls:
         certResolver: le
 
@@ -13,4 +20,7 @@ http:
       loadBalancer:
         servers:
           - url: http://baileys:3000
-
+    ruptur-backend:
+      loadBalancer:
+        servers:
+          - url: http://ruptur-backend:8000

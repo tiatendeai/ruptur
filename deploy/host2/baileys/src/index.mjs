@@ -18,6 +18,7 @@ import makeWASocket, {
 const port = Number.parseInt(process.env.PORT || "3000", 10);
 const baseAuthDir = process.env.BAILEYS_AUTH_DIR || "/data/auth";
 const logLevel = process.env.BAILEYS_LOG_LEVEL || "info";
+const forwardWebhookUrl = String(process.env.BAILEYS_FORWARD_WEBHOOK_URL || "").trim();
 
 const bulkMinDelayMs = Number.parseInt(process.env.BAILEYS_BULK_MIN_DELAY_MS || "1200", 10);
 const bulkMaxDelayMs = Number.parseInt(process.env.BAILEYS_BULK_MAX_DELAY_MS || "3500", 10);
@@ -47,6 +48,43 @@ process.on("uncaughtException", (err) => {
 const jobs = new Map(); // jobId -> {status,total,sent,failed,createdAt,startedAt,finishedAt,errors}
 let bulkQueue = []; // [{jobId, instanceId, jid, text}]
 let bulkWorkerRunning = false;
+
+function extractMessageText(message = {}) {
+  if (!message || typeof message !== "object") return null;
+  if (typeof message.conversation === "string" && message.conversation.trim()) return message.conversation.trim();
+  if (typeof message.extendedTextMessage?.text === "string" && message.extendedTextMessage.text.trim()) {
+    return message.extendedTextMessage.text.trim();
+  }
+  if (typeof message.imageMessage?.caption === "string" && message.imageMessage.caption.trim()) {
+    return message.imageMessage.caption.trim();
+  }
+  if (typeof message.videoMessage?.caption === "string" && message.videoMessage.caption.trim()) {
+    return message.videoMessage.caption.trim();
+  }
+  if (typeof message.buttonsResponseMessage?.selectedDisplayText === "string") {
+    return message.buttonsResponseMessage.selectedDisplayText.trim();
+  }
+  if (typeof message.listResponseMessage?.title === "string") {
+    return message.listResponseMessage.title.trim();
+  }
+  return null;
+}
+
+async function forwardWebhook(payload) {
+  if (!forwardWebhookUrl) return;
+  try {
+    const resp = await fetch(forwardWebhookUrl, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!resp.ok) {
+      logger.warn({ status: resp.status, forwardWebhookUrl }, "Falha ao encaminhar webhook para o Ruptur.");
+    }
+  } catch (err) {
+    logger.warn({ err, forwardWebhookUrl }, "Erro ao encaminhar webhook para o Ruptur.");
+  }
+}
 
 function sanitizeInstanceId(value) {
   const v = String(value || "").trim();
@@ -261,6 +299,26 @@ async function startWhatsApp(inst) {
 
     if (connection === "open") {
       logger.info({ instance: inst.id }, "WhatsApp conectado (Baileys).");
+    }
+  });
+
+  inst.socket.ev.on("messages.upsert", async ({ messages }) => {
+    for (const item of messages || []) {
+      const remoteJid = item?.key?.remoteJid;
+      if (!remoteJid) continue;
+      const payload = {
+        event: "message",
+        instance: inst.id,
+        data: {
+          messageid: item?.key?.id || crypto.randomUUID(),
+          chatid: remoteJid,
+          sender: item?.key?.participant || remoteJid,
+          senderName: item?.pushName || "",
+          text: extractMessageText(item?.message || {}),
+          fromMe: Boolean(item?.key?.fromMe),
+        },
+      };
+      await forwardWebhook(payload);
     }
   });
 }
