@@ -59,6 +59,14 @@ services:
       - ruptur-db
     restart: unless-stopped
 
+  ruptur-web:
+    build:
+      context: ../web
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_RUPTUR_API_BASE_URL: https://api.ruptur.cloud
+    restart: unless-stopped
+
   whisper:
     build:
       context: ./whisper

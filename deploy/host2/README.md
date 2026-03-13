@@ -23,6 +23,7 @@ Esta stack expõe uma API **parecida** com a uazapi (subset), útil para trocar 
   - `baileys.ruptur.cloud` → IP do Host2
   - `api.ruptur.cloud` → IP do Host2
   - `webhook.ruptur.cloud` → IP do Host2
+  - `app.ruptur.cloud` → IP do Host2
 
 ### Subir
 
@@ -59,6 +60,12 @@ docker logs -f host2-baileys-1
 
 ```bash
 http://ruptur-backend:8000/webhook/uazapi
+```
+
+6) O console web ficará disponível em:
+
+```bash
+https://app.ruptur.cloud
 ```
 
 ### Teste (HTTP)
