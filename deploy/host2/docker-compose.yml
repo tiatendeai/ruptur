@@ -41,12 +41,12 @@ services:
       - POSTGRES_PASSWORD=ruptur
     volumes:
       - ruptur_db_data:/var/lib/postgresql/data
-      - ../backend/db/schema.sql:/docker-entrypoint-initdb.d/001_schema.sql:ro
+      - ../../backend/db/schema.sql:/docker-entrypoint-initdb.d/001_schema.sql:ro
     restart: unless-stopped
 
   ruptur-backend:
     build:
-      context: ../backend
+      context: ../../backend
       dockerfile: Dockerfile
     environment:
       - RUPTUR_ENV=prod
@@ -54,14 +54,14 @@ services:
       - RUPTUR_PORT=8000
       - RUPTUR_DATABASE_URL=postgresql://ruptur:ruptur@ruptur-db:5432/ruptur
     volumes:
-      - ../backend/.env:/app/.env:ro
+      - ../../backend/.env:/app/.env:ro
     depends_on:
       - ruptur-db
     restart: unless-stopped
 
   ruptur-web:
     build:
-      context: ../web
+      context: ../../web
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_RUPTUR_API_BASE_URL: https://api.ruptur.cloud
