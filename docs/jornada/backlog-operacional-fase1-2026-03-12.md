@@ -34,6 +34,11 @@ Referencia oficial:
 
 - Definir criterio de aceite do fluxo Fase 1.
 - Congelar o que fica fora da Fase 1.
+- Formalizar o cockpit alvo em quatro frentes:
+  - `MyChat` estilo Chatwoot para inbox e intervencao
+  - `Campanhas` estilo ManyChat/Mlabs para disparos
+  - `Warmup` em kanban para aquecimento e maturacao
+  - `Conexoes` para operar contas e canais ativos
 
 ### Aplicacao
 
@@ -43,6 +48,10 @@ Referencia oficial:
   - dispatcher
   - warmup
   - healthscore
+- Fortalecer `MyChat` como inbox operacional multi-conta.
+- Fortalecer `Campanhas` para criacao, listagem e operacao assistida.
+- Fortalecer `Warmup` com colunas e acoes de aquecimento.
+- Conectar `Conexoes` ao lifecycle das instancias UAZAPI/Baileys.
 
 ### Dados
 
@@ -53,11 +62,19 @@ Referencia oficial:
 
 - Consolidar subdominios de `ruptur.cloud` no inventario.
 - Definir ambiente local e preview como baseline oficial.
+- Consolidar `host2` como stack hibrida:
+  - `traefik`
+  - `baileys`
+  - `ruptur-backend`
+  - `postgres`
+  - `whisper`
+- Deixar `n8n`, `portainer`, `traefik`, `minio`, `typebot` e `redis` prontos em DNS para ativacao progressiva.
 
 ### Governanca
 
 - Rotacionar segredos que apareceram em historico local.
 - Manter backlog vivo por este arquivo ou por ferramenta externa quando ativada.
+- Registrar tudo no GitHub Projects como fonte visivel de execucao.
 
 ## Depois
 
@@ -70,6 +87,8 @@ Referencia oficial:
 - Consolidar `host2` em uma unica raiz operacional.
 - Sanear `.env` da VPS e rotacionar segredos reaproveitados.
 - Atualizar a VPS do commit `02387cf` para o estado mais recente do projeto.
+- Subir landing na raiz `ruptur.cloud` e aplicar o corte claro com `app.ruptur.cloud`.
+- Preparar a camada de automacao para `n8n`, `Temporal` ou `BullMQ`.
 
 ## Bloqueado
 
@@ -83,3 +102,5 @@ Referencia oficial:
 - Consolidacao inicial de governanca
 - Definicao objetiva do criterio de aceite da Fase 1
 - Congelamento formal do escopo da Fase 1
+- Preview local com banco real e smoke tests minimos
+- Validacao de DNS e subdominios operacionais em `ruptur.cloud`

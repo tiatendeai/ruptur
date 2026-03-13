@@ -33,11 +33,11 @@ portfolio:
     host1:
       name: oracle-micro-1
       ip: 129.148.17.85
-      role: traefik + ruptur-backend
+      role: landing + app web
     host2:
       name: oracle-micro-2
       ip: 167.234.228.71
-      role: traefik + baileys + whisper
+      role: traefik + baileys + whisper + ruptur-backend + postgres
 
   domains:
     apex:
@@ -50,11 +50,11 @@ portfolio:
       provider: cloudflare
     api:
       hostname: api.ruptur.cloud
-      host: host1
+      host: host2
       provider: cloudflare
     webhook:
       hostname: webhook.ruptur.cloud
-      host: host1
+      host: host2
       provider: cloudflare
     baileys:
       hostname: baileys.ruptur.cloud

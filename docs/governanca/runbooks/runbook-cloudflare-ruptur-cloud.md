@@ -14,8 +14,8 @@ Zona:
 
 - `ruptur.cloud` -> `129.148.17.85`
 - `app.ruptur.cloud` -> `129.148.17.85`
-- `api.ruptur.cloud` -> `129.148.17.85`
-- `webhook.ruptur.cloud` -> `129.148.17.85`
+- `api.ruptur.cloud` -> `167.234.228.71`
+- `webhook.ruptur.cloud` -> `167.234.228.71`
 - `baileys.ruptur.cloud` -> `167.234.228.71`
 - `n8n.ruptur.cloud` -> `167.234.228.71`
 - `portainer.ruptur.cloud` -> `167.234.228.71`
@@ -27,10 +27,10 @@ Zona:
 
 ## Leitura operacional
 
-- `apex`, `api` e `webhook` apontam para `host1`
-- `baileys`, `n8n`, `portainer`, `traefik`, `minio`, `typebot` e `redis` apontam para `host2`
+- `apex` e `app` apontam para `host1`
+- `api`, `webhook`, `baileys`, `n8n`, `portainer`, `traefik`, `minio`, `typebot` e `redis` apontam para `host2`
 - `www` redireciona via CNAME para o dominio raiz
-- `app` foi reservado como entrada da aplicacao
+- `app` foi reservado como entrada da aplicacao autenticada
 
 ## Observacao de seguranca
 
@@ -38,12 +38,20 @@ Zona:
 - isso nao significa que Redis deva ficar publicamente acessivel
 - o correto e manter restricao por firewall, rede privada ou bind local quando o servico for ativado
 
+## Validacao de roteamento
+
+- `https://api.ruptur.cloud/health` respondeu `200` externamente
+- `api.ruptur.cloud`, `webhook.ruptur.cloud` e `baileys.ruptur.cloud` responderam via `Host` header no Traefik do `host2`
+- `webhook.ruptur.cloud` ainda pode sofrer atraso de propagacao DNS local dependendo do resolvedor
+
 ## Proximo ajuste recomendado
 
-Decidir se `app.ruptur.cloud` sera:
+Subir as interfaces publicas respeitando a separacao:
 
-- o host principal do console web
-- ou se o console ficara no dominio raiz e `www` apenas redireciona
+- `ruptur.cloud` para landing page
+- `app.ruptur.cloud` para aplicacao
+- `api.ruptur.cloud` para backend
+- `webhook.ruptur.cloud` para entrada de webhooks
 
 ## Credenciais e operacao
 

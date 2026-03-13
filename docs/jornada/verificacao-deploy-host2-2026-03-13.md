@@ -18,6 +18,9 @@ No `host2` (`167.234.228.71`) foi confirmado:
 - existe `~/apps/ruptur-host2`
 - o backend responde em `http://127.0.0.1:8000/health`
 - os containers `backend-api-1` e `backend-db-1` estao de pe
+- a stack hibrida em `~/apps/ruptur-host2/host2` tambem responde
+- `api.ruptur.cloud`, `webhook.ruptur.cloud` e `baileys.ruptur.cloud` roteiam no Traefik por `Host` header
+- `https://api.ruptur.cloud/health` respondeu `200`
 
 ## Divergencia operacional encontrada
 
@@ -34,7 +37,7 @@ Isso aumenta risco de:
 - drift de configuracao
 - deploy parcial em lugares diferentes
 
-### 2. Commit da VPS nao e o ultimo do projeto
+### 2. Commit da VPS nao era o ultimo do projeto
 
 O clone operacional em `~/apps/ruptur-backend` estava em:
 
@@ -42,11 +45,17 @@ O clone operacional em `~/apps/ruptur-backend` estava em:
 
 Enquanto o estado atual do projeto local/remoto ja avancou para:
 
-- `0cdc468`
+- `2dbd482`
 
-Conclusao:
+Conclusao inicial:
 
-- o backend em producao parcial nao representa o estado mais atual do `Ruptur`
+- o backend em producao parcial nao representava o estado mais atual do `Ruptur`
+
+Estado apos consolidacao:
+
+- o clone em `~/apps/ruptur-backend` foi atualizado para `2dbd482`
+- o backend foi rebuildado na VPS
+- o health local continuou `200`
 
 ### 3. `.env` da VPS precisa saneamento
 
@@ -68,19 +77,18 @@ Conclusao:
 
 ## Estado real neste momento
 
-- backend local na VPS: parcialmente publicado
-- stack `host2` com Baileys/Traefik/Whisper: separada
-- DNS `api.ruptur.cloud` e `webhook.ruptur.cloud`: ja movidos para `host2`
-- producao atual: funcional em partes, porem ainda nao consolidada
+- backend em `~/apps/ruptur-backend`: publicado e atualizado
+- stack `host2` com Baileys/Traefik/Whisper/Backend/Postgres: funcional
+- DNS `api.ruptur.cloud` e `webhook.ruptur.cloud`: movidos para `host2`
+- producao atual: funcional para health, webhook routing e Baileys
 
 ## Tasks obrigatorias de consolidacao
 
 - escolher uma unica raiz operacional no `host2`
-- atualizar a VPS para o commit mais recente do `Ruptur`
 - sanear `.env` da VPS
-- unificar backend + baileys + traefik na mesma topologia controlada
-- garantir encaminhamento de webhook Baileys -> backend
-- validar health externo via `api.ruptur.cloud`
+- consolidar backend + baileys + traefik na mesma topologia controlada
+- manter encaminhamento de webhook Baileys -> backend como contrato estavel
+- validar health externo via `webhook.ruptur.cloud` apos propagacao local completa
 
 ## Decisao recomendada
 
