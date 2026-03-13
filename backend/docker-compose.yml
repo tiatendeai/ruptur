@@ -1,4 +1,23 @@
 services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      RUPTUR_ENV: prod
+      RUPTUR_DATABASE_URL: postgresql://ruptur:ruptur@db:5432/ruptur
+      # Environment variables expected from .env file or passed at runtime:
+      # RUPTUR_UAZAPI_BASE_URL (URL to Baileys VPS Stack)
+      # RUPTUR_UAZAPI_TOKEN
+      # RUPTUR_UAZAPI_ADMIN_TOKEN
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    restart: unless-stopped
+    volumes:
+      - .env:/app/.env:ro
+
   db:
     image: postgres:16
     environment:
@@ -10,6 +29,7 @@ services:
     volumes:
       - db_data:/var/lib/postgresql/data
       - ./db/schema.sql:/docker-entrypoint-initdb.d/001_schema.sql:ro
+    restart: unless-stopped
 
 volumes:
   db_data:
