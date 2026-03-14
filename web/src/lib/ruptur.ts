@@ -67,6 +67,16 @@ export type RupturBaileysStatus = {
   qrcode?: string;
 };
 
+export type RupturUazapiStatus = {
+  id?: string;
+  status?: string;
+  qrcode?: string;
+  paircode?: string;
+  number?: string;
+  owner?: string;
+  profileName?: string;
+};
+
 export type RupturCampaign = {
   id: string;
   name: string;
@@ -208,6 +218,24 @@ export async function getQueueSummary() {
 export async function listUazapiInstances() {
   const data = await apiFetch("/integrations/uazapi/instances");
   return data as { ok?: boolean; instances?: unknown[] } & Record<string, unknown>;
+}
+
+export async function getUazapiStatus(instance?: string) {
+  const sp = new URLSearchParams();
+  if (instance) sp.set("instance", instance);
+  const data = await apiFetch(`/integrations/uazapi/status${sp.toString() ? `?${sp.toString()}` : ""}`);
+  return (data.uazapi?.instance || data.uazapi || {}) as RupturUazapiStatus;
+}
+
+export async function connectUazapiInstance(instance?: string, phone?: string) {
+  const sp = new URLSearchParams();
+  if (instance) sp.set("instance", instance);
+  const data = await apiFetch(`/integrations/uazapi/connect${sp.toString() ? `?${sp.toString()}` : ""}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(phone ? { phone } : {}),
+  });
+  return (data.uazapi?.instance || data.uazapi || {}) as RupturUazapiStatus;
 }
 
 export async function listBaileysInstances() {

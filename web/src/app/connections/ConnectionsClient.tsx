@@ -1,8 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { rupturApiBaseUrl } from "@/lib/config";
-import { connectBaileysInstance, getBaileysStatus, listBaileysInstances, listChannelHealth, listUazapiInstances, type RupturBaileysInstance, type RupturBaileysStatus, type RupturChannelHealth } from "@/lib/ruptur";
+import {
+  connectBaileysInstance,
+  connectUazapiInstance,
+  getBaileysStatus,
+  getUazapiStatus,
+  listBaileysInstances,
+  listChannelHealth,
+  listUazapiInstances,
+  type RupturBaileysInstance,
+  type RupturBaileysStatus,
+  type RupturChannelHealth,
+} from "@/lib/ruptur";
 
 type UazapiInstance = {
   id?: string;
@@ -12,16 +23,56 @@ type UazapiInstance = {
   qrcode?: string;
   paircode?: string;
   number?: string;
+  profileName?: string;
 };
 
 function extractUazapiInstances(input: Record<string, unknown>): UazapiInstance[] {
   const root = input.uazapi;
-  if (Array.isArray(input.instances)) return input.instances as UazapiInstance[];
-  if (Array.isArray(root)) return root as UazapiInstance[];
+  const pickNumber = (item: Record<string, unknown>) =>
+    [item.number, item.owner, item.phone, item.msisdn].find((value) => typeof value === "string" && value.trim().length > 0) as string | undefined;
+  const normalize = (raw: unknown): UazapiInstance | null => {
+    if (!raw || typeof raw !== "object") return null;
+    const item = raw as Record<string, unknown>;
+    const status = typeof item.status === "string" ? item.status : typeof item.connection === "string" ? item.connection : undefined;
+    const name =
+      typeof item.name === "string"
+        ? item.name
+        : typeof item.instance === "string"
+          ? item.instance
+          : typeof item.id === "string"
+            ? item.id
+            : undefined;
+    return {
+      id: typeof item.id === "string" ? item.id : name,
+      name,
+      status,
+      token: typeof item.token === "string" ? item.token : undefined,
+      qrcode: typeof item.qrcode === "string" ? item.qrcode : undefined,
+      paircode: typeof item.paircode === "string" ? item.paircode : typeof item.code === "string" ? item.code : undefined,
+      number: pickNumber(item),
+      profileName: typeof item.profileName === "string" ? item.profileName : typeof item.pushName === "string" ? item.pushName : undefined,
+    };
+  };
+  const normalizeList = (items: unknown[]) => items.map(normalize).filter((item): item is UazapiInstance => Boolean(item?.name));
+  if (Array.isArray(input.instances)) return normalizeList(input.instances);
+  if (Array.isArray(root)) return normalizeList(root);
   if (root && typeof root === "object" && Array.isArray((root as { instances?: unknown[] }).instances)) {
-    return ((root as { instances?: unknown[] }).instances || []) as UazapiInstance[];
+    return normalizeList((root as { instances?: unknown[] }).instances || []);
   }
   return [];
+}
+
+function isUazapiConnected(status?: string) {
+  const normalized = (status || "").toLowerCase();
+  return normalized === "connected" || normalized === "open" || normalized.includes("connected") || normalized.includes("open");
+}
+
+function pickPreferredUazapiInstance(items: UazapiInstance[]) {
+  return items.find((item) => isUazapiConnected(item.status)) || items.find((item) => item.qrcode || item.paircode) || items[0] || null;
+}
+
+function pickPreferredBaileysInstance(items: RupturBaileysInstance[]) {
+  return items.find((item) => (item.connection || "").toLowerCase() === "open") || items.find((item) => item.hasQr) || items[0] || null;
 }
 
 export default function ConnectionsClient() {
@@ -31,10 +82,11 @@ export default function ConnectionsClient() {
   const [provider, setProvider] = useState<"uazapi" | "baileys">("uazapi");
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
   const [baileysStatus, setBaileysStatus] = useState<RupturBaileysStatus | null>(null);
+  const [uazapiStatus, setUazapiStatus] = useState<UazapiInstance | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [failedQrUrl, setFailedQrUrl] = useState<string | null>(null);
 
-  async function loadConnectionsData(activeProvider: "uazapi" | "baileys") {
+  const loadConnectionsData = useCallback(async (activeProvider: "uazapi" | "baileys") => {
     const [instanceResponse, healthResponse, baileysResponse] = await Promise.allSettled([
       listUazapiInstances(),
       listChannelHealth(),
@@ -68,58 +120,24 @@ export default function ConnectionsClient() {
     setError(errors.length ? errors.join(" | ") : null);
     setSelectedInstanceId((current) => {
       if (activeProvider === "uazapi") {
-        return current || nextUazapiItems[0]?.name || null;
+        const currentStillExists = nextUazapiItems.some((item) => item.name === current);
+        return currentStillExists ? current : pickPreferredUazapiInstance(nextUazapiItems)?.name || null;
       }
-      return current || nextBaileysItems[0]?.instance || null;
+      const currentStillExists = nextBaileysItems.some((item) => item.instance === current);
+      return currentStillExists ? current : pickPreferredBaileysInstance(nextBaileysItems)?.instance || null;
     });
-  }
+  }, [baileysInstances, instances]);
 
   async function refresh() {
+    setFailedQrUrl(null);
     await loadConnectionsData(provider);
   }
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const [instanceResponse, healthResponse, baileysResponse] = await Promise.allSettled([
-        listUazapiInstances(),
-        listChannelHealth(),
-        listBaileysInstances(),
-      ]);
-
       if (cancelled) return;
-
-      const errors: string[] = [];
-      let nextUazapiItems = instances;
-      let nextBaileysItems = baileysInstances;
-
-      if (instanceResponse.status === "fulfilled") {
-        nextUazapiItems = extractUazapiInstances(instanceResponse.value);
-        setInstances(nextUazapiItems);
-      } else {
-        errors.push(`uazapi: ${instanceResponse.reason instanceof Error ? instanceResponse.reason.message : String(instanceResponse.reason)}`);
-      }
-
-      if (healthResponse.status === "fulfilled") {
-        setHealth(healthResponse.value);
-      } else {
-        errors.push(`health: ${healthResponse.reason instanceof Error ? healthResponse.reason.message : String(healthResponse.reason)}`);
-      }
-
-      if (baileysResponse.status === "fulfilled") {
-        nextBaileysItems = baileysResponse.value;
-        setBaileysInstances(nextBaileysItems);
-      } else {
-        errors.push(`baileys: ${baileysResponse.reason instanceof Error ? baileysResponse.reason.message : String(baileysResponse.reason)}`);
-      }
-
-      setError(errors.length ? errors.join(" | ") : null);
-      setSelectedInstanceId((current) => {
-        if (provider === "uazapi") {
-          return current || nextUazapiItems[0]?.name || null;
-        }
-        return current || nextBaileysItems[0]?.instance || null;
-      });
+      await loadConnectionsData(provider);
     })().catch((e) => {
       if (cancelled) return;
       setError(e instanceof Error ? e.message : String(e));
@@ -127,7 +145,7 @@ export default function ConnectionsClient() {
     return () => {
       cancelled = true;
     };
-  }, [baileysInstances, instances, provider]);
+  }, [loadConnectionsData, provider]);
 
   useEffect(() => {
     if (provider !== "baileys" || !selectedInstanceId) return;
@@ -136,14 +154,37 @@ export default function ConnectionsClient() {
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
   }, [provider, selectedInstanceId]);
 
+  useEffect(() => {
+    if (provider !== "uazapi" || !selectedInstanceId) return;
+    void getUazapiStatus(selectedInstanceId)
+      .then((item) =>
+        setUazapiStatus({
+          id: item.id || selectedInstanceId,
+          name: selectedInstanceId,
+          status: item.status,
+          qrcode: item.qrcode,
+          paircode: item.paircode,
+          number: item.number || item.owner,
+          profileName: item.profileName,
+        }),
+      )
+      .catch(() => setUazapiStatus(null));
+  }, [provider, selectedInstanceId]);
+
   function switchProvider(next: "uazapi" | "baileys") {
     setProvider(next);
-    setSelectedInstanceId(next === "uazapi" ? instances[0]?.name || null : baileysInstances[0]?.instance || null);
+    setFailedQrUrl(null);
+    setSelectedInstanceId(
+      next === "uazapi"
+        ? pickPreferredUazapiInstance(instances)?.name || null
+        : pickPreferredBaileysInstance(baileysInstances)?.instance || null,
+    );
     if (next !== "baileys") setBaileysStatus(null);
+    if (next !== "uazapi") setUazapiStatus(null);
   }
 
   const summary = useMemo(() => {
-    const connected = instances.filter((item) => (item.status || "").toLowerCase().includes("open")).length;
+    const connected = instances.filter((item) => isUazapiConnected(item.status)).length;
     const baileysConnected = baileysInstances.filter((item) => (item.connection || "").toLowerCase() === "open").length;
     return {
       total: provider === "uazapi" ? instances.length : baileysInstances.length,
@@ -156,10 +197,11 @@ export default function ConnectionsClient() {
     () => instances.find((instance) => (instance.name || null) === selectedInstanceId) || null,
     [instances, selectedInstanceId],
   );
+  const selectedUazapiDetails = uazapiStatus || selectedUazapiInstance;
 
   const qrUrl =
     provider === "uazapi"
-      ? selectedUazapiInstance?.qrcode || (selectedInstanceId
+      ? selectedUazapiDetails?.qrcode || (selectedInstanceId
         ? `${rupturApiBaseUrl()}/integrations/uazapi/qrcode.png?instance=${encodeURIComponent(selectedInstanceId)}`
         : null)
       : selectedInstanceId
@@ -248,13 +290,21 @@ export default function ConnectionsClient() {
                     selectedInstanceId === (instance.name || null) ? "border-sky-300/30" : "border-white/10",
                   ].join(" ")}
                 >
-                  <button type="button" onClick={() => setSelectedInstanceId(instance.name || null)} className="w-full text-left">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFailedQrUrl(null);
+                      setSelectedInstanceId(instance.name || null);
+                    }}
+                    className="w-full text-left"
+                  >
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className="text-lg font-medium">{instance.name || `Instancia ${index + 1}`}</div>
                       <div className="mt-1 text-xs uppercase tracking-[0.25em] text-zinc-500">
                         {instance.status || "status_indefinido"}
                       </div>
+                      {instance.profileName ? <div className="mt-2 text-sm text-zinc-400">{instance.profileName}</div> : null}
                     </div>
                     <div className="rounded-full border border-white/10 px-3 py-1 text-xs text-zinc-300">
                       {instance.number || "sem_numero"}
@@ -271,7 +321,14 @@ export default function ConnectionsClient() {
                     selectedInstanceId === (instance.instance || null) ? "border-amber-300/30" : "border-white/10",
                   ].join(" ")}
                 >
-                  <button type="button" onClick={() => setSelectedInstanceId(instance.instance || null)} className="w-full text-left">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFailedQrUrl(null);
+                      setSelectedInstanceId(instance.instance || null);
+                    }}
+                    className="w-full text-left"
+                  >
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="text-lg font-medium">{instance.instance || `Instancia ${index + 1}`}</div>
@@ -305,12 +362,44 @@ export default function ConnectionsClient() {
             {provider === "uazapi" ? (
               <>
                 <div className="mt-4 text-xs uppercase tracking-[0.25em] text-zinc-500">status</div>
-                <div className="mt-2 text-sm text-zinc-200">{selectedUazapiInstance?.status || "sem_status"}</div>
+                <div className="mt-2 text-sm text-zinc-200">{selectedUazapiDetails?.status || "sem_status"}</div>
                 <div className="mt-4 text-xs uppercase tracking-[0.25em] text-zinc-500">numero</div>
-                <div className="mt-2 text-sm text-zinc-200">{selectedUazapiInstance?.number || "sem_numero"}</div>
+                <div className="mt-2 text-sm text-zinc-200">{selectedUazapiDetails?.number || "sem_numero"}</div>
+                {selectedUazapiDetails?.profileName ? (
+                  <>
+                    <div className="mt-4 text-xs uppercase tracking-[0.25em] text-zinc-500">perfil</div>
+                    <div className="mt-2 text-sm text-zinc-200">{selectedUazapiDetails.profileName}</div>
+                  </>
+                ) : null}
                 <div className="mt-4 text-xs uppercase tracking-[0.25em] text-zinc-500">codigo de conexao</div>
                 <div className="mt-2 rounded-2xl border border-dashed border-white/10 bg-black/20 px-4 py-3 text-sm text-zinc-200">
-                  {selectedUazapiInstance?.paircode || "sem_codigo_disponivel"}
+                  {selectedUazapiDetails?.paircode || "sem_codigo_disponivel"}
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      selectedInstanceId &&
+                      void connectUazapiInstance(selectedInstanceId)
+                        .then((item) =>
+                          setUazapiStatus({
+                            id: item.id || selectedInstanceId,
+                            name: selectedInstanceId,
+                            status: item.status,
+                            qrcode: item.qrcode,
+                            paircode: item.paircode,
+                            number: item.number || item.owner,
+                            profileName: item.profileName,
+                          }),
+                        )
+                        .then(() => refresh())
+                        .catch((e) => setError(e instanceof Error ? e.message : String(e)))
+                    }
+                    disabled={!selectedInstanceId}
+                    className="rounded-full border border-white/10 px-4 py-2 text-sm text-zinc-200 hover:bg-white/5 disabled:opacity-50"
+                  >
+                    Gerar QR ou codigo
+                  </button>
                 </div>
               </>
             ) : null}
