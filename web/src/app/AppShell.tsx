@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 const NAV_ITEMS = [
   { href: "/inbox", label: "MyChat", kicker: "Inbox" },
+  { href: "/crm", label: "CRM", kicker: "Modulo" },
   { href: "/pipeline", label: "Pipeline", kicker: "CRM" },
   { href: "/broadcasts", label: "Campanhas", kicker: "Disparos" },
   { href: "/warmup", label: "Warmup", kicker: "Maturacao" },
