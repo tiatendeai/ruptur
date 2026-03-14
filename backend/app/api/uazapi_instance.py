@@ -41,6 +41,22 @@ class InitInstanceRequest(BaseModel):
     name: str = Field(min_length=1, description="Nome da instância (único)")
     systemName: str | None = Field(default=None, description="Nome do sistema (opcional)")
 
+
+def _list_single_instance() -> dict[str, Any]:
+    if not settings.uazapi_token:
+        raise HTTPException(status_code=400, detail="uazapi_admin_not_configured")
+    status = client(settings, token=settings.uazapi_token).instance_status()
+    instance = status.get("instance") if isinstance(status.get("instance"), dict) else {}
+    item = {
+        "id": instance.get("id") or "default",
+        "name": instance.get("id") or "default",
+        "status": instance.get("status") or "unknown",
+        "qrcode": instance.get("qrcode") or "",
+        "number": instance.get("number") or "",
+    }
+    return {"ok": True, "uazapi": [redact(item)]}
+
+
 @router.get("/instances")
 def list_instances(
     x_uazapi_admintoken: str | None = Header(default=None, alias="x-uazapi-admintoken"),
@@ -50,6 +66,21 @@ def list_instances(
     """
     try:
         return {"ok": True, "uazapi": redact(admin_client(settings, admin_token=x_uazapi_admintoken).list_instances())}
+    except HTTPException as exc:
+        if exc.status_code == 400 and exc.detail == "uazapi_admin_not_configured":
+            try:
+                return _list_single_instance()
+            except UazapiError as upstream_exc:
+                raise HTTPException(
+                    status_code=502,
+                    detail={
+                        "error": str(upstream_exc),
+                        "upstream_status": upstream_exc.status_code,
+                        "upstream_body": upstream_exc.body,
+                        "upstream_url": upstream_exc.url,
+                    },
+                )
+        raise
     except UazapiError as exc:
         raise HTTPException(
             status_code=502,
