@@ -21,7 +21,15 @@ class Settings(BaseSettings):
         description="Lista separada por vírgula de origins permitidos (ou *).",
     )
 
-    public_url: str = Field(default="https://api.ruptur.cloud", alias="RUPTUR_PUBLIC_URL")
+    public_url: str = Field(default="http://localhost:8000", alias="RUPTUR_PUBLIC_URL")
+    
+    # ElevenLabs Config
+    eleven_api_key: str | None = Field(default=None, alias="RUPTUR_ELEVEN_API_KEY")
+    eleven_voice_id: str = Field(default="aU2vcrnwi348Gnc2Y1si", alias="RUPTUR_ELEVEN_VOICE_ID")
+    
+    # OpenAI Prompt Config
+    openai_prompt_id: str | None = Field(default=None, alias="RUPTUR_OPENAI_PROMPT_ID")
+    openai_prompt_version: str = Field(default="1", alias="RUPTUR_OPENAI_PROMPT_VERSION")
 
     uazapi_base_url: str | None = Field(default=None, alias="RUPTUR_UAZAPI_BASE_URL")
     uazapi_token: str | None = Field(default=None, alias="RUPTUR_UAZAPI_TOKEN")

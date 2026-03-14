@@ -22,12 +22,26 @@ def _digits_only(value: str) -> str:
     return "".join(ch for ch in value if ch.isdigit())
 
 
+def neutralize_br_number(number: str) -> str:
+    """
+    Remove o nono dígito de números brasileiros (especialmente DDD 31) 
+    para contornar o bug de sincronização do WhatsApp Mobile.
+    Ex: 5531989131980 -> 553189131980
+    """
+    digits = "".join(ch for ch in number if ch.isdigit())
+    if digits.startswith("55") and len(digits) == 13 and digits[4] == "9":
+        return digits[:4] + digits[5:]
+    return digits
+
+
 def extract_phone_from_jid(jid: str | None) -> str | None:
     if not jid:
         return None
     if "@g.us" in jid:
         return None
     digits = _digits_only(jid)
+    if digits and digits.startswith("55"):
+        return neutralize_br_number(digits)
     return digits or None
 
 
