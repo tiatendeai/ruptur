@@ -1,16 +1,17 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Space_Grotesk, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
-import Link from "next/link";
+import AppShell from "./AppShell";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const spaceGrotesk = Space_Grotesk({
+  variable: "--font-space-grotesk",
   subsets: ["latin"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const ibmPlexMono = IBM_Plex_Mono({
+  variable: "--font-ibm-plex-mono",
   subsets: ["latin"],
+  weight: ["400", "500", "600"],
 });
 
 export const metadata: Metadata = {
@@ -25,51 +26,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-zinc-950 text-zinc-50`}
-      >
-        <div className="min-h-dvh">
-          <div className="mx-auto grid min-h-dvh max-w-7xl grid-cols-12 gap-0">
-            <aside className="col-span-12 border-b border-white/10 bg-zinc-950/80 px-4 py-3 backdrop-blur md:col-span-3 md:min-h-dvh md:border-b-0 md:border-r">
-              <div className="flex items-center justify-between md:block">
-                <div>
-                  <div className="text-base font-semibold tracking-wide">Ruptur</div>
-                  <div className="text-sm text-zinc-400">Console</div>
-                </div>
-              </div>
-              <nav className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-1">
-                <Link className="rounded-lg px-3 py-2 text-base hover:bg-white/5" href="/inbox">
-                  MyChat
-                </Link>
-                <Link className="rounded-lg px-3 py-2 text-base hover:bg-white/5" href="/pipeline">
-                  Pipeline
-                </Link>
-                <Link className="rounded-lg px-3 py-2 text-base hover:bg-white/5" href="/broadcasts">
-                  Campanhas
-                </Link>
-                <Link className="rounded-lg px-3 py-2 text-base hover:bg-white/5" href="/warmup">
-                  Warmup
-                </Link>
-                <Link className="rounded-lg px-3 py-2 text-base hover:bg-white/5" href="/connections">
-                  Conexões
-                </Link>
-                <Link className="rounded-lg px-3 py-2 text-base hover:bg-white/5" href="/sendflow">
-                  Sendflow
-                </Link>
-                <Link className="rounded-lg px-3 py-2 text-base hover:bg-white/5" href="/metrics">
-                  Métricas
-                </Link>
-                <Link className="rounded-lg px-3 py-2 text-base hover:bg-white/5" href="/billing">
-                  Planos
-                </Link>
-              </nav>
-              <div className="mt-6 hidden text-sm text-zinc-500 md:block">
-                Canal primário • canal contingência
-              </div>
-            </aside>
-            <main className="col-span-12 bg-zinc-950 px-4 py-6 md:col-span-9 md:px-6">{children}</main>
-          </div>
-        </div>
+      <body className={`${spaceGrotesk.variable} ${ibmPlexMono.variable} antialiased`}>
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );
