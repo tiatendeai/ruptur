@@ -20,7 +20,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/sendflow", label: "Sendflow", kicker: "Fluxos" },
   { href: "/metrics", label: "Metricas", kicker: "Saude" },
   { href: "/billing", label: "Planos", kicker: "Receita" },
-  { href: "/studio", label: "Studio", kicker: "Connectome" },
+  { href: "https://studio.ruptur.cloud", label: "Studio", kicker: "Connectome", external: true },
 ];
 
 export default function AppShell({

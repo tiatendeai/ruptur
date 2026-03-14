@@ -1420,42 +1420,32 @@
         highlight.setAttribute("class", "highlight");
         group.appendChild(highlight);
 
-        const orbitGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
-        orbitGroup.setAttribute("transform", `translate(${pos.x} ${pos.y})`);
+        const core = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        core.setAttribute("cx", pos.x);
+        core.setAttribute("cy", pos.y);
+        core.setAttribute("r", Math.max(2.2, radius * 0.14));
+        core.setAttribute("fill", layerColors[node.layer] || "white");
+        core.setAttribute("opacity", "0.92");
+        group.appendChild(core);
 
-        const orbitA = document.createElementNS("http://www.w3.org/2000/svg", "ellipse");
-        orbitA.setAttribute("cx", 0);
-        orbitA.setAttribute("cy", 0);
-        orbitA.setAttribute("rx", radius * 0.46);
-        orbitA.setAttribute("ry", radius * 0.2);
-        orbitA.setAttribute("class", "orbit");
-        orbitGroup.appendChild(orbitA);
+        const innerOrbitA = document.createElementNS("http://www.w3.org/2000/svg", "ellipse");
+        innerOrbitA.setAttribute("cx", pos.x);
+        innerOrbitA.setAttribute("cy", pos.y);
+        innerOrbitA.setAttribute("rx", radius * 0.34);
+        innerOrbitA.setAttribute("ry", Math.max(3, radius * 0.11));
+        innerOrbitA.setAttribute("class", "orbit");
+        innerOrbitA.setAttribute("opacity", "0.35");
+        group.appendChild(innerOrbitA);
 
-        const orbitB = document.createElementNS("http://www.w3.org/2000/svg", "ellipse");
-        orbitB.setAttribute("cx", 0);
-        orbitB.setAttribute("cy", 0);
-        orbitB.setAttribute("rx", radius * 0.34);
-        orbitB.setAttribute("ry", radius * 0.14);
-        orbitB.setAttribute("class", "orbit");
-        orbitB.setAttribute("transform", "rotate(62)");
-        orbitGroup.appendChild(orbitB);
-
-        const atomDot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-        atomDot.setAttribute("cx", radius * 0.46);
-        atomDot.setAttribute("cy", 0);
-        atomDot.setAttribute("r", Math.max(1.6, radius * 0.08));
-        atomDot.setAttribute("class", "atom-dot");
-
-        const atomSpin = document.createElementNS("http://www.w3.org/2000/svg", "animateTransform");
-        atomSpin.setAttribute("attributeName", "transform");
-        atomSpin.setAttribute("type", "rotate");
-        atomSpin.setAttribute("from", "0 0 0");
-        atomSpin.setAttribute("to", "360 0 0");
-        atomSpin.setAttribute("dur", `${6 + (radiusBase % 5)}s`);
-        atomSpin.setAttribute("repeatCount", "indefinite");
-        orbitGroup.appendChild(atomDot);
-        orbitGroup.appendChild(atomSpin);
-        group.appendChild(orbitGroup);
+        const innerOrbitB = document.createElementNS("http://www.w3.org/2000/svg", "ellipse");
+        innerOrbitB.setAttribute("cx", pos.x);
+        innerOrbitB.setAttribute("cy", pos.y);
+        innerOrbitB.setAttribute("rx", radius * 0.26);
+        innerOrbitB.setAttribute("ry", Math.max(3, radius * 0.09));
+        innerOrbitB.setAttribute("class", "orbit");
+        innerOrbitB.setAttribute("transform", `rotate(62 ${pos.x} ${pos.y})`);
+        innerOrbitB.setAttribute("opacity", "0.28");
+        group.appendChild(innerOrbitB);
 
         group.appendChild(circle);
 

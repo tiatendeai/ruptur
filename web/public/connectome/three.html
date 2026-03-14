@@ -490,33 +490,57 @@
       function buildBrainShell() {
         shellGroup.clear();
 
-        const shellGeometry = new THREE.SphereGeometry(260, 40, 32);
-        shellGeometry.scale(1.15, 0.92, 0.96);
-        const shellMat = new THREE.MeshPhysicalMaterial({
+        const hemiMaterial = new THREE.MeshPhysicalMaterial({
           color: 0x0c1a28,
           transparent: true,
-          opacity: 0.08,
-          roughness: 0.35,
-          metalness: 0.1,
-          transmission: 0.2,
+          opacity: 0.1,
+          roughness: 0.34,
+          metalness: 0.08,
+          transmission: 0.18,
           side: THREE.DoubleSide,
         });
-        const shell = new THREE.Mesh(shellGeometry, shellMat);
-        shellGroup.add(shell);
 
-        const wire = new THREE.LineSegments(
-          new THREE.WireframeGeometry(shellGeometry),
-          new THREE.LineBasicMaterial({ color: 0x79d8ff, transparent: true, opacity: 0.18 })
-        );
-        shellGroup.add(wire);
+        const leftGeometry = new THREE.SphereGeometry(188, 42, 32);
+        leftGeometry.scale(1.05, 1.02, 0.92);
+        const leftHemi = new THREE.Mesh(leftGeometry, hemiMaterial.clone());
+        leftHemi.position.set(-105, 16, -26);
+        shellGroup.add(leftHemi);
 
-        const split = new THREE.TorusGeometry(160, 1.5, 12, 120);
-        const splitMesh = new THREE.Mesh(
-          split,
-          new THREE.MeshBasicMaterial({ color: 0xff7b54, transparent: true, opacity: 0.24 })
+        const rightGeometry = new THREE.SphereGeometry(188, 42, 32);
+        rightGeometry.scale(1.05, 1.02, 0.92);
+        const rightHemi = new THREE.Mesh(rightGeometry, hemiMaterial.clone());
+        rightHemi.position.set(105, 16, -26);
+        shellGroup.add(rightHemi);
+
+        const cerebellumGeometry = new THREE.SphereGeometry(92, 28, 24);
+        cerebellumGeometry.scale(1.08, 0.72, 0.84);
+        const cerebellum = new THREE.Mesh(cerebellumGeometry, hemiMaterial.clone());
+        cerebellum.position.set(0, -150, -86);
+        shellGroup.add(cerebellum);
+
+        [leftGeometry, rightGeometry, cerebellumGeometry].forEach((geometry, index) => {
+          const wire = new THREE.LineSegments(
+            new THREE.WireframeGeometry(geometry),
+            new THREE.LineBasicMaterial({
+              color: index === 2 ? 0xff7b54 : 0x79d8ff,
+              transparent: true,
+              opacity: index === 2 ? 0.16 : 0.14
+            })
+          );
+          if (index === 0) wire.position.copy(leftHemi.position);
+          if (index === 1) wire.position.copy(rightHemi.position);
+          if (index === 2) wire.position.copy(cerebellum.position);
+          shellGroup.add(wire);
+        });
+
+        const groove = new THREE.Mesh(
+          new THREE.CapsuleGeometry(10, 292, 10, 24),
+          new THREE.MeshBasicMaterial({ color: 0xff7b54, transparent: true, opacity: 0.12 })
         );
-        splitMesh.rotation.y = Math.PI / 2;
-        shellGroup.add(splitMesh);
+        groove.rotation.z = Math.PI / 2;
+        groove.rotation.y = Math.PI / 2;
+        groove.position.set(0, 8, -24);
+        shellGroup.add(groove);
       }
 
       function createAtomCore(radius, color) {
@@ -625,8 +649,8 @@
           const from = nodeMap.get(fromId);
           const to = nodeMap.get(toId);
           if (!from || !to) return;
-          const geom = new THREE.BufferGeometry().setFromPoints([from.position, to.position]);
-          const mat = new THREE.LineBasicMaterial({ color: 0x79d8ff, transparent: true, opacity: 0.28 });
+          const geom = new THREE.BufferGeometry();
+          const mat = new THREE.LineBasicMaterial({ color: 0x79d8ff, transparent: true, opacity: 0.34 });
           const line = new THREE.Line(geom, mat);
           line.userData = { fromId, toId };
           groups.add(line);
@@ -637,14 +661,29 @@
       }
 
       function setBrainLayout() {
+        const compactMap = {
+          adk: [-150, 108, -28],
+          jarvis: [150, 112, -40],
+          machine_builder: [0, 132, -12],
+          ruptur: [0, 28, 96],
+          crm: [-118, 12, 48],
+          messaging: [126, -2, 54],
+          cockpit: [138, 70, 46],
+          whatsapp: [178, 28, 110],
+          lead: [-70, -96, 88],
+          automation: [28, -76, 46],
+          prospect: [-182, 24, 70],
+          qualification: [-144, -44, 82],
+          followup: [6, -152, 82],
+          opportunity: [118, -124, 72]
+        };
         dataset.forEach((node, index) => {
-          const angle = (index / dataset.length) * Math.PI * 2;
-          const side = index % 2 === 0 ? -1 : 1;
-          const cluster = node.mass * 18;
+          const base = compactMap[node.id] || [0, 0, 0];
+          const wobble = (index % 3) - 1;
           node.base = [
-            side * (70 + Math.cos(angle) * (65 + cluster)),
-            Math.sin(angle * 1.8) * (120 + cluster * 0.6),
-            Math.cos(angle * 1.4) * (90 + cluster)
+            base[0] + wobble * 5,
+            base[1] + Math.sin(index * 1.7) * 4,
+            base[2] + Math.cos(index * 1.1) * 4
           ];
         });
         buildNodes();
@@ -838,10 +877,15 @@
         linkMeshes.forEach((line) => {
           const from = nodeMap.get(line.userData.fromId);
           const to = nodeMap.get(line.userData.toId);
-          line.geometry.setFromPoints([from.position, to.position]);
+          const midpoint = from.position.clone().add(to.position).multiplyScalar(0.5);
+          const lift = 26 + Math.abs(from.position.x - to.position.x) * 0.08;
+          midpoint.y += lift;
+          midpoint.z -= 18;
+          const curve = new THREE.QuadraticBezierCurve3(from.position.clone(), midpoint, to.position.clone());
+          line.geometry.setFromPoints(curve.getPoints(20));
         });
 
-        shellGroup.rotation.y = t * 0.05;
+        shellGroup.rotation.y = t * 0.032;
         controls.update();
         renderer.render(scene, camera);
         requestAnimationFrame(animate);
