@@ -32,13 +32,16 @@ async def process_ai_response(payload: dict[str, Any], lead_id: str, conversatio
     """
     Background task to generate and send AI response.
     """
+    print(f"[DEBUG] Starting process_ai_response for lead={lead_id} conv={conversation_id}")
     try:
         with connect() as conn:
             lead = conn.execute("SELECT name, phone, source FROM leads WHERE id = %s", (lead_id,)).fetchone()
             if not lead:
+                print(f"[DEBUG] Lead {lead_id} not found in DB")
                 return
             
             lead_name, lead_phone, lead_source = lead
+            print(f"[DEBUG] Processing for {lead_name} ({lead_phone})")
             
             # Puxar histórico recente
             history_rows = crm_repo.list_messages(conn, conversation_id=conversation_id, limit=10)
@@ -47,7 +50,12 @@ async def process_ai_response(payload: dict[str, Any], lead_id: str, conversatio
                 role = "assistant" if m.direction == "out" else "user"
                 history.append({"role": role, "content": m.body or ""})
 
-            last_msg = history[-1]["content"] if history else ""
+            if not history:
+                print("[DEBUG] No history found, skipping response")
+                return
+
+            last_msg = history[-1]["content"]
+            print(f"[DEBUG] Last message found: {last_msg[:50]}...")
             
             # Gerar resposta do Jarvis
             response_text = agent_service.get_jarvis_response(
@@ -55,6 +63,7 @@ async def process_ai_response(payload: dict[str, Any], lead_id: str, conversatio
                 last_message=last_msg,
                 history=history[:-1]
             )
+            print(f"[DEBUG] Jarvis generated response: {response_text[:50]}...")
 
             # Salvar no banco
             external_id = crm_repo.store_out_message(
@@ -64,6 +73,7 @@ async def process_ai_response(payload: dict[str, Any], lead_id: str, conversatio
                 raw={"processed_by": "jarvis_ai"}
             )
             conn.commit()
+            print(f"[DEBUG] Stored Jarvis response message id: {external_id}")
 
             # Enviar via Provedor correto
             # Neutralizar o número para garantir o sync no celular
@@ -72,21 +82,28 @@ async def process_ai_response(payload: dict[str, Any], lead_id: str, conversatio
             is_baileys = "instance" in payload or "jid" in payload.get("data", {})
             
             if is_baileys and settings.baileys_base_url:
+                print(f"[DEBUG] Sending via Baileys to {clean_number}")
                 client = BaileysClient(base_url=settings.baileys_base_url, instance_id=settings.baileys_instance_id)
-                client.send_text(number=clean_number, text=response_text)
-                logger.info(f"AI Response sent via Baileys to {clean_number}")
+                res = client.send_text(number=clean_number, text=response_text)
+                print(f"[DEBUG] Baileys response: {res}")
             elif settings.uazapi_base_url and settings.uazapi_token:
+                print(f"[DEBUG] Sending via UAZAPI to {clean_number}")
                 client = UazapiClient(base_url=settings.uazapi_base_url, token=settings.uazapi_token)
-                client.send_text(number=clean_number, text=response_text)
-                logger.info(f"AI Response sent via UAZAPI to {clean_number}")
+                res = client.send_text(number=clean_number, text=response_text)
+                print(f"[DEBUG] UAZAPI response: {res}")
+            else:
+                print("[DEBUG] No provider configured for sending response")
 
     except Exception as e:
+        print(f"[DEBUG ERROR] Error in process_ai_response: {e}")
         logger.error(f"Error in process_ai_response: {e}")
 
 
 @router.post("/uazapi")
 async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks) -> dict[str, Any]:
     payload = await request.json()
+    print(f"\n[WEBHOOK] Payload received: {str(payload)[:200]}...")
+    
     if not isinstance(payload, dict):
         raise HTTPException(status_code=400, detail="payload must be a JSON object")
 
@@ -94,22 +111,30 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks) ->
         with connect() as conn:
             result = ingest_uazapi_webhook(conn, payload)
             conn.commit()
+            print(f"[WEBHOOK] Ingestion result: stored={result.stored} lead={result.lead_id} conv={result.conversation_id}")
             
             if result.stored and result.lead_id and result.conversation_id:
-                # Verificar se é uma mensagem de entrada (in) para disparar o agente
                 fields = extract_message_fields(payload)
                 chatid = fields.get("chatid") or ""
+                from_me = fields.get("from_me")
+                
+                print(f"[WEBHOOK] Checking AI Trigger: chatid={chatid} from_me={from_me}")
                 
                 # Regra de Grupos: 
-                # Se for grupo (@g.us), só responde se estiver na whitelist RUPTUR_ALLOWED_GROUPS_JIDS.
-                # Se for chat privado (s.whatsapp.net), responde normalmente.
                 is_group = "@g.us" in chatid
                 allowed_groups = [jid.strip() for jid in settings.allowed_groups_jids.split(",") if jid.strip()]
                 
                 should_respond = not is_group or chatid in allowed_groups
+                print(f"[WEBHOOK] is_group={is_group} allowed={chatid in allowed_groups} should_respond={should_respond}")
                 
-                if fields.get("from_me") is False and should_respond:
+                # Resiliência para from_me (pode vir como string em alguns adaptadores)
+                is_from_me = str(from_me).lower() == "true"
+                
+                if is_from_me is False and should_respond:
+                   print(f"[WEBHOOK] AI Response queued for lead {result.lead_id}")
                    background_tasks.add_task(process_ai_response, payload, result.lead_id, result.conversation_id)
+                else:
+                   print(f"[WEBHOOK] AI Response SKIPPED (from_me={from_me}, should_respond={should_respond})")
 
             return {
                 "ok": True,
@@ -118,6 +143,7 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks) ->
                 "conversation_id": result.conversation_id,
                 "message_id": result.message_id,
             }
-    except DatabaseNotConfiguredError:
-        return {"ok": True, "stored": False, "reason": "database_not_configured"}
+    except Exception as e:
+        print(f"[WEBHOOK ERROR] {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
