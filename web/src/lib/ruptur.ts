@@ -9,6 +9,27 @@ export type RupturLead = {
   conversation_id?: string | null;
   last_message_at?: string | null;
   last_message_body?: string | null;
+  last_message_direction?: "in" | "out" | null;
+  labels?: string[];
+  assignee_name?: string | null;
+  assignee_team?: string | null;
+  paused?: boolean;
+  manual_override?: boolean;
+};
+
+export type RupturLabel = {
+  key: string;
+  name: string;
+  color: string;
+};
+
+export type RupturSavedView = {
+  id: string;
+  scope: string;
+  name: string;
+  definition: Record<string, string>;
+  position: number;
+  is_shared: boolean;
 };
 
 export type RupturMessage = {
@@ -95,6 +116,70 @@ export async function updateLead(
     body: JSON.stringify(input),
   });
   return data as { ok: boolean };
+}
+
+export async function listLabels() {
+  const data = await apiFetch("/crm/labels");
+  return (data.labels || []) as RupturLabel[];
+}
+
+export async function setLeadLabels(leadId: string, labels: string[]) {
+  const data = await apiFetch(`/crm/leads/${leadId}/labels`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ labels }),
+  });
+  return data as { ok: boolean };
+}
+
+export async function assignLead(
+  leadId: string,
+  input: {
+    owner_name?: string;
+    team?: string;
+  },
+) {
+  const data = await apiFetch(`/crm/leads/${leadId}/assign`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  return data as { ok: boolean };
+}
+
+export async function updateLeadAutomationState(
+  leadId: string,
+  input: {
+    paused?: boolean;
+    manual_override?: boolean;
+  },
+) {
+  const data = await apiFetch(`/crm/leads/${leadId}/automation`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  return data as { ok: boolean };
+}
+
+export async function listSavedViews(scope = "inbox") {
+  const data = await apiFetch(`/crm/views?scope=${encodeURIComponent(scope)}`);
+  return (data.views || []) as RupturSavedView[];
+}
+
+export async function createSavedView(input: {
+  scope?: string;
+  name: string;
+  definition: Record<string, string>;
+  position?: number;
+  is_shared?: boolean;
+}) {
+  const data = await apiFetch("/crm/views", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  return data as { ok: boolean; id: string };
 }
 
 export async function listUazapiInstances() {

@@ -35,12 +35,24 @@ async def process_ai_response(payload: dict[str, Any], lead_id: str, conversatio
     print(f"[DEBUG] Starting process_ai_response for lead={lead_id} conv={conversation_id}")
     try:
         with connect() as conn:
-            lead = conn.execute("SELECT name, phone, source FROM leads WHERE id = %s", (lead_id,)).fetchone()
+            lead = conn.execute(
+                """
+                SELECT name, phone, source, paused, manual_override
+                FROM leads
+                WHERE id = %s
+                """,
+                (lead_id,),
+            ).fetchone()
             if not lead:
                 print(f"[DEBUG] Lead {lead_id} not found in DB")
                 return
             
-            lead_name, lead_phone, lead_source = lead
+            lead_name, lead_phone, lead_source, paused, manual_override = lead
+            if paused or manual_override:
+                print(
+                    f"[DEBUG] AI response suppressed for lead={lead_id} paused={paused} manual_override={manual_override}"
+                )
+                return
             print(f"[DEBUG] Processing for {lead_name} ({lead_phone})")
             
             # Puxar histórico recente
@@ -149,4 +161,3 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks) ->
     except Exception as e:
         print(f"[WEBHOOK ERROR] {e}")
         raise HTTPException(status_code=500, detail=str(e))
-

@@ -26,6 +26,29 @@ class LeadRow:
     conversation_id: str | None
     last_message_at: str | None
     last_message_body: str | None
+    last_message_direction: str | None
+    labels: list[str]
+    assignee_name: str | None
+    assignee_team: str | None
+    paused: bool
+    manual_override: bool
+
+
+@dataclass(frozen=True)
+class LabelRow:
+    key: str
+    name: str
+    color: str
+
+
+@dataclass(frozen=True)
+class SavedViewRow:
+    id: str
+    scope: str
+    name: str
+    definition: dict[str, Any]
+    position: int
+    is_shared: bool
 
 
 @dataclass(frozen=True)
@@ -47,6 +70,65 @@ def list_stages(conn: Connection) -> list[StageRow]:
         """
     ).fetchall()
     return [StageRow(key=r[0], name=r[1], position=r[2], is_terminal=r[3]) for r in rows]
+
+
+def list_labels(conn: Connection) -> list[LabelRow]:
+    rows = conn.execute(
+        """
+        SELECT key, name, color
+        FROM crm_labels
+        ORDER BY name ASC
+        """
+    ).fetchall()
+    return [LabelRow(key=r[0], name=r[1], color=r[2]) for r in rows]
+
+
+def create_label(conn: Connection, *, key: str, name: str, color: str) -> None:
+    conn.execute(
+        """
+        INSERT INTO crm_labels (key, name, color)
+        VALUES (%s, %s, %s)
+        ON CONFLICT (key) DO UPDATE
+          SET name = EXCLUDED.name,
+              color = EXCLUDED.color
+        """,
+        (key, name, color),
+    )
+
+
+def list_saved_views(conn: Connection, *, scope: str) -> list[SavedViewRow]:
+    rows = conn.execute(
+        """
+        SELECT id::text, scope, name, definition, position, is_shared
+        FROM saved_views
+        WHERE scope = %s
+        ORDER BY position ASC, created_at ASC
+        """,
+        (scope,),
+    ).fetchall()
+    return [
+        SavedViewRow(id=r[0], scope=r[1], name=r[2], definition=r[3] or {}, position=r[4], is_shared=r[5]) for r in rows
+    ]
+
+
+def create_saved_view(
+    conn: Connection,
+    *,
+    scope: str,
+    name: str,
+    definition: dict[str, Any],
+    position: int,
+    is_shared: bool,
+) -> str:
+    row = conn.execute(
+        """
+        INSERT INTO saved_views (scope, name, definition, position, is_shared)
+        VALUES (%s, %s, %s, %s, %s)
+        RETURNING id::text
+        """,
+        (scope, name, Jsonb(definition), position, is_shared),
+    ).fetchone()
+    return row[0]
 
 
 def create_stage(conn: Connection, *, key: str, name: str, position: int, is_terminal: bool) -> None:
@@ -90,9 +172,18 @@ def list_leads(conn: Connection, *, status: str | None, q: str | None, limit: in
           SELECT DISTINCT ON (m.conversation_id)
             m.conversation_id,
             m.created_at AS last_message_at,
-            m.body AS last_message_body
+            m.body AS last_message_body,
+            m.direction AS last_message_direction
           FROM messages m
           ORDER BY m.conversation_id, m.created_at DESC
+        ),
+        label_agg AS (
+          SELECT
+            ll.lead_id,
+            array_agg(cl.key ORDER BY cl.name) AS labels
+          FROM lead_label_links ll
+          JOIN crm_labels cl ON cl.id = ll.label_id
+          GROUP BY ll.lead_id
         )
         SELECT
           l.id::text,
@@ -102,10 +193,18 @@ def list_leads(conn: Connection, *, status: str | None, q: str | None, limit: in
           l.updated_at::text,
           conv.conversation_id::text,
           last_msg.last_message_at::text,
-          last_msg.last_message_body
+          last_msg.last_message_body,
+          last_msg.last_message_direction,
+          COALESCE(label_agg.labels, '{{}}'::text[]),
+          la.owner_name,
+          la.team,
+          l.paused,
+          l.manual_override
         FROM leads l
         LEFT JOIN conv ON conv.lead_id = l.id
         LEFT JOIN last_msg ON last_msg.conversation_id = conv.conversation_id
+        LEFT JOIN label_agg ON label_agg.lead_id = l.id
+        LEFT JOIN lead_assignments la ON la.lead_id = l.id
         {where_sql}
         ORDER BY l.updated_at DESC
         LIMIT %s
@@ -123,6 +222,12 @@ def list_leads(conn: Connection, *, status: str | None, q: str | None, limit: in
             conversation_id=r[5],
             last_message_at=r[6],
             last_message_body=r[7],
+            last_message_direction=r[8],
+            labels=list(r[9] or []),
+            assignee_name=r[10],
+            assignee_team=r[11],
+            paused=r[12],
+            manual_override=r[13],
         )
         for r in rows
     ]
@@ -139,6 +244,84 @@ def update_lead(conn: Connection, *, lead_id: str, name: str | None, status: str
     conn.execute(
         "INSERT INTO pipeline_events (lead_id, event_type, payload) VALUES (%s,'lead_updated',%s)",
         (lead_id, Jsonb({"name": name, "status": status})),
+    )
+    return True
+
+
+def set_lead_automation_state(
+    conn: Connection,
+    *,
+    lead_id: str,
+    paused: bool | None,
+    manual_override: bool | None,
+) -> bool:
+    row = conn.execute("SELECT paused, manual_override FROM leads WHERE id = %s", (lead_id,)).fetchone()
+    if not row:
+        return False
+    next_paused = paused if paused is not None else row[0]
+    next_manual_override = manual_override if manual_override is not None else row[1]
+    conn.execute(
+        """
+        UPDATE leads
+        SET paused = %s,
+            manual_override = %s,
+            updated_at = now()
+        WHERE id = %s
+        """,
+        (next_paused, next_manual_override, lead_id),
+    )
+    conn.execute(
+        "INSERT INTO pipeline_events (lead_id, event_type, payload) VALUES (%s,'automation_state_updated',%s)",
+        (lead_id, Jsonb({"paused": next_paused, "manual_override": next_manual_override})),
+    )
+    return True
+
+
+def set_lead_labels(conn: Connection, *, lead_id: str, label_keys: list[str]) -> bool:
+    row = conn.execute("SELECT 1 FROM leads WHERE id = %s", (lead_id,)).fetchone()
+    if not row:
+        return False
+
+    conn.execute("DELETE FROM lead_label_links WHERE lead_id = %s", (lead_id,))
+    if label_keys:
+        label_rows = conn.execute(
+            "SELECT id FROM crm_labels WHERE key = ANY(%s)",
+            (label_keys,),
+        ).fetchall()
+        for label_row in label_rows:
+            conn.execute(
+                """
+                INSERT INTO lead_label_links (lead_id, label_id)
+                VALUES (%s, %s)
+                ON CONFLICT DO NOTHING
+                """,
+                (lead_id, label_row[0]),
+            )
+    conn.execute(
+        "INSERT INTO pipeline_events (lead_id, event_type, payload) VALUES (%s,'labels_updated',%s)",
+        (lead_id, Jsonb({"labels": label_keys})),
+    )
+    return True
+
+
+def assign_lead(conn: Connection, *, lead_id: str, owner_name: str | None, team: str | None) -> bool:
+    row = conn.execute("SELECT 1 FROM leads WHERE id = %s", (lead_id,)).fetchone()
+    if not row:
+        return False
+    conn.execute(
+        """
+        INSERT INTO lead_assignments (lead_id, owner_name, team, assigned_at, updated_at)
+        VALUES (%s, %s, %s, now(), now())
+        ON CONFLICT (lead_id) DO UPDATE
+          SET owner_name = EXCLUDED.owner_name,
+              team = EXCLUDED.team,
+              updated_at = now()
+        """,
+        (lead_id, owner_name, team),
+    )
+    conn.execute(
+        "INSERT INTO pipeline_events (lead_id, event_type, payload) VALUES (%s,'lead_assigned',%s)",
+        (lead_id, Jsonb({"owner_name": owner_name, "team": team})),
     )
     return True
 
@@ -188,4 +371,3 @@ def upsert_pipeline_stages(conn: Connection, items: Iterable[StageRow]) -> None:
             """,
             (s.key, s.name, s.position, s.is_terminal),
         )
-

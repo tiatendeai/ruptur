@@ -84,6 +84,55 @@ class Lead(BaseModel):
     conversation_id: str | None = None
     last_message_at: str | None = None
     last_message_body: str | None = None
+    last_message_direction: str | None = None
+    labels: list[str] = Field(default_factory=list)
+    assignee_name: str | None = None
+    assignee_team: str | None = None
+    paused: bool = False
+    manual_override: bool = False
+
+
+class Label(BaseModel):
+    key: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    color: str = Field(min_length=1)
+
+
+class CreateLabelRequest(BaseModel):
+    key: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    color: str = Field(default="sand", min_length=1)
+
+
+class SetLeadLabelsRequest(BaseModel):
+    labels: list[str] = Field(default_factory=list)
+
+
+class AssignLeadRequest(BaseModel):
+    owner_name: str | None = None
+    team: str | None = None
+
+
+class UpdateLeadAutomationStateRequest(BaseModel):
+    paused: bool | None = None
+    manual_override: bool | None = None
+
+
+class SavedView(BaseModel):
+    id: str
+    scope: str
+    name: str = Field(min_length=1)
+    definition: dict[str, Any] = Field(default_factory=dict)
+    position: int = 0
+    is_shared: bool = True
+
+
+class CreateSavedViewRequest(BaseModel):
+    scope: str = Field(default="inbox", min_length=1)
+    name: str = Field(min_length=1)
+    definition: dict[str, Any] = Field(default_factory=dict)
+    position: int = 0
+    is_shared: bool = True
 
 
 @router.get("/leads")
@@ -101,6 +150,27 @@ def list_leads(
         return {"ok": True, "leads": [], "reason": "database_not_configured"}
 
 
+@router.get("/labels")
+def list_labels() -> dict[str, Any]:
+    try:
+        with connect() as conn:
+            rows = crm_repo.list_labels(conn)
+            return {"ok": True, "labels": [Label(**r.__dict__).model_dump() for r in rows]}
+    except DatabaseNotConfiguredError:
+        return {"ok": True, "labels": [], "reason": "database_not_configured"}
+
+
+@router.post("/labels")
+def create_label(req: CreateLabelRequest) -> dict[str, Any]:
+    try:
+        with connect() as conn:
+            crm_repo.create_label(conn, key=req.key, name=req.name, color=req.color)
+            conn.commit()
+            return {"ok": True}
+    except DatabaseNotConfiguredError:
+        raise HTTPException(status_code=503, detail="database_not_configured")
+
+
 class UpdateLeadRequest(BaseModel):
     name: str | None = None
     status: str | None = None
@@ -115,6 +185,78 @@ def update_lead(lead_id: str, req: UpdateLeadRequest) -> dict[str, Any]:
                 raise HTTPException(status_code=404, detail="lead_not_found")
             conn.commit()
             return {"ok": True}
+    except DatabaseNotConfiguredError:
+        raise HTTPException(status_code=503, detail="database_not_configured")
+
+
+@router.patch("/leads/{lead_id}/labels")
+def set_lead_labels(lead_id: str, req: SetLeadLabelsRequest) -> dict[str, Any]:
+    try:
+        with connect() as conn:
+            ok = crm_repo.set_lead_labels(conn, lead_id=lead_id, label_keys=req.labels)
+            if not ok:
+                raise HTTPException(status_code=404, detail="lead_not_found")
+            conn.commit()
+            return {"ok": True}
+    except DatabaseNotConfiguredError:
+        raise HTTPException(status_code=503, detail="database_not_configured")
+
+
+@router.patch("/leads/{lead_id}/assign")
+def assign_lead(lead_id: str, req: AssignLeadRequest) -> dict[str, Any]:
+    try:
+        with connect() as conn:
+            ok = crm_repo.assign_lead(conn, lead_id=lead_id, owner_name=req.owner_name, team=req.team)
+            if not ok:
+                raise HTTPException(status_code=404, detail="lead_not_found")
+            conn.commit()
+            return {"ok": True}
+    except DatabaseNotConfiguredError:
+        raise HTTPException(status_code=503, detail="database_not_configured")
+
+
+@router.patch("/leads/{lead_id}/automation")
+def update_lead_automation_state(lead_id: str, req: UpdateLeadAutomationStateRequest) -> dict[str, Any]:
+    try:
+        with connect() as conn:
+            ok = crm_repo.set_lead_automation_state(
+                conn,
+                lead_id=lead_id,
+                paused=req.paused,
+                manual_override=req.manual_override,
+            )
+            if not ok:
+                raise HTTPException(status_code=404, detail="lead_not_found")
+            conn.commit()
+            return {"ok": True}
+    except DatabaseNotConfiguredError:
+        raise HTTPException(status_code=503, detail="database_not_configured")
+
+
+@router.get("/views")
+def list_saved_views(scope: str = Query(default="inbox")) -> dict[str, Any]:
+    try:
+        with connect() as conn:
+            rows = crm_repo.list_saved_views(conn, scope=scope)
+            return {"ok": True, "views": [SavedView(**r.__dict__).model_dump() for r in rows]}
+    except DatabaseNotConfiguredError:
+        return {"ok": True, "views": [], "reason": "database_not_configured"}
+
+
+@router.post("/views")
+def create_saved_view(req: CreateSavedViewRequest) -> dict[str, Any]:
+    try:
+        with connect() as conn:
+            view_id = crm_repo.create_saved_view(
+                conn,
+                scope=req.scope,
+                name=req.name,
+                definition=req.definition,
+                position=req.position,
+                is_shared=req.is_shared,
+            )
+            conn.commit()
+            return {"ok": True, "id": view_id}
     except DatabaseNotConfiguredError:
         raise HTTPException(status_code=503, detail="database_not_configured")
 

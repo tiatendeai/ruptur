@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #d7d2c5;
-  --foreground: #11181d;
+  --background: #f6f1e8;
+  --foreground: #16110f;
 }
 
 @theme inline {
@@ -16,6 +16,11 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-space-grotesk), sans-serif;
+  background-image:
+    linear-gradient(180deg, rgba(161, 78, 47, 0.08), transparent 22%),
+    linear-gradient(90deg, rgba(22, 17, 15, 0.035) 1px, transparent 1px),
+    linear-gradient(rgba(22, 17, 15, 0.03) 1px, transparent 1px);
+  background-size: auto, 28px 28px, 28px 28px;
 }
 
 code, pre, kbd, samp {
@@ -44,4 +49,9 @@ pre {
 
 *::-webkit-scrollbar-track {
   background: transparent;
+}
+
+::selection {
+  background: #111111;
+  color: #f3efe6;
 }

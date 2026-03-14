@@ -93,3 +93,17 @@ Cada item deve conter:
 - criterio de aceite
 - plano de rollback se houver risco operacional
 - registro em doc se a decisao alterar politica, processo ou arquitetura
+
+## Entregas multi-time
+
+Quando mais de um time atua sobre a mesma frente:
+
+- congelar fronteiras antes de abrir execucao paralela
+- nomear um dono por trilha e um coordenador unico da entrega
+- registrar contratos entre modulos no repositorio
+- registrar bloqueios e decisoes no proprio projeto, nao em conversa solta
+- evitar que dois times editem o mesmo arquivo central no mesmo ciclo
+
+Referencia ativa:
+
+- `docs/jornada/plano-conjunto-pipeline-agent-2026-03-14.md`

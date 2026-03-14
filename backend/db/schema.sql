@@ -15,6 +15,16 @@ CREATE TABLE IF NOT EXISTS leads (
 
 CREATE UNIQUE INDEX IF NOT EXISTS leads_phone_uniq ON leads (phone) WHERE phone IS NOT NULL;
 
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT 'unknown';
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS external_id text;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS phone text;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS name text;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'novo';
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS paused boolean NOT NULL DEFAULT false;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS manual_override boolean NOT NULL DEFAULT false;
+
 CREATE TABLE IF NOT EXISTS conversations (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   lead_id uuid NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
@@ -68,6 +78,61 @@ CREATE TABLE IF NOT EXISTS pipeline_events (
 );
 
 CREATE INDEX IF NOT EXISTS pipeline_events_lead_idx ON pipeline_events (lead_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS crm_labels (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  key text NOT NULL UNIQUE,
+  name text NOT NULL,
+  color text NOT NULL DEFAULT 'sand',
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+INSERT INTO crm_labels (key, name, color)
+VALUES
+  ('vip', 'VIP', 'amber'),
+  ('urgente', 'Urgente', 'red'),
+  ('proposta', 'Proposta', 'sky'),
+  ('retorno', 'Retorno', 'emerald')
+ON CONFLICT (key) DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS lead_label_links (
+  lead_id uuid NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
+  label_id uuid NOT NULL REFERENCES crm_labels(id) ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (lead_id, label_id)
+);
+
+CREATE INDEX IF NOT EXISTS lead_label_links_label_idx ON lead_label_links (label_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS lead_assignments (
+  lead_id uuid PRIMARY KEY REFERENCES leads(id) ON DELETE CASCADE,
+  owner_name text,
+  team text,
+  assigned_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS lead_assignments_team_idx ON lead_assignments (team, updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS saved_views (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  scope text NOT NULL DEFAULT 'inbox',
+  name text NOT NULL,
+  definition jsonb NOT NULL DEFAULT '{}'::jsonb,
+  position int NOT NULL DEFAULT 0,
+  is_shared boolean NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS saved_views_scope_idx ON saved_views (scope, position, created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS saved_views_scope_name_uniq ON saved_views (scope, name);
+
+INSERT INTO saved_views (scope, name, definition, position, is_shared)
+VALUES
+  ('inbox', 'Responder agora', '{"queueFilter":"awaiting_us"}'::jsonb, 10, true),
+  ('inbox', 'Sem conversa', '{"queueFilter":"no_conversation"}'::jsonb, 20, true),
+  ('inbox', 'Qualificados', '{"statusFilter":"qualificado"}'::jsonb, 30, true)
+ON CONFLICT (scope, name) DO NOTHING;
 
 -- Sendflow: fontes (grupos/comunidades/canais) + opt-in (consentimento)
 CREATE TABLE IF NOT EXISTS sendflow_sources (

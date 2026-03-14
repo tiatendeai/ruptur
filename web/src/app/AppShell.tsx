@@ -20,41 +20,42 @@ export default function AppShell({
   children: React.ReactNode;
 }>) {
   const pathname = usePathname();
+  const currentItem = NAV_ITEMS.find((item) => pathname.startsWith(item.href)) ?? NAV_ITEMS[0];
 
   return (
-    <div className="min-h-dvh bg-[radial-gradient(circle_at_top_left,rgba(245,158,11,0.18),transparent_28%),radial-gradient(circle_at_85%_20%,rgba(14,165,233,0.2),transparent_24%),linear-gradient(180deg,#0b1115_0%,#12191e_52%,#d7d2c5_52%,#d7d2c5_100%)] text-zinc-950">
-      <div className="mx-auto min-h-dvh max-w-[1680px] px-3 py-3 sm:px-4 lg:px-5">
-        <div className="grid min-h-[calc(100dvh-1.5rem)] grid-cols-1 gap-3 lg:grid-cols-[300px_minmax(0,1fr)]">
-          <aside className="overflow-hidden rounded-[32px] border border-black/10 bg-[#0f171c] text-zinc-50 shadow-[0_32px_120px_rgba(0,0,0,0.34)]">
-            <div className="border-b border-white/10 bg-[linear-gradient(135deg,rgba(245,158,11,0.2),rgba(15,23,28,0.9))] px-5 pb-5 pt-6">
-              <div className="text-[11px] uppercase tracking-[0.45em] text-amber-200/75">Ruptur Ops</div>
-              <div className="mt-3 flex items-end justify-between gap-3">
-                <div>
-                  <div className="font-sans text-3xl font-semibold leading-none tracking-[-0.04em]">Console</div>
-                  <div className="mt-2 max-w-[16rem] text-sm text-zinc-300">
-                    cockpit comercial para mensageria, CRM e intervencao operacional
-                  </div>
-                </div>
-                <div className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-[10px] uppercase tracking-[0.25em] text-zinc-300">
+    <div className="min-h-dvh text-zinc-950">
+      <div className="mx-auto min-h-dvh max-w-[1720px] px-3 py-3 sm:px-4 sm:py-4 lg:px-5">
+        <div className="grid min-h-[calc(100dvh-1.5rem)] gap-3 lg:grid-cols-[264px_minmax(0,1fr)]">
+          <aside className="flex min-h-0 flex-col overflow-hidden rounded-[32px] border border-black/10 bg-[#f8f4ec]/95 shadow-[0_24px_80px_rgba(70,43,31,0.12)] backdrop-blur">
+            <div className="border-b border-black/10 px-5 pb-5 pt-6">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-[11px] uppercase tracking-[0.42em] text-[#9d4e31]">Ruptur Ops</div>
+                <div className="rounded-full border border-[#9d4e31]/20 bg-[#fffaf2] px-2.5 py-1 text-[10px] uppercase tracking-[0.24em] text-[#9d4e31]">
                   live
                 </div>
               </div>
+              <div className="mt-5 text-[2.4rem] font-semibold leading-[0.9] tracking-[-0.08em] text-[#16110f]">
+                Control
+                <br />
+                Deck
+              </div>
+              <p className="mt-4 max-w-[16rem] text-sm leading-6 text-zinc-600">
+                operacao comercial com leitura rapida, contexto continuo e menos ruido visual.
+              </p>
             </div>
 
-            <div className="px-3 pb-4 pt-3">
-              <div className="grid grid-cols-2 gap-2 px-2 text-[10px] uppercase tracking-[0.25em] text-zinc-500">
-                <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-3">
-                  canal primario
-                  <div className="mt-2 text-xs text-zinc-200">uazapi</div>
-                </div>
-                <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-3">
-                  contingencia
-                  <div className="mt-2 text-xs text-zinc-200">baileys</div>
-                </div>
+            <div className="grid grid-cols-2 gap-px border-b border-black/10 bg-black/10 text-[10px] uppercase tracking-[0.28em]">
+              <div className="bg-[#f3ecdf] px-4 py-4 text-zinc-500">
+                stack
+                <div className="mt-2 text-xs tracking-[0.12em] text-zinc-900">uazapi + baileys</div>
+              </div>
+              <div className="bg-[#f3ecdf] px-4 py-4 text-zinc-500">
+                ambiente
+                <div className="mt-2 text-xs tracking-[0.12em] text-zinc-900">app.ruptur.cloud</div>
               </div>
             </div>
 
-            <nav className="grid gap-2 px-3 pb-4">
+            <nav className="grid gap-2 px-3 py-4 sm:grid-cols-2 lg:grid-cols-1">
               {NAV_ITEMS.map((item, index) => {
                 const active = pathname === item.href;
                 return (
@@ -62,50 +63,65 @@ export default function AppShell({
                     key={item.href}
                     href={item.href}
                     className={[
-                      "group relative overflow-hidden rounded-[24px] border px-4 py-4 transition",
+                      "group relative overflow-hidden rounded-[22px] border px-4 py-4 transition",
                       active
-                        ? "border-amber-300/25 bg-[linear-gradient(135deg,rgba(245,158,11,0.16),rgba(255,255,255,0.05))] text-white shadow-[0_18px_40px_rgba(0,0,0,0.28)]"
-                        : "border-white/8 bg-white/[0.03] text-zinc-300 hover:border-white/15 hover:bg-white/[0.06]",
+                        ? "border-[#9d4e31]/30 bg-[#fff8ef] text-zinc-950 shadow-[0_14px_32px_rgba(70,43,31,0.1)]"
+                        : "border-black/8 bg-[#fbf7f0] text-zinc-700 hover:border-black/15 hover:bg-white",
                     ].join(" ")}
                   >
-                    <div className="absolute right-3 top-3 font-mono text-[10px] text-zinc-500">0{index + 1}</div>
+                    <div className="absolute right-3 top-3 font-mono text-[10px] text-zinc-400">0{index + 1}</div>
                     <div className="text-[10px] uppercase tracking-[0.32em] text-zinc-500">{item.kicker}</div>
-                    <div className="mt-2 font-sans text-lg font-medium tracking-[-0.03em]">{item.label}</div>
+                    <div className="mt-2 font-sans text-lg font-medium tracking-[-0.04em]">{item.label}</div>
                   </Link>
                 );
               })}
             </nav>
+
+            <div className="mt-auto border-t border-black/10 px-5 py-4">
+              <div className="text-[10px] uppercase tracking-[0.3em] text-zinc-500">modo</div>
+              <div className="mt-2 text-sm text-zinc-700">operacao assistida para equipe comercial</div>
+            </div>
           </aside>
 
           <div className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-3">
-            <header className="overflow-hidden rounded-[32px] border border-black/10 bg-[#efe9de] px-5 py-4 shadow-[0_24px_90px_rgba(0,0,0,0.16)]">
-              <div className="grid gap-3 xl:grid-cols-[1.4fr_0.6fr]">
-                <div className="flex flex-col justify-between gap-3">
-                  <div className="text-[11px] uppercase tracking-[0.42em] text-zinc-500">Operational Layer</div>
-                  <div className="max-w-3xl font-sans text-3xl font-semibold leading-[0.95] tracking-[-0.05em] text-zinc-950">
-                    operacao visivel para campanhas, inbox, aquecimento e decisao comercial em um unico cockpit
+            <header className="overflow-hidden rounded-[32px] border border-black/10 bg-[#fcfaf5] shadow-[0_18px_64px_rgba(70,43,31,0.1)]">
+              <div className="grid gap-px xl:grid-cols-[minmax(0,1fr)_380px]">
+                <div className="bg-[#fcfaf5] px-5 py-5 sm:px-6">
+                  <div className="flex flex-wrap items-center gap-3 text-[11px] uppercase tracking-[0.38em] text-zinc-500">
+                    <span>{currentItem.kicker}</span>
+                    <span className="rounded-full border border-black/10 px-2.5 py-1 tracking-[0.22em] text-[#9d4e31]">
+                      {currentItem.label}
+                    </span>
+                  </div>
+                  <div className="mt-4 max-w-4xl font-sans text-3xl font-semibold leading-[0.94] tracking-[-0.065em] text-zinc-950 sm:text-[2.8rem]">
+                    operacao clara, decisao rapida e menos cenografia entre a equipe e a conversa.
+                  </div>
+                  <div className="mt-5 flex flex-wrap gap-2 text-[11px] uppercase tracking-[0.24em] text-zinc-500">
+                    <span className="rounded-full border border-black/10 bg-white px-3 py-1.5">canal primario ativo</span>
+                    <span className="rounded-full border border-black/10 bg-white px-3 py-1.5">crm em linha</span>
+                    <span className="rounded-full border border-black/10 bg-white px-3 py-1.5">acoes manuais liberadas</span>
                   </div>
                 </div>
 
-                <div className="grid gap-2 sm:grid-cols-3 xl:grid-cols-1">
-                  <div className="rounded-[24px] border border-black/10 bg-white/80 px-4 py-3">
+                <div className="grid gap-px bg-black/10 sm:grid-cols-3 xl:grid-cols-1">
+                  <div className="bg-[#efe4d4] px-5 py-4">
                     <div className="text-[10px] uppercase tracking-[0.28em] text-zinc-500">estado</div>
-                    <div className="mt-2 text-sm font-medium text-zinc-900">preview de producao</div>
+                    <div className="mt-2 text-sm font-medium text-zinc-900">producao assistida</div>
                   </div>
-                  <div className="rounded-[24px] border border-black/10 bg-[#0f171c] px-4 py-3 text-zinc-50">
-                    <div className="text-[10px] uppercase tracking-[0.28em] text-zinc-500">dominio</div>
-                    <div className="mt-2 text-sm font-medium">app.ruptur.cloud</div>
+                  <div className="bg-[#9d4e31] px-5 py-4 text-[#fff7ee]">
+                    <div className="text-[10px] uppercase tracking-[0.28em] text-zinc-200">modulo ativo</div>
+                    <div className="mt-2 text-sm font-medium">{currentItem.label}</div>
                   </div>
-                  <div className="rounded-[24px] border border-black/10 bg-[linear-gradient(135deg,rgba(14,165,233,0.16),rgba(255,255,255,0.9))] px-4 py-3">
+                  <div className="bg-[#efe4d4] px-5 py-4">
                     <div className="text-[10px] uppercase tracking-[0.28em] text-zinc-500">foco</div>
-                    <div className="mt-2 text-sm font-medium text-zinc-900">entrega ponta a ponta</div>
+                    <div className="mt-2 text-sm font-medium text-zinc-900">leitura operacional</div>
                   </div>
                 </div>
               </div>
             </header>
 
-            <main className="min-h-0 overflow-hidden rounded-[32px] border border-black/10 bg-[#d7d2c5] p-3 shadow-[0_28px_100px_rgba(0,0,0,0.18)] sm:p-4 lg:p-5">
-              <div className="min-h-full overflow-auto rounded-[28px] border border-black/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.5),rgba(244,239,232,0.82))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] sm:p-5">
+            <main className="min-h-0 overflow-hidden rounded-[32px] border border-black/10 bg-[#fffdf8]/90 p-2 shadow-[0_28px_90px_rgba(70,43,31,0.12)] sm:p-3">
+              <div className="min-h-full overflow-auto rounded-[26px] bg-[#fffaf2] p-4 text-zinc-950 sm:p-5">
                 {children}
               </div>
             </main>
