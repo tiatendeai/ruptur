@@ -30,13 +30,14 @@ def neutralize_br_number(number: str) -> str:
         return digits[:4] + digits[5:]
     return digits
 
-async def process_ai_response(payload: dict[str, Any], lead_id: str, conversation_id: str):
+async def process_ai_response(payload: dict[str, Any], lead_id: str, conversation_id: str, last_msg: str, message_id: str):
     """
-    Background task to generate and send AI response.
+    Processa a resposta da IA em segundo plano.
     """
-    print(f"[DEBUG] Starting process_ai_response for lead={lead_id} conv={conversation_id}")
+    print(f"[DEBUG] Starting process_ai_response for lead={lead_id} conv={conversation_id} msg_id={message_id}")
     try:
         with connect() as conn:
+            # Pegar dados do lead
             lead = conn.execute(
                 """
                 SELECT name, phone, source, paused, manual_override
@@ -57,25 +58,23 @@ async def process_ai_response(payload: dict[str, Any], lead_id: str, conversatio
                 return
             print(f"[DEBUG] Processing for {lead_name} ({lead_phone})")
             
-            # Puxar histórico recente
+            # Puxar histórico recente (excluindo a mensagem atual que já foi passada)
             history_rows = crm_repo.list_messages(conn, conversation_id=conversation_id, limit=10)
             history = []
             for m in reversed(history_rows):
+                if m.id == message_id:
+                    continue # Pula a mensagem atual pois ela será o 'last_message'
                 role = "assistant" if m.direction == "out" else "user"
                 history.append({"role": role, "content": m.body or ""})
-
-            if not history:
-                print("[DEBUG] No history found, skipping response")
-                return
-
-            last_msg = history[-1]["content"]
-            print(f"[DEBUG] Last message found: {last_msg[:50]}...")
+            
+            print(f"[DEBUG] Reconstructed history (context): {json.dumps(history, ensure_ascii=False)}")
+            print(f"[DEBUG] Current message (trigger): '{last_msg}'")
             
             # Gerar resposta do Jarvis
             response_text = agent_service.get_jarvis_response(
                 lead_name=lead_name or lead_phone or "Cliente",
                 last_message=last_msg,
-                history=history[:-1]
+                history=history
             )
             print(f"[DEBUG] Lead: {lead_name}, Msg: '{last_msg}', History Length: {len(history)}")
             print(f"[DEBUG] Jarvis generated response: {response_text[:50]}...")
@@ -123,8 +122,9 @@ async def process_ai_response(payload: dict[str, Any], lead_id: str, conversatio
                     with open(file_path, "wb") as f:
                         f.write(audio_data)
                     
-                    audio_url = f"{settings.public_url}/static/audio/{filename}"
-                    print(f"[DEBUG] Sending via Baileys to {target_jid} with audio: {audio_url}")
+                    # Usar rede interna do Docker para o Baileys baixar o arquivo rápido
+                    audio_url = f"http://ruptur-backend:8000/static/audio/{filename}"
+                    print(f"[DEBUG] Sending via Baileys to {target_jid} with audio (internal): {audio_url}")
                     res = client.send_voice_jid(jid=target_jid, audio_url=audio_url)
                 else:
                     print(f"[DEBUG] Sending via Baileys to {target_jid}")
@@ -187,7 +187,14 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks) ->
                 
                 if is_from_me is False and should_respond and result.message_id:
                    print(f"[WEBHOOK] AI Response queued for lead {result.lead_id} (Message: {result.message_id})")
-                   background_tasks.add_task(process_ai_response, payload, result.lead_id, result.conversation_id)
+                   background_tasks.add_task(
+                       process_ai_response, 
+                       payload, 
+                       result.lead_id, 
+                       result.conversation_id, 
+                       fields["body"], 
+                       result.message_id
+                   )
                 else:
                    reason = "duplicate" if not result.message_id else "from_me/not_allowed"
                    print(f"[WEBHOOK] AI Response SKIPPED (reason={reason}, from_me={from_me}, should_respond={should_respond})")

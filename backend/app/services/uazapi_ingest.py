@@ -71,6 +71,8 @@ def extract_message_fields(payload: dict[str, Any]) -> dict[str, Any]:
     transcription = data.get("transcription")
     from_me = data.get("fromMe")
 
+    print(f"[DEBUG INGEST] messageid={message_external_id}, text={text}, transcription={transcription}")
+    
     body = None
     if isinstance(text, str) and text.strip():
         body = text
@@ -78,11 +80,13 @@ def extract_message_fields(payload: dict[str, Any]) -> dict[str, Any]:
         body = f"[Áudio Transcrito]: {transcription}"
     else:
         content = data.get("content")
+        print(f"[DEBUG INGEST] Using content fallback: {content}")
         if isinstance(content, str) and content.strip():
             body = content
         elif content is not None:
             body = json.dumps(content, ensure_ascii=False)
 
+    print(f"[DEBUG INGEST] Final body extracted: '{body}'")
     return {
         "message_external_id": str(message_external_id) if message_external_id else None,
         "chatid": str(chatid) if chatid else None,
