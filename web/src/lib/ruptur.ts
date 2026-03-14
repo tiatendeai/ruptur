@@ -15,6 +15,7 @@ export type RupturLead = {
   assignee_team?: string | null;
   paused?: boolean;
   manual_override?: boolean;
+  queue_state?: "paused" | "manual" | "no_conversation" | "awaiting_us" | "awaiting_contact" | "active";
 };
 
 export type RupturLabel = {
@@ -32,6 +33,11 @@ export type RupturSavedView = {
   is_shared: boolean;
 };
 
+export type RupturQueueSummaryItem = {
+  key: "paused" | "manual" | "no_conversation" | "awaiting_us" | "awaiting_contact" | "active";
+  total: number;
+};
+
 export type RupturMessage = {
   id: string;
   external_id: string;
@@ -47,6 +53,18 @@ export type RupturChannelHealth = {
   score: number;
   status: string;
   updated_at: string;
+};
+
+export type RupturBaileysInstance = {
+  instance?: string;
+  connection?: string;
+  hasQr?: boolean;
+};
+
+export type RupturBaileysStatus = {
+  id?: string;
+  status?: string;
+  qrcode?: string;
 };
 
 export type RupturCampaign = {
@@ -182,9 +200,35 @@ export async function createSavedView(input: {
   return data as { ok: boolean; id: string };
 }
 
+export async function getQueueSummary() {
+  const data = await apiFetch("/crm/queues/summary");
+  return (data.items || []) as RupturQueueSummaryItem[];
+}
+
 export async function listUazapiInstances() {
   const data = await apiFetch("/integrations/uazapi/instances");
   return data as { ok?: boolean; instances?: unknown[] } & Record<string, unknown>;
+}
+
+export async function listBaileysInstances() {
+  const data = await apiFetch("/integrations/baileys/instances");
+  return (data.items || []) as RupturBaileysInstance[];
+}
+
+export async function getBaileysStatus(instance?: string) {
+  const sp = new URLSearchParams();
+  if (instance) sp.set("instance", instance);
+  const data = await apiFetch(`/integrations/baileys/status${sp.toString() ? `?${sp.toString()}` : ""}`);
+  return (data.instance || {}) as RupturBaileysStatus;
+}
+
+export async function connectBaileysInstance(instance?: string) {
+  const sp = new URLSearchParams();
+  if (instance) sp.set("instance", instance);
+  const data = await apiFetch(`/integrations/baileys/connect${sp.toString() ? `?${sp.toString()}` : ""}`, {
+    method: "POST",
+  });
+  return (data.instance || {}) as RupturBaileysStatus;
 }
 
 export async function listChannelHealth() {

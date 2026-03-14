@@ -238,3 +238,49 @@ E o mesmo para `Time Cockpit/CRM`.
 - se houver disputa de arquivo central, parar e redividir
 - se houver duvida de produto, subir para o Diego
 - se houver duvida de fronteira tecnica, registrar aqui antes de implementar
+
+## Atualizacao de ciclo — Time Cockpit/CRM
+
+Data: 2026-03-14
+
+- Itens puxados de `Agora`: expor sinais operacionais consumiveis; preparar surface funcional no MyChat e no cockpit de conexoes
+- Arquivos/modulos alvo: `web/src/app/inbox/InboxClient.tsx`, `web/src/app/connections/ConnectionsClient.tsx`, `web/src/lib/ruptur.ts`, `backend/app/api/baileys_instance.py`, `backend/app/main.py`
+- Contrato consumido: health e status das integracoes existentes; endpoints do gateway Baileys em `deploy/host2/baileys/src/index.mjs`
+- Contrato produzido: `GET /integrations/baileys/instances`, `GET /integrations/baileys/status`, `POST /integrations/baileys/connect`, `GET /integrations/baileys/qrcode.png`; `queue_state` e guard rails permanecem estaveis para o Agent
+- Bloqueios para o outro time: para habilitar `reset de sessao` e ajustes profundos de instancia Baileys, o gateway precisa expor endpoint dedicado e contrato de erro/estado
+- Bloqueios para o Diego: nenhum novo bloqueio de produto nesta fatia
+- Resultado do ciclo: inbox agora abre nas mensagens recentes, ganhou CTA para voltar ao fim e corrigiu a digitacao invisivel; a tela de conexoes passou a alternar UAZAPI/Baileys corretamente e listar instancias conforme os contratos hoje disponiveis
+
+## Atualizacao de ciclo — Time Cockpit/CRM
+
+Data: 2026-03-14
+
+- Itens puxados de `Agora`:
+  - adicionar `manual_override` e `paused`
+  - expor `queue_state` consumivel pelo agent
+- Arquivos/modulos alvo:
+  - `backend/db/schema.sql`
+  - `backend/app/api/crm.py`
+  - `backend/app/repositories/crm_repo.py`
+  - `backend/app/api/uazapi_webhook.py`
+  - `web/src/app/inbox/InboxClient.tsx`
+  - `web/src/lib/ruptur.ts`
+- Contrato consumido:
+  - `lead_id`
+  - `conversation_id`
+  - `labels`
+  - `assignee_name`
+  - `assignee_team`
+- Contrato produzido:
+  - `paused`
+  - `manual_override`
+  - `queue_state`
+- Bloqueios para o outro time:
+  - nenhum para consumo inicial; ja podem usar os sinais operacionais atuais
+- Bloqueios para o Diego:
+  - falta decidir policy final de resposta automatica
+- Resultado do ciclo:
+  - guard rails operacionais implementados
+  - loop atual de IA ja respeita pausa e intervencao manual
+  - `queue_state` passou a ser fronteira explicita de API
+  - resumo agregado de fila exposto pelo backend em `GET /crm/queues/summary`

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RupturLabel, RupturLead, RupturMessage, RupturSavedView, RupturStage } from "@/lib/ruptur";
 import {
   assignLead,
@@ -86,6 +86,9 @@ export default function InboxClient() {
   const [draftPaused, setDraftPaused] = useState(false);
   const [draftManualOverride, setDraftManualOverride] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
+  const previousConversationIdRef = useRef<string | null>(null);
 
   const selected = useMemo(() => leads.find((lead) => lead.id === selectedLeadId) || null, [leads, selectedLeadId]);
 
@@ -200,6 +203,32 @@ export default function InboxClient() {
     }
     void refreshMessages(selected.conversation_id);
   }, [selected?.conversation_id, refreshMessages]);
+
+  useEffect(() => {
+    const node = messagesContainerRef.current;
+    if (!node) return;
+    const conversationChanged = previousConversationIdRef.current !== (selected?.conversation_id || null);
+    previousConversationIdRef.current = selected?.conversation_id || null;
+    const nearBottom = node.scrollHeight - node.scrollTop - node.clientHeight < 120;
+    if (conversationChanged || nearBottom) {
+      node.scrollTop = node.scrollHeight;
+      setShowScrollToBottom(false);
+    }
+  }, [messages, selected?.conversation_id]);
+
+  function handleMessagesScroll() {
+    const node = messagesContainerRef.current;
+    if (!node) return;
+    const nearBottom = node.scrollHeight - node.scrollTop - node.clientHeight < 120;
+    setShowScrollToBottom(!nearBottom);
+  }
+
+  function scrollMessagesToBottom() {
+    const node = messagesContainerRef.current;
+    if (!node) return;
+    node.scrollTo({ top: node.scrollHeight, behavior: "smooth" });
+    setShowScrollToBottom(false);
+  }
 
   async function onSend() {
     if (!selected?.conversation_id) return;
@@ -558,7 +587,8 @@ export default function InboxClient() {
             </button>
           </div>
 
-          <div className="max-h-[62dvh] overflow-auto py-4">
+          <div className="relative">
+          <div ref={messagesContainerRef} onScroll={handleMessagesScroll} className="max-h-[62dvh] overflow-auto py-4">
             {!selected?.conversation_id ? (
               <div className="rounded-[20px] border border-dashed border-black/10 bg-white/70 p-6 text-sm text-zinc-500">
                 Este lead ainda nao tem conversa aberta.
@@ -587,11 +617,21 @@ export default function InboxClient() {
               </div>
             )}
           </div>
+            {selected?.conversation_id && showScrollToBottom ? (
+              <button
+                type="button"
+                onClick={scrollMessagesToBottom}
+                className="absolute bottom-4 right-3 rounded-full border border-black/10 bg-white px-3 py-2 text-xs font-medium text-zinc-700 shadow-[0_12px_24px_rgba(0,0,0,0.08)] transition hover:bg-[#f6efe4]"
+              >
+                Ir para o fim
+              </button>
+            ) : null}
+          </div>
 
           <div className="border-t border-black/10 pt-4">
             <div className="flex gap-2">
               <textarea
-                className="min-h-24 w-full rounded-[20px] border border-black/10 bg-white px-4 py-3 text-sm outline-none placeholder:text-zinc-400 focus:border-[#9d4e31]/40"
+                className="min-h-24 w-full rounded-[20px] border border-black/10 bg-white px-4 py-3 text-sm text-zinc-950 outline-none placeholder:text-zinc-400 focus:border-[#9d4e31]/40"
                 placeholder="Digite para responder manualmente pela conta conectada..."
                 value={text}
                 onChange={(e) => setText(e.target.value)}

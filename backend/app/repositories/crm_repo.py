@@ -32,6 +32,7 @@ class LeadRow:
     assignee_team: str | None
     paused: bool
     manual_override: bool
+    queue_state: str
 
 
 @dataclass(frozen=True)
@@ -49,6 +50,12 @@ class SavedViewRow:
     definition: dict[str, Any]
     position: int
     is_shared: bool
+
+
+@dataclass(frozen=True)
+class QueueSummaryRow:
+    key: str
+    total: int
 
 
 @dataclass(frozen=True)
@@ -228,9 +235,72 @@ def list_leads(conn: Connection, *, status: str | None, q: str | None, limit: in
             assignee_team=r[11],
             paused=r[12],
             manual_override=r[13],
+            queue_state=_queue_state_from_row(
+                paused=r[12],
+                manual_override=r[13],
+                conversation_id=r[5],
+                last_message_direction=r[8],
+            ),
         )
         for r in rows
     ]
+
+
+def _queue_state_from_row(
+    *,
+    paused: bool,
+    manual_override: bool,
+    conversation_id: str | None,
+    last_message_direction: str | None,
+) -> str:
+    if paused:
+        return "paused"
+    if manual_override:
+        return "manual"
+    if not conversation_id:
+        return "no_conversation"
+    if last_message_direction == "in":
+        return "awaiting_us"
+    if last_message_direction == "out":
+        return "awaiting_contact"
+    return "active"
+
+
+def queue_summary(conn: Connection) -> list[QueueSummaryRow]:
+    rows = conn.execute(
+        """
+        WITH conv AS (
+          SELECT DISTINCT ON (c.lead_id)
+            c.lead_id,
+            c.id AS conversation_id
+          FROM conversations c
+          ORDER BY c.lead_id, c.updated_at DESC
+        ),
+        last_msg AS (
+          SELECT DISTINCT ON (m.conversation_id)
+            m.conversation_id,
+            m.direction AS last_message_direction
+          FROM messages m
+          ORDER BY m.conversation_id, m.created_at DESC
+        )
+        SELECT
+          CASE
+            WHEN l.paused THEN 'paused'
+            WHEN l.manual_override THEN 'manual'
+            WHEN conv.conversation_id IS NULL THEN 'no_conversation'
+            WHEN last_msg.last_message_direction = 'in' THEN 'awaiting_us'
+            WHEN last_msg.last_message_direction = 'out' THEN 'awaiting_contact'
+            ELSE 'active'
+          END AS queue_state,
+          COUNT(*)::int AS total
+        FROM leads l
+        LEFT JOIN conv ON conv.lead_id = l.id
+        LEFT JOIN last_msg ON last_msg.conversation_id = conv.conversation_id
+        GROUP BY 1
+        ORDER BY 1
+        """
+    ).fetchall()
+    return [QueueSummaryRow(key=r[0], total=r[1]) for r in rows]
 
 
 def update_lead(conn: Connection, *, lead_id: str, name: str | None, status: str | None) -> bool:

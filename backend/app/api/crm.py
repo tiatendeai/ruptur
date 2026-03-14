@@ -90,6 +90,7 @@ class Lead(BaseModel):
     assignee_team: str | None = None
     paused: bool = False
     manual_override: bool = False
+    queue_state: str = "active"
 
 
 class Label(BaseModel):
@@ -125,6 +126,11 @@ class SavedView(BaseModel):
     definition: dict[str, Any] = Field(default_factory=dict)
     position: int = 0
     is_shared: bool = True
+
+
+class QueueSummaryItem(BaseModel):
+    key: str
+    total: int = 0
 
 
 class CreateSavedViewRequest(BaseModel):
@@ -241,6 +247,16 @@ def list_saved_views(scope: str = Query(default="inbox")) -> dict[str, Any]:
             return {"ok": True, "views": [SavedView(**r.__dict__).model_dump() for r in rows]}
     except DatabaseNotConfiguredError:
         return {"ok": True, "views": [], "reason": "database_not_configured"}
+
+
+@router.get("/queues/summary")
+def get_queue_summary() -> dict[str, Any]:
+    try:
+        with connect() as conn:
+            rows = crm_repo.queue_summary(conn)
+            return {"ok": True, "items": [QueueSummaryItem(**r.__dict__).model_dump() for r in rows]}
+    except DatabaseNotConfiguredError:
+        return {"ok": True, "items": [], "reason": "database_not_configured"}
 
 
 @router.post("/views")
