@@ -112,7 +112,9 @@ async def process_ai_response(payload: dict[str, Any], lead_id: str, conversatio
             
             if is_baileys and settings.baileys_base_url:
                 client = BaileysClient(base_url=settings.baileys_base_url, instance_id=settings.baileys_instance_id)
-                target_jid = chatid if chatid and "@" in chatid else f"{neutralize_br_number(lead_phone)}@s.whatsapp.net"
+                # Garantir neutralização do JID para evitar "mensagens fantasma" no mobile
+                raw_jid = chatid if chatid and "@" in chatid else f"{lead_phone}@s.whatsapp.net"
+                target_jid = neutralize_br_number(raw_jid.split("@")[0]) + "@s.whatsapp.net" if "@s.whatsapp.net" in raw_jid else raw_jid
                 
                 if audio_data:
                     # Salvar áudio localmente e expor via URL
@@ -183,11 +185,12 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks) ->
                 # Resiliência para from_me (pode vir como string em alguns adaptadores)
                 is_from_me = str(from_me).lower() == "true"
                 
-                if is_from_me is False and should_respond:
-                   print(f"[WEBHOOK] AI Response queued for lead {result.lead_id}")
+                if is_from_me is False and should_respond and result.message_id:
+                   print(f"[WEBHOOK] AI Response queued for lead {result.lead_id} (Message: {result.message_id})")
                    background_tasks.add_task(process_ai_response, payload, result.lead_id, result.conversation_id)
                 else:
-                   print(f"[WEBHOOK] AI Response SKIPPED (from_me={from_me}, should_respond={should_respond})")
+                   reason = "duplicate" if not result.message_id else "from_me/not_allowed"
+                   print(f"[WEBHOOK] AI Response SKIPPED (reason={reason}, from_me={from_me}, should_respond={should_respond})")
 
             return {
                 "ok": True,
