@@ -1,20 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { RupturLabel, RupturLead, RupturMessage, RupturSavedView, RupturStage } from "@/lib/ruptur";
+import type { RupturContactProfile, RupturLead, RupturMessage, RupturSavedView } from "@/lib/ruptur";
 import {
-  assignLead,
   createSavedView,
-  listLabels,
+  listContactProfiles,
   listLeads,
   listMessages,
   listSavedViews,
-  listStages,
   sendConversationText,
-  setLeadLabels,
-  updateLeadAutomationState,
-  updateLead,
-  getQueuesSummary,
 } from "@/lib/ruptur";
 
 function fmtTime(value?: string | null) {
@@ -29,23 +23,200 @@ function fmtTime(value?: string | null) {
   });
 }
 
-function hoursSince(value?: string | null) {
-  if (!value) return null;
+function fmtRelative(value?: string | null) {
+  if (!value) return "";
   const ts = new Date(value).getTime();
-  if (Number.isNaN(ts)) return null;
-  return (Date.now() - ts) / 1000 / 60 / 60;
+  if (Number.isNaN(ts)) return "";
+  const diff = Math.max(0, Date.now() - ts);
+  const minutes = Math.round(diff / 1000 / 60);
+  if (minutes < 1) return "agora";
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.round(hours / 24);
+  return `${days}d`;
 }
 
-
-function statusTone(status: string) {
-  const normalized = status.toLowerCase();
-  if (normalized.includes("qual")) return "border-emerald-700/15 bg-emerald-50 text-emerald-900";
-  if (normalized.includes("cont")) return "border-sky-700/15 bg-sky-50 text-sky-900";
-  if (normalized.includes("perd") || normalized.includes("lost")) return "border-red-700/15 bg-red-50 text-red-900";
-  return "border-black/10 bg-[#f4ede2] text-zinc-700";
+function fmtDayLabel(value?: string | null) {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("pt-BR", {
+    weekday: "short",
+    day: "2-digit",
+    month: "2-digit",
+  });
 }
 
-const DEFAULT_STATUS_FILTER = "all";
+function normalizePhone(value?: string | null) {
+  const digits = (value || "").replace(/\D/g, "");
+  return digits || null;
+}
+
+function avatarLabel(name?: string | null, phone?: string | null) {
+  const source = (name || phone || "?").trim();
+  if (!source) return "?";
+  const words = source.split(/\s+/).filter(Boolean);
+  if (words.length >= 2) return `${words[0][0] || ""}${words[1][0] || ""}`.toUpperCase();
+  return source.slice(0, 2).toUpperCase();
+}
+
+function compareLeadFreshness(a: RupturLead, b: RupturLead) {
+  const aTs = new Date(a.last_message_at || a.updated_at || 0).getTime();
+  const bTs = new Date(b.last_message_at || b.updated_at || 0).getTime();
+  return bTs - aTs;
+}
+
+function compareMessages(a: RupturMessage, b: RupturMessage) {
+  return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+}
+
+type InboxContact = {
+  key: string;
+  primaryLead: RupturLead;
+  leads: RupturLead[];
+  conversationIds: string[];
+  phone: string | null;
+  name: string | null;
+  labels: string[];
+  lastMessageAt: string | null;
+  lastMessageBody: string | null;
+  lastMessageDirection: "in" | "out" | null;
+};
+
+type MessageBlock = {
+  key: string;
+  direction: "in" | "out";
+  sender: string | null;
+  createdAt: string;
+  items: RupturMessage[];
+};
+
+function buildContacts(leads: RupturLead[]) {
+  const groups = new Map<string, RupturLead[]>();
+
+  for (const lead of leads) {
+    const key = normalizePhone(lead.phone) || lead.conversation_id || lead.id;
+    const current = groups.get(key) || [];
+    current.push(lead);
+    groups.set(key, current);
+  }
+
+  const contacts: InboxContact[] = [];
+  for (const [key, items] of groups.entries()) {
+    const sorted = [...items].sort(compareLeadFreshness);
+    const withConversation = sorted.find((item) => item.conversation_id);
+    const named = sorted.find((item) => item.name?.trim());
+    const primaryLead = withConversation || named || sorted[0];
+    const labelSet = new Set<string>();
+    const conversationIds = new Set<string>();
+
+    for (const item of sorted) {
+      for (const label of item.labels || []) labelSet.add(label);
+      if (item.conversation_id) conversationIds.add(item.conversation_id);
+    }
+
+    contacts.push({
+      key,
+      primaryLead,
+      leads: sorted,
+      conversationIds: Array.from(conversationIds),
+      phone: primaryLead.phone || sorted.find((item) => item.phone)?.phone || null,
+      name: primaryLead.name || sorted.find((item) => item.name?.trim())?.name || null,
+      labels: Array.from(labelSet),
+      lastMessageAt: primaryLead.last_message_at || null,
+      lastMessageBody: primaryLead.last_message_body || null,
+      lastMessageDirection: primaryLead.last_message_direction || null,
+    });
+  }
+
+  return contacts.sort((a, b) => compareLeadFreshness(a.primaryLead, b.primaryLead));
+}
+
+function buildMessageBlocks(items: RupturMessage[]) {
+  const blocks: MessageBlock[] = [];
+
+  for (const message of items) {
+    const previous = blocks[blocks.length - 1];
+    const previousTs = previous
+      ? new Date(previous.items[previous.items.length - 1]?.created_at || previous.createdAt).getTime()
+      : 0;
+    const currentTs = new Date(message.created_at).getTime();
+    const canMerge =
+      previous &&
+      previous.direction === message.direction &&
+      (previous.sender || null) === (message.sender || null) &&
+      currentTs - previousTs < 1000 * 60 * 10;
+
+    if (canMerge) {
+      previous.items.push(message);
+      continue;
+    }
+
+    blocks.push({
+      key: message.id,
+      direction: message.direction,
+      sender: message.sender || null,
+      createdAt: message.created_at,
+      items: [message],
+    });
+  }
+
+  return blocks;
+}
+
+function ContactAvatar({
+  name,
+  phone,
+  imageUrl,
+  className,
+}: {
+  name?: string | null;
+  phone?: string | null;
+  imageUrl?: string | null;
+  className: string;
+}) {
+  if (imageUrl) {
+    return <img src={imageUrl} alt={name || phone || "Contato"} className={`${className} object-cover`} loading="lazy" />;
+  }
+
+  return (
+    <div className={`${className} bg-[#eadcca] text-xs font-semibold uppercase tracking-[0.16em] text-[#8f492e]`}>
+      {avatarLabel(name, phone)}
+    </div>
+  );
+}
+
+function queueTone(queue?: RupturLead["queue_state"]) {
+  if (queue === "paused") return "border-zinc-700/15 bg-zinc-100 text-zinc-800";
+  if (queue === "manual") return "border-amber-700/15 bg-amber-50 text-amber-900";
+  if (queue === "awaiting_us") return "border-[#9d4e31]/20 bg-[#fbefe4] text-[#8f492e]";
+  if (queue === "awaiting_contact") return "border-sky-700/15 bg-sky-50 text-sky-900";
+  if (queue === "no_conversation") return "border-black/10 bg-[#f4ede2] text-zinc-700";
+  return "border-emerald-700/15 bg-emerald-50 text-emerald-900";
+}
+
+function linkifyText(value?: string | null) {
+  const text = value || "—";
+  const parts = text.split(/(https?:\/\/[^\s]+)/g);
+  return parts.map((part, index) => {
+    if (/^https?:\/\/[^\s]+$/.test(part)) {
+      return (
+        <a
+          key={`${part}-${index}`}
+          href={part}
+          target="_blank"
+          rel="noreferrer"
+          className="break-all text-[#8f492e] underline decoration-[#d5a88e] underline-offset-2"
+        >
+          {part}
+        </a>
+      );
+    }
+    return <span key={`${part}-${index}`}>{part}</span>;
+  });
+}
+
 const DEFAULT_QUEUE_FILTER = "all";
 
 const QUEUE_FILTERS = [
@@ -60,114 +231,89 @@ const QUEUE_FILTERS = [
 export default function InboxClient() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
-  const [savingLead, setSavingLead] = useState(false);
   const [leads, setLeads] = useState<RupturLead[]>([]);
-  const [stages, setStages] = useState<RupturStage[]>([]);
-  const [labels, setLabels] = useState<RupturLabel[]>([]);
   const [savedViews, setSavedViews] = useState<RupturSavedView[]>([]);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [messages, setMessages] = useState<RupturMessage[]>([]);
   const [text, setText] = useState("");
   const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState(DEFAULT_STATUS_FILTER);
+  const [messageQuery, setMessageQuery] = useState("");
   const [queueFilter, setQueueFilter] = useState(DEFAULT_QUEUE_FILTER);
-  const [draftName, setDraftName] = useState("");
-  const [draftStatus, setDraftStatus] = useState("");
-  const [draftOwnerName, setDraftOwnerName] = useState("");
-  const [draftOwnerTeam, setDraftOwnerTeam] = useState("");
-  const [draftLabels, setDraftLabels] = useState<string[]>([]);
-  const [draftPaused, setDraftPaused] = useState(false);
-  const [draftManualOverride, setDraftManualOverride] = useState(false);
-  const [summary, setSummary] = useState<{ total: number; by_queue: Record<string, number>; with_conversation: number } | null>(null);
+  const [mobilePane, setMobilePane] = useState<"list" | "chat" | "context">("list");
+  const [profileImages, setProfileImages] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const previousConversationIdRef = useRef<string | null>(null);
-
-  const selected = useMemo(() => leads.find((lead) => lead.id === selectedLeadId) || null, [leads, selectedLeadId]);
-
-  const stageOptions = useMemo(() => {
-    const keys = new Set<string>();
-    return stages.filter((stage) => {
-      if (keys.has(stage.key)) return false;
-      keys.add(stage.key);
-      return true;
-    });
-  }, [stages]);
+  const contacts = useMemo(() => buildContacts(leads), [leads]);
+  const selectedContact = useMemo(
+    () => contacts.find((contact) => contact.primaryLead.id === selectedLeadId) || null,
+    [contacts, selectedLeadId],
+  );
+  const selected = selectedContact?.primaryLead || null;
 
   const counts = useMemo(() => {
-    const byStatus = new Map<string, number>();
     const localByQueue = new Map<string, number>();
-    for (const lead of leads) {
-      byStatus.set(lead.status, (byStatus.get(lead.status) || 0) + 1);
+    for (const contact of contacts) {
+      const lead = contact.primaryLead;
       const queueKey = lead.queue_state || "active";
       localByQueue.set(queueKey, (localByQueue.get(queueKey) || 0) + 1);
     }
     return {
-      total: summary?.total ?? leads.length,
-      withConversation: summary?.with_conversation ?? leads.filter((lead) => lead.conversation_id).length,
-      byStatus,
-      byQueue: summary ? new Map(Object.entries(summary.by_queue)) : localByQueue,
+      total: contacts.length,
+      withConversation: contacts.filter((contact) => contact.conversationIds.length > 0).length,
+      byQueue: localByQueue,
     };
-  }, [leads, summary]);
+  }, [contacts]);
 
-  const filteredLeads = useMemo(() => {
-    return leads.filter((lead) => {
-      if (statusFilter !== DEFAULT_STATUS_FILTER && lead.status !== statusFilter) return false;
+  const filteredContacts = useMemo(() => {
+    return contacts.filter((contact) => {
+      const lead = contact.primaryLead;
       if (queueFilter !== DEFAULT_QUEUE_FILTER && lead.queue_state !== queueFilter) return false;
       if (!query.trim()) return true;
       const term = query.trim().toLowerCase();
-      return [lead.name || "", lead.phone || "", lead.last_message_body || ""].some((value) =>
+      return [contact.name || "", contact.phone || "", contact.lastMessageBody || ""].some((value) =>
         value.toLowerCase().includes(term),
       );
     });
-  }, [leads, query, queueFilter, statusFilter]);
+  }, [contacts, query, queueFilter]);
 
-  const selectedStage = useMemo(
-    () => stageOptions.find((stage) => stage.key === (selected?.status || draftStatus)),
-    [draftStatus, selected?.status, stageOptions],
+  const visibleMessages = useMemo(() => {
+    if (!messageQuery.trim()) return messages;
+    const term = messageQuery.trim().toLowerCase();
+    return messages.filter((message) =>
+      [message.body || "", message.sender || ""].some((value) => value.toLowerCase().includes(term)),
+    );
+  }, [messageQuery, messages]);
+
+  const messageBlocks = useMemo(() => buildMessageBlocks(visibleMessages), [visibleMessages]);
+  const selectedPhone = normalizePhone(selectedContact?.phone);
+  const waLink = selectedPhone ? `https://wa.me/${selectedPhone}` : null;
+  const quickReplies = useMemo(
+    () => [
+      "Oi, vi sua mensagem e vou seguir por aqui.",
+      "Recebi seu contato. Ja estou verificando e volto em instantes.",
+      "Perfeito. Pode me confirmar seu objetivo para eu te responder com mais precisao?",
+      "Se preferir, posso continuar esse atendimento por aqui e te atualizar em tempo real.",
+    ],
+    [],
   );
-
-  const leadsByStage = useMemo(() => {
-    return stageOptions.map((stage) => ({
-      stage,
-      items: filteredLeads.filter((lead) => lead.status === stage.key).slice(0, 4),
-      total: filteredLeads.filter((lead) => lead.status === stage.key).length,
-    }));
-  }, [filteredLeads, stageOptions]);
 
   const refreshLeads = useCallback(async () => {
     setLoading(true);
-    const results = await Promise.allSettled([
-      listLeads(),
-      listStages(),
-      listLabels(),
-      listSavedViews("inbox"),
-      getQueuesSummary(),
-    ]);
-    const [leadItems, stageItems, labelItems, viewItems, summaryData] = results;
+    const results = await Promise.allSettled([listLeads(), listSavedViews("inbox")]);
+    const [leadItems, viewItems] = results;
     const errors: string[] = [];
 
     if (leadItems.status === "fulfilled") {
       setLeads(leadItems.value);
       setSelectedLeadId((current) => {
-        if (current && leadItems.value.some((lead) => lead.id === current)) return current;
-        return leadItems.value[0]?.id || null;
+        const nextContacts = buildContacts(leadItems.value);
+        if (current && nextContacts.some((contact) => contact.primaryLead.id === current)) return current;
+        return nextContacts[0]?.primaryLead.id || null;
       });
     } else {
       errors.push(`leads: ${leadItems.reason instanceof Error ? leadItems.reason.message : String(leadItems.reason)}`);
-    }
-
-    if (stageItems.status === "fulfilled") {
-      setStages(stageItems.value);
-    } else {
-      errors.push(`stages: ${stageItems.reason instanceof Error ? stageItems.reason.message : String(stageItems.reason)}`);
-    }
-
-    if (labelItems.status === "fulfilled") {
-      setLabels(labelItems.value);
-    } else {
-      errors.push(`labels: ${labelItems.reason instanceof Error ? labelItems.reason.message : String(labelItems.reason)}`);
     }
 
     if (viewItems.status === "fulfilled") {
@@ -176,21 +322,21 @@ export default function InboxClient() {
       errors.push(`views: ${viewItems.reason instanceof Error ? viewItems.reason.message : String(viewItems.reason)}`);
     }
 
-    if (summaryData.status === "fulfilled") {
-      setSummary(summaryData.value);
-    } else {
-      errors.push(`summary: ${summaryData.reason instanceof Error ? summaryData.reason.message : String(summaryData.reason)}`);
-    }
-
     setError(errors.length ? errors.join(" | ") : null);
     setLoading(false);
   }, []);
 
-  const refreshMessages = useCallback(async (conversationId: string) => {
+  const refreshMessages = useCallback(async (conversationIds: string[]) => {
     setError(null);
     try {
-      const items = await listMessages(conversationId);
-      setMessages(items.reverse());
+      const results = await Promise.all(conversationIds.map((conversationId) => listMessages(conversationId)));
+      const deduped = new Map<string, RupturMessage>();
+      for (const batch of results) {
+        for (const item of batch) {
+          deduped.set(item.external_id || item.id, item);
+        }
+      }
+      setMessages(Array.from(deduped.values()).sort(compareMessages));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -201,39 +347,56 @@ export default function InboxClient() {
   }, [refreshLeads]);
 
   useEffect(() => {
-    if (!selected) {
-      setDraftName("");
-      setDraftStatus("");
-      return;
-    }
-    setDraftName(selected.name || "");
-    setDraftStatus(selected.status || "");
-    setDraftOwnerName(selected.assignee_name || "");
-    setDraftOwnerTeam(selected.assignee_team || "");
-    setDraftLabels(selected.labels || []);
-    setDraftPaused(Boolean(selected.paused));
-    setDraftManualOverride(Boolean(selected.manual_override));
-  }, [selected]);
+    const candidates = [
+      ...filteredContacts.slice(0, 40).map((contact) => normalizePhone(contact.phone)).filter(Boolean),
+      normalizePhone(selectedContact?.phone),
+    ].filter(Boolean) as string[];
+
+    const pending = candidates.filter((phone) => !profileImages[phone]);
+    if (!pending.length) return;
+
+    let cancelled = false;
+    void listContactProfiles(pending).then((items: RupturContactProfile[]) => {
+      if (cancelled || !items.length) return;
+      setProfileImages((current) => {
+        const next = { ...current };
+        for (const item of items) {
+          const key = normalizePhone(item.number);
+          if (key && item.imageUrl) next[key] = item.imageUrl;
+        }
+        return next;
+      });
+    }).catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [filteredContacts, profileImages, selectedContact]);
 
   useEffect(() => {
-    if (!selected?.conversation_id) {
+    if (!selectedContact?.conversationIds.length) {
       setMessages([]);
       return;
     }
-    void refreshMessages(selected.conversation_id);
-  }, [selected?.conversation_id, refreshMessages]);
+    void refreshMessages(selectedContact.conversationIds);
+  }, [refreshMessages, selectedContact]);
 
   useEffect(() => {
     const node = messagesContainerRef.current;
     if (!node) return;
-    const conversationChanged = previousConversationIdRef.current !== (selected?.conversation_id || null);
-    previousConversationIdRef.current = selected?.conversation_id || null;
+    const conversationKey = selectedContact?.conversationIds.join("|") || null;
+    const conversationChanged = previousConversationIdRef.current !== conversationKey;
+    previousConversationIdRef.current = conversationKey;
     const nearBottom = node.scrollHeight - node.scrollTop - node.clientHeight < 120;
     if (conversationChanged || nearBottom) {
       node.scrollTop = node.scrollHeight;
       setShowScrollToBottom(false);
     }
-  }, [messages, selected?.conversation_id]);
+  }, [messages, selectedContact]);
+
+  useEffect(() => {
+    if (selectedLeadId) setMobilePane("chat");
+  }, [selectedLeadId]);
 
   function handleMessagesScroll() {
     const node = messagesContainerRef.current;
@@ -249,6 +412,13 @@ export default function InboxClient() {
     setShowScrollToBottom(false);
   }
 
+  async function copySelectedPhone() {
+    if (!selectedPhone || typeof navigator === "undefined" || !navigator.clipboard) return;
+    try {
+      await navigator.clipboard.writeText(selectedPhone);
+    } catch {}
+  }
+
   async function onSend() {
     if (!selected?.conversation_id) return;
     const value = text.trim();
@@ -257,7 +427,7 @@ export default function InboxClient() {
     setText("");
     try {
       await sendConversationText(selected.conversation_id, value);
-      await Promise.all([refreshMessages(selected.conversation_id), refreshLeads()]);
+      await Promise.all([refreshMessages(selectedContact?.conversationIds || [selected.conversation_id]), refreshLeads()]);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setText(value);
@@ -266,40 +436,7 @@ export default function InboxClient() {
     }
   }
 
-  async function onSaveLead() {
-    if (!selected) return;
-    setSavingLead(true);
-    setError(null);
-    try {
-      await updateLead(selected.id, {
-        name: draftName.trim() || selected.name || undefined,
-        status: draftStatus || selected.status,
-      });
-      await assignLead(selected.id, {
-        owner_name: draftOwnerName.trim() || undefined,
-        team: draftOwnerTeam.trim() || undefined,
-      });
-      await setLeadLabels(selected.id, draftLabels);
-      await updateLeadAutomationState(selected.id, {
-        paused: draftPaused,
-        manual_override: draftManualOverride,
-      });
-      await refreshLeads();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setSavingLead(false);
-    }
-  }
-
-  const statusChoices = useMemo(() => {
-    const items = stageOptions.map((stage) => stage.key);
-    if (!items.includes(draftStatus) && draftStatus) items.unshift(draftStatus);
-    return Array.from(new Set(items));
-  }, [draftStatus, stageOptions]);
-
   function applySavedView(view: RupturSavedView) {
-    setStatusFilter(view.definition.statusFilter || DEFAULT_STATUS_FILTER);
     setQueueFilter(view.definition.queueFilter || DEFAULT_QUEUE_FILTER);
     setQuery(view.definition.query || "");
   }
@@ -312,7 +449,6 @@ export default function InboxClient() {
         scope: "inbox",
         name: name.trim(),
         definition: {
-          statusFilter,
           queueFilter,
           query,
         },
@@ -325,12 +461,6 @@ export default function InboxClient() {
     }
   }
 
-  function toggleDraftLabel(labelName: string) {
-    setDraftLabels((current) =>
-      current.includes(labelName) ? current.filter((item) => item !== labelName) : [...current, labelName],
-    );
-  }
-
   return (
     <div className="space-y-4">
       <section className="overflow-hidden rounded-[28px] border border-black/10 bg-[#f5ecdf] text-zinc-950">
@@ -338,11 +468,10 @@ export default function InboxClient() {
           <div className="bg-[#f5ecdf] px-5 py-5 sm:px-6 sm:py-6">
             <div className="text-[11px] uppercase tracking-[0.38em] text-[#9d4e31]">MyChat</div>
             <h1 className="mt-3 max-w-4xl text-4xl font-semibold leading-[0.9] tracking-[-0.07em] sm:text-[3.5rem]">
-              conversa, fila e pipeline no mesmo campo de visao.
+              inbox limpo para ler, responder e seguir a conversa.
             </h1>
             <p className="mt-4 max-w-2xl text-sm leading-6 text-zinc-600">
-              inspirado no Chatwoot, mas focado no nosso uso: fila viva, leitura de prioridade e acoes de CRM sem
-              enterrar a conversa.
+              aqui fica so a operacao de inbox: contatos consolidados, avatar, historico agrupado e resposta rapida.
             </p>
           </div>
 
@@ -356,8 +485,8 @@ export default function InboxClient() {
               <div className="mt-2 text-3xl font-semibold tracking-[-0.05em]">{counts.withConversation}</div>
             </div>
             <div className="bg-[#eadcca] px-5 py-4">
-              <div className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">estagios visiveis</div>
-              <div className="mt-2 text-3xl font-semibold tracking-[-0.05em]">{stageOptions.length}</div>
+              <div className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">na fila agora</div>
+              <div className="mt-2 text-3xl font-semibold tracking-[-0.05em]">{filteredContacts.length}</div>
             </div>
           </div>
         </div>
@@ -369,8 +498,8 @@ export default function InboxClient() {
         <div className="border-b border-black/10 px-5 py-4">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
             <div>
-              <div className="text-[11px] uppercase tracking-[0.34em] text-zinc-500">queue control</div>
-              <div className="mt-2 text-2xl font-semibold tracking-[-0.05em]">controle de fila com leitura de prioridade</div>
+              <div className="text-[11px] uppercase tracking-[0.34em] text-zinc-500">inbox control</div>
+              <div className="mt-2 text-2xl font-semibold tracking-[-0.05em]">recorte rapido da operacao de conversa</div>
             </div>
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
               {QUEUE_FILTERS.map((filter) => {
@@ -418,75 +547,37 @@ export default function InboxClient() {
             </button>
           </div>
         </div>
-
-        <div className="overflow-x-auto px-4 py-4">
-          <div className="grid min-w-[980px] grid-cols-4 gap-3">
-            {leadsByStage.map(({ stage, items, total }) => (
-              <section key={stage.key} className="rounded-[22px] border border-black/10 bg-[#fcfaf5] p-3">
-                <div className="flex items-start justify-between gap-3 border-b border-black/10 pb-3">
-                  <div>
-                    <div className="text-[10px] uppercase tracking-[0.28em] text-zinc-500">pipeline</div>
-                    <div className="mt-2 text-lg font-semibold tracking-[-0.04em]">{stage.name}</div>
-                  </div>
-                  <div className="rounded-full border border-black/10 bg-white px-3 py-1 text-sm text-zinc-700">{total}</div>
-                </div>
-
-                <div className="mt-3 space-y-2">
-                  {items.length ? (
-                    items.map((lead) => {
-                      const waiting = lead.queue_state === "awaiting_us";
-                      const stale = (hoursSince(lead.last_message_at) || 0) > 12;
-                      return (
-                        <button
-                          key={lead.id}
-                          type="button"
-                          onClick={() => setSelectedLeadId(lead.id)}
-                          className={[
-                            "w-full rounded-[18px] border p-3 text-left transition",
-                            selectedLeadId === lead.id
-                              ? "border-[#9d4e31]/25 bg-[#fff4e9]"
-                              : "border-black/10 bg-white hover:bg-[#fffaf2]",
-                          ].join(" ")}
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="truncate text-sm font-medium">{lead.name || lead.phone || "Sem nome"}</div>
-                              <div className="mt-1 truncate text-xs text-zinc-500">{lead.phone || "telefone_indefinido"}</div>
-                            </div>
-                            <div className="flex flex-wrap items-center justify-end gap-1">
-                              {lead.paused ? (
-                                <span className="rounded-full bg-zinc-900 px-2 py-1 text-[10px] uppercase tracking-[0.2em] text-white">pausado</span>
-                              ) : null}
-                              {lead.manual_override ? (
-                                <span className="rounded-full bg-[#d9875f] px-2 py-1 text-[10px] uppercase tracking-[0.2em] text-white">manual</span>
-                              ) : null}
-                              {waiting ? (
-                                <span className="rounded-full bg-[#9d4e31] px-2 py-1 text-[10px] uppercase tracking-[0.2em] text-white">agir</span>
-                              ) : null}
-                            </div>
-                          </div>
-                          <div className="mt-3 line-clamp-2 text-xs text-zinc-500">{lead.last_message_body || "Sem ultima mensagem"}</div>
-                          <div className="mt-3 flex items-center justify-between gap-3 text-[10px] uppercase tracking-[0.2em] text-zinc-400">
-                            <span>{fmtTime(lead.last_message_at || lead.updated_at) || "sem data"}</span>
-                            {stale ? <span>frio</span> : <span>quente</span>}
-                          </div>
-                        </button>
-                      );
-                    })
-                  ) : (
-                    <div className="rounded-[18px] border border-dashed border-black/10 bg-white px-3 py-4 text-sm text-zinc-500">
-                      Nenhum lead nesta leitura.
-                    </div>
-                  )}
-                </div>
-              </section>
-            ))}
-          </div>
-        </div>
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[330px_minmax(0,1fr)_320px]">
-        <aside className="rounded-[26px] border border-black/10 bg-white p-4 shadow-[0_14px_40px_rgba(70,43,31,0.06)]">
+        <div className="flex gap-2 xl:hidden">
+          {[
+            { key: "list", label: "Conversas" },
+            { key: "chat", label: "Chat" },
+            { key: "context", label: "Contato" },
+          ].map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => setMobilePane(item.key as "list" | "chat" | "context")}
+              className={[
+                "flex-1 rounded-[18px] border px-3 py-3 text-sm font-medium transition",
+                mobilePane === item.key
+                  ? "border-[#9d4e31]/30 bg-[#fbefe4] text-[#8f492e]"
+                  : "border-black/10 bg-white text-zinc-600",
+              ].join(" ")}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+
+        <aside
+          className={[
+            "rounded-[26px] border border-black/10 bg-white p-4 shadow-[0_14px_40px_rgba(70,43,31,0.06)]",
+            mobilePane === "list" ? "block" : "hidden xl:block",
+          ].join(" ")}
+        >
           <div className="flex items-start justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold tracking-[-0.03em]">Fila detalhada</h2>
@@ -509,32 +600,27 @@ export default function InboxClient() {
               onChange={(e) => setQuery(e.target.value)}
             />
 
+            <div className="rounded-[18px] border border-black/10 bg-[#fcfaf5] px-4 py-3 text-xs text-zinc-500">
+              contatos unificados por telefone, com avatar, ultima direcao de mensagem e estado operacional.
+            </div>
+
             <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => setStatusFilter(DEFAULT_STATUS_FILTER)}
-                className={[
-                  "rounded-full border px-3 py-1.5 text-xs transition",
-                  statusFilter === DEFAULT_STATUS_FILTER
-                    ? "border-[#9d4e31]/30 bg-[#f7ebe1] text-[#8f492e]"
-                    : "border-black/10 text-zinc-500 hover:bg-[#f6efe4]",
-                ].join(" ")}
-              >
-                Todos <span className="ml-1 text-zinc-500">{counts.total}</span>
-              </button>
-              {stageOptions.map((stage) => (
+              {QUEUE_FILTERS.map((filter) => (
                 <button
-                  key={stage.key}
+                  key={filter.key}
                   type="button"
-                  onClick={() => setStatusFilter(stage.key)}
+                  onClick={() => setQueueFilter(filter.key)}
                   className={[
                     "rounded-full border px-3 py-1.5 text-xs transition",
-                    statusFilter === stage.key
+                    queueFilter === filter.key
                       ? "border-[#9d4e31]/30 bg-[#f7ebe1] text-[#8f492e]"
                       : "border-black/10 text-zinc-500 hover:bg-[#f6efe4]",
                   ].join(" ")}
                 >
-                  {stage.name} <span className="ml-1 text-zinc-500">{counts.byStatus.get(stage.key) || 0}</span>
+                  {filter.label}{" "}
+                  <span className="ml-1 text-zinc-500">
+                    {filter.key === "all" ? counts.total : counts.byQueue.get(filter.key) || 0}
+                  </span>
                 </button>
               ))}
             </div>
@@ -545,36 +631,68 @@ export default function InboxClient() {
               <div className="rounded-[20px] border border-dashed border-black/10 bg-[#fcfaf5] p-5 text-sm text-zinc-500">
                 Carregando conversas...
               </div>
-            ) : filteredLeads.length ? (
+            ) : filteredContacts.length ? (
               <ul className="space-y-2">
-                {filteredLeads.map((lead) => (
-                  <li key={lead.id}>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedLeadId(lead.id)}
-                      className={[
-                        "w-full rounded-[20px] border px-4 py-3 text-left transition",
-                        selectedLeadId === lead.id
-                          ? "border-[#9d4e31]/25 bg-[#fbf1e7] shadow-[0_10px_25px_rgba(70,43,31,0.08)]"
-                          : "border-black/10 bg-[#fffdf9] hover:border-black/15 hover:bg-[#fcf7ef]",
-                      ].join(" ")}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="truncate text-sm font-medium">{lead.name || lead.phone || "Sem nome"}</div>
-                          <div className="mt-1 truncate text-xs text-zinc-500">{lead.phone || "telefone_indefinido"}</div>
+                {filteredContacts.map((contact) => {
+                  const lead = contact.primaryLead;
+                  return (
+                    <li key={contact.key}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedLeadId(lead.id);
+                          setMobilePane("chat");
+                        }}
+                        className={[
+                          "w-full rounded-[20px] border px-4 py-3 text-left transition",
+                          selectedLeadId === lead.id
+                            ? "border-[#9d4e31]/25 bg-[#fbf1e7] shadow-[0_10px_25px_rgba(70,43,31,0.08)]"
+                            : "border-black/10 bg-[#fffdf9] hover:border-black/15 hover:bg-[#fcf7ef]",
+                        ].join(" ")}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex min-w-0 items-start gap-3">
+                            <ContactAvatar
+                              name={contact.name}
+                              phone={contact.phone}
+                              imageUrl={profileImages[normalizePhone(contact.phone) || ""]}
+                              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
+                            />
+                            <div className="min-w-0">
+                              <div className="truncate text-sm font-medium">{contact.name || contact.phone || "Sem nome"}</div>
+                              <div className="mt-1 truncate text-xs text-zinc-500">{contact.phone || "telefone_indefinido"}</div>
+                            </div>
+                          </div>
+                          <div className="flex flex-col items-end gap-1">
+                            {lead.paused ? (
+                              <span className="rounded-full bg-zinc-900 px-2.5 py-1 text-[10px] uppercase tracking-[0.2em] text-white">
+                                pausado
+                              </span>
+                            ) : lead.manual_override ? (
+                              <span className="rounded-full bg-[#d9875f] px-2.5 py-1 text-[10px] uppercase tracking-[0.2em] text-white">
+                                manual
+                              </span>
+                            ) : lead.queue_state === "awaiting_us" ? (
+                              <span className="rounded-full bg-[#9d4e31] px-2.5 py-1 text-[10px] uppercase tracking-[0.2em] text-white">
+                                responder
+                              </span>
+                            ) : null}
+                          </div>
                         </div>
-                        <div className={["rounded-full border px-2.5 py-1 text-[10px] uppercase tracking-[0.2em]", statusTone(lead.status)].join(" ")}>
-                          {lead.status}
+                        <div className="mt-3 flex items-end justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="line-clamp-2 text-xs text-zinc-500">{contact.lastMessageBody || "Sem ultima mensagem"}</div>
+                            <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-[0.18em] text-zinc-400">
+                              <span>{contact.lastMessageDirection === "out" ? "saida" : "entrada"}</span>
+                              <span>{fmtRelative(contact.lastMessageAt || lead.updated_at)}</span>
+                            </div>
+                          </div>
+                          <div className="shrink-0 text-[10px] text-zinc-500">{fmtTime(contact.lastMessageAt || lead.updated_at)}</div>
                         </div>
-                      </div>
-                      <div className="mt-3 flex items-end justify-between gap-3">
-                        <div className="line-clamp-2 text-xs text-zinc-500">{lead.last_message_body || "Sem ultima mensagem"}</div>
-                        <div className="shrink-0 text-[10px] text-zinc-500">{fmtTime(lead.last_message_at || lead.updated_at)}</div>
-                      </div>
-                    </button>
-                  </li>
-                ))}
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
             ) : (
               <div className="rounded-[20px] border border-dashed border-black/10 bg-[#fcfaf5] p-5 text-sm text-zinc-500">
@@ -584,59 +702,163 @@ export default function InboxClient() {
           </div>
         </aside>
 
-        <section className="rounded-[26px] border border-black/10 bg-[#f8f2e8] p-4 shadow-[0_14px_40px_rgba(70,43,31,0.06)]">
+        <section
+          className={[
+            "rounded-[26px] border border-black/10 bg-[#f8f2e8] p-4 shadow-[0_14px_40px_rgba(70,43,31,0.06)]",
+            mobilePane === "chat" ? "block" : "hidden xl:block",
+          ].join(" ")}
+        >
           <div className="flex flex-col gap-4 border-b border-black/10 pb-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <div className="text-[11px] uppercase tracking-[0.3em] text-[#9d4e31]">janela de intervencao</div>
-              <div className="mt-2 text-2xl font-semibold tracking-[-0.04em]">
-                {selected?.name || selected?.phone || "Selecione uma conversa"}
-              </div>
-              <div className="mt-1 flex flex-wrap gap-2 text-xs text-zinc-500">
-                <span>{selected?.phone || "sem_telefone"}</span>
-                {selected?.status ? <span className="rounded-full border border-black/10 bg-white px-2 py-0.5">{selected.status}</span> : null}
+            <div className="flex items-center gap-3">
+              <ContactAvatar
+                name={selectedContact?.name}
+                phone={selectedContact?.phone}
+                imageUrl={profileImages[normalizePhone(selectedContact?.phone) || ""]}
+                className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-sm font-semibold uppercase tracking-[0.18em]"
+              />
+              <div>
+                <div className="text-[11px] uppercase tracking-[0.3em] text-[#9d4e31]">conversa ativa</div>
+                <div className="mt-2 text-2xl font-semibold tracking-[-0.04em]">
+                  {selectedContact?.name || selectedContact?.phone || "Selecione uma conversa"}
+                </div>
+                <div className="mt-1 flex flex-wrap gap-2 text-xs text-zinc-500">
+                  <span>{selectedContact?.phone || "sem_telefone"}</span>
+                  {selectedContact && selectedContact.leads.length > 1 ? (
+                    <span className="rounded-full border border-black/10 bg-white px-2 py-0.5">
+                      {selectedContact.leads.length} registros unidos
+                    </span>
+                  ) : null}
+                  {selected?.queue_state ? (
+                    <span className={["rounded-full border px-2 py-0.5", queueTone(selected.queue_state)].join(" ")}>
+                      {selected.queue_state}
+                    </span>
+                  ) : null}
+                  {selectedContact?.labels.length ? (
+                    <span className="rounded-full border border-black/10 bg-white px-2 py-0.5">
+                      {selectedContact.labels.length} labels
+                    </span>
+                  ) : null}
+                </div>
               </div>
             </div>
-            <button
-              type="button"
-              className="rounded-full border border-black/10 bg-white px-4 py-2 text-sm text-zinc-700 transition hover:bg-[#f6efe4] disabled:opacity-50"
-              onClick={() => selected?.conversation_id && void refreshMessages(selected.conversation_id)}
-              disabled={!selected?.conversation_id}
-            >
-              Atualizar chat
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                className="rounded-full border border-black/10 bg-white px-4 py-2 text-sm text-zinc-700 transition hover:bg-[#f6efe4] xl:hidden"
+                onClick={() => setMobilePane("list")}
+              >
+                Voltar
+              </button>
+              <button
+                type="button"
+                className="rounded-full border border-black/10 bg-white px-4 py-2 text-sm text-zinc-700 transition hover:bg-[#f6efe4] disabled:opacity-50"
+                onClick={() => selectedContact?.conversationIds.length && void refreshMessages(selectedContact.conversationIds)}
+                disabled={!selectedContact?.conversationIds.length}
+              >
+                Atualizar chat
+              </button>
+              <button
+                type="button"
+                className="rounded-full border border-black/10 bg-white px-4 py-2 text-sm text-zinc-700 transition hover:bg-[#f6efe4] disabled:opacity-50"
+                onClick={() => void copySelectedPhone()}
+                disabled={!selectedPhone}
+              >
+                Copiar numero
+              </button>
+              {waLink ? (
+                <a
+                  href={waLink}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-full border border-black/10 bg-white px-4 py-2 text-sm text-zinc-700 transition hover:bg-[#f6efe4]"
+                >
+                  Abrir no WhatsApp
+                </a>
+              ) : null}
+              <button
+                type="button"
+                className="rounded-full border border-black/10 bg-white px-4 py-2 text-sm text-zinc-700 transition hover:bg-[#f6efe4] xl:hidden"
+                onClick={() => setMobilePane("context")}
+              >
+                Contato
+              </button>
+            </div>
           </div>
 
           <div className="relative">
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <input
+              className="min-w-[220px] flex-1 rounded-[16px] border border-black/10 bg-white px-4 py-2.5 text-sm outline-none placeholder:text-zinc-400 focus:border-[#9d4e31]/40"
+              placeholder="Buscar dentro da conversa"
+              value={messageQuery}
+              onChange={(e) => setMessageQuery(e.target.value)}
+            />
+            {quickReplies.map((reply) => (
+              <button
+                key={reply}
+                type="button"
+                onClick={() => setText((current) => (current ? `${current}\n${reply}` : reply))}
+                className="rounded-full border border-black/10 bg-white px-3 py-2 text-xs text-zinc-600 transition hover:bg-[#f6efe4]"
+              >
+                + resposta rapida
+              </button>
+            ))}
+          </div>
           <div ref={messagesContainerRef} onScroll={handleMessagesScroll} className="max-h-[62dvh] overflow-auto py-4">
-            {!selected?.conversation_id ? (
+            {!selectedContact?.conversationIds.length ? (
               <div className="rounded-[20px] border border-dashed border-black/10 bg-white/70 p-6 text-sm text-zinc-500">
                 Este lead ainda nao tem conversa aberta.
               </div>
             ) : messages.length ? (
               <div className="space-y-3">
-                {messages.map((message) => (
-                  <div key={message.id} className={message.direction === "out" ? "flex justify-end" : "flex justify-start"}>
-                    <div
-                      className={[
-                        "max-w-[82%] rounded-[20px] border px-4 py-3 text-sm shadow-[0_12px_30px_rgba(0,0,0,0.12)]",
-                        message.direction === "out" ? "border-[#9d4e31]/20 bg-[#fff4e9]" : "border-black/10 bg-white",
-                      ].join(" ")}
-                    >
-                      <div className="whitespace-pre-wrap leading-6">{message.body || "—"}</div>
-                      <div className="mt-2 text-right text-[10px] uppercase tracking-[0.2em] text-zinc-500">
-                        {message.direction === "out" ? "saida" : "entrada"} • {fmtTime(message.created_at)}
+                {messageBlocks.map((block, index) => {
+                  const dayLabel = fmtDayLabel(block.createdAt);
+                  const previousDayLabel = index > 0 ? fmtDayLabel(messageBlocks[index - 1]?.createdAt) : null;
+                  return (
+                    <div key={block.key}>
+                      {dayLabel && dayLabel !== previousDayLabel ? (
+                        <div className="mb-3 flex items-center justify-center">
+                          <span className="rounded-full border border-black/10 bg-white px-3 py-1 text-[10px] uppercase tracking-[0.22em] text-zinc-500">
+                            {dayLabel}
+                          </span>
+                        </div>
+                      ) : null}
+                      <div className={block.direction === "out" ? "flex justify-end" : "flex justify-start"}>
+                        <div
+                          className={[
+                            "max-w-[82%] rounded-[20px] border px-4 py-3 text-sm shadow-[0_12px_30px_rgba(0,0,0,0.12)]",
+                            block.direction === "out" ? "border-[#9d4e31]/20 bg-[#fff4e9]" : "border-black/10 bg-white",
+                          ].join(" ")}
+                        >
+                          {block.direction === "in" ? (
+                            <div className="mb-2 text-[10px] uppercase tracking-[0.2em] text-zinc-500">
+                              {block.sender || selectedContact?.name || selectedContact?.phone || "contato"}
+                            </div>
+                          ) : null}
+                          <div className="space-y-2">
+                            {block.items.map((message) => (
+                              <div key={message.id} className="whitespace-pre-wrap leading-6">
+                                {linkifyText(message.body)}
+                              </div>
+                            ))}
+                          </div>
+                          <div className="mt-3 text-right text-[10px] uppercase tracking-[0.2em] text-zinc-500">
+                            {block.direction === "out" ? "saida" : "entrada"} •{" "}
+                            {fmtTime(block.items[block.items.length - 1]?.created_at || block.createdAt)}
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <div className="rounded-[20px] border border-dashed border-black/10 bg-white/70 p-6 text-sm text-zinc-500">
-                Sem mensagens ainda.
+                {messageQuery.trim() ? "Nenhuma mensagem bate com a busca atual." : "Sem mensagens ainda."}
               </div>
             )}
           </div>
-            {selected?.conversation_id && showScrollToBottom ? (
+            {selectedContact?.conversationIds.length && showScrollToBottom ? (
               <button
                 type="button"
                 onClick={scrollMessagesToBottom}
@@ -648,6 +870,18 @@ export default function InboxClient() {
           </div>
 
           <div className="border-t border-black/10 pt-4">
+            <div className="mb-3 flex flex-wrap gap-2">
+              {quickReplies.map((reply) => (
+                <button
+                  key={`composer-${reply}`}
+                  type="button"
+                  onClick={() => setText(reply)}
+                  className="rounded-full border border-black/10 bg-white px-3 py-1.5 text-xs text-zinc-600 transition hover:bg-[#f6efe4]"
+                >
+                  usar modelo
+                </button>
+              ))}
+            </div>
             <div className="flex gap-2">
               <textarea
                 className="min-h-24 w-full rounded-[20px] border border-black/10 bg-white px-4 py-3 text-sm text-zinc-950 outline-none placeholder:text-zinc-400 focus:border-[#9d4e31]/40"
@@ -671,12 +905,30 @@ export default function InboxClient() {
                 {sending ? "Enviando..." : "Responder"}
               </button>
             </div>
+            <div className="mt-3 flex items-center justify-between gap-3 text-[11px] text-zinc-500">
+              <span>`Enter` envia, `Shift + Enter` quebra linha.</span>
+              <span>{text.trim().length} caracteres</span>
+            </div>
           </div>
         </section>
 
-        <aside className="rounded-[26px] border border-black/10 bg-[#201714] p-4 text-[#fff7ef] shadow-[0_14px_40px_rgba(70,43,31,0.12)]">
-          <h2 className="text-lg font-semibold tracking-[-0.03em]">Contexto do lead</h2>
-          <p className="mt-1 text-sm text-zinc-400">edicao rapida para intervir no pipeline sem sair da conversa.</p>
+        <aside
+          className={[
+            "rounded-[26px] border border-black/10 bg-[#201714] p-4 text-[#fff7ef] shadow-[0_14px_40px_rgba(70,43,31,0.12)]",
+            mobilePane === "context" ? "block" : "hidden xl:block",
+          ].join(" ")}
+        >
+          <div className="mb-4 xl:hidden">
+            <button
+              type="button"
+              className="rounded-full border border-white/10 bg-white/[0.06] px-4 py-2 text-sm text-zinc-200 transition hover:bg-white/[0.12]"
+              onClick={() => setMobilePane("chat")}
+            >
+              Voltar ao chat
+            </button>
+          </div>
+          <h2 className="text-lg font-semibold tracking-[-0.03em]">Contexto da conversa</h2>
+          <p className="mt-1 text-sm text-zinc-400">painel de leitura do inbox, sem editar CRM ou pipeline aqui.</p>
 
           {selected ? (
             <div className="mt-5 space-y-4">
@@ -686,15 +938,34 @@ export default function InboxClient() {
               </div>
 
               <div className="rounded-[20px] border border-white/10 bg-white/[0.04] p-4">
-                <div className="text-xs uppercase tracking-[0.25em] text-zinc-500">Leitura atual</div>
-                <div className="mt-2 text-lg font-semibold tracking-[-0.03em]">{selectedStage?.name || selected?.status || "Sem estagio"}</div>
-                <p className="mt-2 text-sm text-zinc-400">
-                  ajuste nome e estagio aqui para reposicionar o lead sem quebrar o fluxo de resposta.
-                </p>
+                <div className="text-xs uppercase tracking-[0.25em] text-zinc-500">Contato consolidado</div>
+                <div className="mt-2 text-lg font-semibold tracking-[-0.03em]">
+                  {selectedContact?.name || selected.phone || "Sem nome"}
+                </div>
+                <p className="mt-2 text-sm text-zinc-400">{selectedContact?.phone || "sem_telefone"}</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {waLink ? (
+                    <a
+                      href={waLink}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-xs text-zinc-200 transition hover:bg-white/[0.12]"
+                    >
+                      abrir no WhatsApp
+                    </a>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => void copySelectedPhone()}
+                    className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-xs text-zinc-200 transition hover:bg-white/[0.12]"
+                  >
+                    copiar numero
+                  </button>
+                </div>
               </div>
 
               <div className="rounded-[20px] border border-white/10 bg-white/[0.04] p-4">
-                <div className="text-xs uppercase tracking-[0.25em] text-zinc-500">Leitura de fila</div>
+                <div className="text-xs uppercase tracking-[0.25em] text-zinc-500">Estado operacional</div>
                 <div className="mt-2 text-sm text-zinc-200">
                   {selected.queue_state === "paused"
                     ? "automacao pausada; nenhuma resposta automatica deve sair."
@@ -711,131 +982,23 @@ export default function InboxClient() {
               </div>
 
               <div className="rounded-[20px] border border-white/10 bg-white/[0.04] p-4">
-                <div className="text-xs uppercase tracking-[0.25em] text-zinc-500">Guard rails</div>
-                <div className="mt-3 space-y-3">
-                  <label className="flex items-center justify-between gap-3 text-sm">
-                    <span className="text-zinc-300">Pausar automacao</span>
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4 accent-[#d9875f]"
-                      checked={draftPaused}
-                      onChange={(e) => setDraftPaused(e.target.checked)}
-                    />
-                  </label>
-                  <label className="flex items-center justify-between gap-3 text-sm">
-                    <span className="text-zinc-300">Intervencao manual</span>
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4 accent-[#d9875f]"
-                      checked={draftManualOverride}
-                      onChange={(e) => setDraftManualOverride(e.target.checked)}
-                    />
-                  </label>
-                </div>
-              </div>
-
-              <div className="rounded-[20px] border border-white/10 bg-white/[0.04] p-4">
-                <div className="text-xs uppercase tracking-[0.25em] text-zinc-500">Responsavel</div>
-                <div className="mt-2 text-sm text-zinc-200">
-                  {selected.assignee_name || "sem owner"} {selected.assignee_team ? `• ${selected.assignee_team}` : ""}
-                </div>
-              </div>
-
-              <label className="block">
-                <div className="mb-2 text-xs uppercase tracking-[0.25em] text-zinc-500">Nome do lead</div>
-                <input
-                  className="w-full rounded-[18px] border border-white/10 bg-[#2a211e] px-4 py-3 text-sm outline-none focus:border-[#d9875f]/40"
-                  value={draftName}
-                  onChange={(e) => setDraftName(e.target.value)}
-                  placeholder="Nome exibido no cockpit"
-                />
-              </label>
-
-              <label className="block">
-                <div className="mb-2 text-xs uppercase tracking-[0.25em] text-zinc-500">Estagio atual</div>
-                <select
-                  className="w-full rounded-[18px] border border-white/10 bg-[#2a211e] px-4 py-3 text-sm outline-none focus:border-[#d9875f]/40"
-                  value={draftStatus}
-                  onChange={(e) => setDraftStatus(e.target.value)}
-                >
-                  {statusChoices.map((status) => {
-                    const stage = stageOptions.find((item) => item.key === status);
-                    return (
-                      <option key={status} value={status}>
-                        {stage?.name || status}
-                      </option>
-                    );
-                  })}
-                </select>
-              </label>
-
-              <label className="block">
-                <div className="mb-2 text-xs uppercase tracking-[0.25em] text-zinc-500">Owner</div>
-                <input
-                  className="w-full rounded-[18px] border border-white/10 bg-[#2a211e] px-4 py-3 text-sm outline-none focus:border-[#d9875f]/40"
-                  value={draftOwnerName}
-                  onChange={(e) => setDraftOwnerName(e.target.value)}
-                  placeholder="quem responde por este lead"
-                />
-              </label>
-
-              <label className="block">
-                <div className="mb-2 text-xs uppercase tracking-[0.25em] text-zinc-500">Time</div>
-                <input
-                  className="w-full rounded-[18px] border border-white/10 bg-[#2a211e] px-4 py-3 text-sm outline-none focus:border-[#d9875f]/40"
-                  value={draftOwnerTeam}
-                  onChange={(e) => setDraftOwnerTeam(e.target.value)}
-                  placeholder="closer, sdr, inbound..."
-                />
-              </label>
-
-              <div>
-                <div className="mb-2 text-xs uppercase tracking-[0.25em] text-zinc-500">Labels</div>
-                <div className="flex flex-wrap gap-2">
-                  {labels.map((label) => {
-                    const active = draftLabels.includes(label.key);
-                    return (
-                      <button
-                        key={label.key}
-                        type="button"
-                        onClick={() => toggleDraftLabel(label.key)}
-                        className={[
-                          "rounded-full border px-3 py-1.5 text-xs transition",
-                          active
-                            ? "border-[#d9875f]/30 bg-[#d9875f]/14 text-[#ffe0cf]"
-                            : "border-white/10 bg-white/[0.04] text-zinc-300 hover:bg-white/[0.08]",
-                        ].join(" ")}
-                      >
-                        {label.name}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => void onSaveLead()}
-                disabled={savingLead || !selected}
-                className="w-full rounded-[20px] border border-[#d9875f]/30 bg-[#d9875f]/14 px-4 py-3 text-sm font-medium text-[#ffe0cf] hover:bg-[#d9875f]/22 disabled:opacity-50"
-              >
-                {savingLead ? "Salvando..." : "Salvar contexto"}
-              </button>
-
-              <div className="rounded-[20px] border border-white/10 bg-white/[0.04] p-4">
                 <div className="text-xs uppercase tracking-[0.25em] text-zinc-500">Resumo rapido</div>
                 <dl className="mt-3 space-y-3 text-sm">
                   <div className="flex items-center justify-between gap-3">
                     <dt className="text-zinc-400">Telefone</dt>
-                    <dd className="text-right">{selected.phone || "sem_telefone"}</dd>
+                    <dd className="text-right">{selectedContact?.phone || selected.phone || "sem_telefone"}</dd>
                   </div>
                   <div className="flex items-center justify-between gap-3">
-                    <dt className="text-zinc-400">Conversa</dt>
-                    <dd className="text-right">{selected.conversation_id ? "aberta" : "nao iniciada"}</dd>
+                    <dt className="text-zinc-400">Registros unidos</dt>
+                    <dd className="text-right">{selectedContact?.leads.length || 1}</dd>
                   </div>
                   <div className="flex items-center justify-between gap-3">
-                    <dt className="text-zinc-400">Mensageria</dt>
-                    <dd className="text-right">{selected.last_message_body ? "ativa" : "sem historico"}</dd>
+                    <dt className="text-zinc-400">Conversas ativas</dt>
+                    <dd className="text-right">{selectedContact?.conversationIds.length || 0}</dd>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <dt className="text-zinc-400">Mensagens carregadas</dt>
+                    <dd className="text-right">{messages.length}</dd>
                   </div>
                   <div className="flex items-center justify-between gap-3">
                     <dt className="text-zinc-400">Automacao</dt>
@@ -843,12 +1006,34 @@ export default function InboxClient() {
                       {selected.paused ? "pausada" : selected.manual_override ? "manual" : "liberada"}
                     </dd>
                   </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <dt className="text-zinc-400">Responsavel</dt>
+                    <dd className="text-right">
+                      {selected.assignee_name || "sem owner"} {selected.assignee_team ? `• ${selected.assignee_team}` : ""}
+                    </dd>
+                  </div>
                 </dl>
               </div>
+
+              {selectedContact?.labels.length ? (
+                <div className="rounded-[20px] border border-white/10 bg-white/[0.04] p-4">
+                  <div className="text-xs uppercase tracking-[0.25em] text-zinc-500">Labels do contato</div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {selectedContact.labels.map((label) => (
+                      <span
+                        key={label}
+                        className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-xs text-zinc-200"
+                      >
+                        {label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </div>
           ) : (
             <div className="mt-5 rounded-[20px] border border-dashed border-white/15 bg-white/[0.04] p-5 text-sm text-zinc-400">
-              Selecione um lead para editar status, nome e acompanhar o contexto.
+              Selecione uma conversa para acompanhar o contexto do inbox.
             </div>
           )}
         </aside>

@@ -37,6 +37,21 @@ class BaileysClient:
             logger.error(f"Error sending message via Baileys: {e}")
             return {"ok": False, "error": str(e)}
 
+    def chat_details(self, number: str, preview: bool = True) -> dict[str, Any]:
+        url = f"{self.base_url}/chat/details"
+        payload = {
+            "number": number,
+            "preview": preview,
+        }
+        try:
+            with httpx.Client(timeout=30) as client:
+                resp = client.post(url, json=payload, headers=self._headers())
+                resp.raise_for_status()
+                return resp.json()
+        except Exception as e:
+            logger.error(f"Error fetching chat details via Baileys: {e}")
+            return {"ok": False, "error": str(e)}
+
     def send_voice_jid(self, jid: str, audio_data: bytes) -> dict[str, Any]:
         """Envia áudio como PTT embutindo os bytes em base64.
 

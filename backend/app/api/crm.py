@@ -5,6 +5,7 @@ from typing import Any
 from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from app.clients.baileys import BaileysClient
 from app.clients.uazapi import UazapiError
 from app.db import DatabaseNotConfiguredError, connect
 from app.repositories import crm_repo
@@ -311,6 +312,64 @@ class Message(BaseModel):
     created_at: str
 
 
+class ContactProfileImagesRequest(BaseModel):
+    numbers: list[str] = Field(default_factory=list)
+    preview: bool = True
+    provider: str | None = Field(default=None, description="auto|uazapi|baileys")
+    instance: str | None = Field(default=None, description="Instancia opcional do provider")
+
+
+def _digits_only(value: str | None) -> str:
+    return "".join(ch for ch in str(value or "") if ch.isdigit())
+
+
+def _resolve_avatar_provider(preferred: str | None) -> str:
+    normalized = (preferred or "auto").strip().lower()
+    if normalized in {"uazapi", "baileys"}:
+        return normalized
+    if settings.uazapi_base_url and (settings.uazapi_admin_token or settings.uazapi_token):
+        return "uazapi"
+    if settings.baileys_base_url:
+        return "baileys"
+    raise HTTPException(status_code=400, detail="avatar_provider_not_configured")
+
+
+def _fetch_contact_profile_image(
+    *,
+    number: str,
+    preview: bool,
+    provider: str,
+    instance: str | None,
+    x_uazapi_token: str | None,
+    x_uazapi_admintoken: str | None,
+) -> dict[str, Any]:
+    if provider == "uazapi":
+        token = resolve_token(
+            settings,
+            token=x_uazapi_token,
+            instance=instance,
+            admin_token=x_uazapi_admintoken,
+        )
+        details = client(settings, token=token).chat_details(number=number, preview=preview)
+        return {
+            "imageUrl": details.get("imagePreview") or details.get("image") or details.get("profilePicUrl") or None,
+            "name": details.get("wa_contactName") or details.get("wa_name") or details.get("name") or None,
+            "jid": details.get("wa_chatid") or None,
+        }
+
+    details = BaileysClient(
+        base_url=settings.baileys_base_url,
+        instance_id=(instance or settings.baileys_instance_id or "default"),
+    ).chat_details(number=number, preview=preview)
+    if not details.get("ok", True):
+        raise HTTPException(status_code=502, detail=f"baileys_avatar_unavailable: {details.get('error') or 'unknown_error'}")
+    return {
+        "imageUrl": details.get("imagePreview") or details.get("image") or None,
+        "name": details.get("wa_contactName") or details.get("wa_name") or details.get("name") or None,
+        "jid": details.get("wa_chatid") or None,
+    }
+
+
 @router.get("/conversations/{conversation_id}/messages")
 def list_messages(
     conversation_id: str,
@@ -323,6 +382,57 @@ def list_messages(
             return {"ok": True, "messages": messages}
     except DatabaseNotConfiguredError:
         return {"ok": True, "messages": [], "reason": "database_not_configured"}
+
+
+@router.post("/contacts/profile-images")
+def contact_profile_images(
+    req: ContactProfileImagesRequest,
+    x_uazapi_token: str | None = Header(default=None, alias="x-uazapi-token"),
+    x_uazapi_admintoken: str | None = Header(default=None, alias="x-uazapi-admintoken"),
+) -> dict[str, Any]:
+    provider = _resolve_avatar_provider(req.provider)
+    seen: set[str] = set()
+    items: list[dict[str, Any]] = []
+
+    for raw in req.numbers:
+        number = _digits_only(raw)
+        if not number or number in seen:
+            continue
+        seen.add(number)
+        try:
+            profile = _fetch_contact_profile_image(
+                number=number,
+                preview=req.preview,
+                provider=provider,
+                instance=req.instance,
+                x_uazapi_token=x_uazapi_token,
+                x_uazapi_admintoken=x_uazapi_admintoken,
+            )
+        except UazapiError as exc:
+            raise HTTPException(
+                status_code=502,
+                detail={
+                    "error": str(exc),
+                    "upstream_status": exc.status_code,
+                    "upstream_body": exc.body,
+                    "upstream_url": exc.url,
+                },
+            )
+        except HTTPException:
+            raise
+        except Exception:
+            profile = {"imageUrl": None, "name": None, "jid": None}
+
+        items.append(
+            {
+                "number": number,
+                "imageUrl": profile.get("imageUrl"),
+                "name": profile.get("name"),
+                "jid": profile.get("jid"),
+            }
+        )
+
+    return {"ok": True, "provider": provider, "items": items}
 
 
 class SendConversationTextRequest(BaseModel):

@@ -47,6 +47,13 @@ export type RupturMessage = {
   created_at: string;
 };
 
+export type RupturContactProfile = {
+  number: string;
+  imageUrl?: string | null;
+  name?: string | null;
+  jid?: string | null;
+};
+
 export type RupturChannelHealth = {
   provider: string;
   instance_id: string;
@@ -120,6 +127,15 @@ export async function listStages() {
 export async function listMessages(conversationId: string) {
   const data = await apiFetch(`/crm/conversations/${conversationId}/messages?limit=80`);
   return (data.messages || []) as RupturMessage[];
+}
+
+export async function listContactProfiles(numbers: string[]) {
+  const data = await apiFetch("/crm/contacts/profile-images", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ numbers, preview: true }),
+  });
+  return (data.items || []) as RupturContactProfile[];
 }
 
 export async function sendConversationText(conversationId: string, text: string) {

@@ -381,6 +381,43 @@ app.post("/instance/connect", async (_req, res) => {
   return app._router.handle({ ..._req, url: "/instance/status", method: "GET" }, res, () => {});
 });
 
+app.post("/chat/details", async (req, res) => {
+  const instanceId = getInstanceId(req);
+  const number = String(req.body?.number || "").trim();
+  const preview = Boolean(req.body?.preview);
+
+  if (!number || /\s/.test(number)) return res.status(400).json({ ok: false, error: "number_invalid" });
+  const inst = await ensureStarted(instanceId);
+  if (!inst.socket) return res.status(503).json({ ok: false, error: "not_ready" });
+  if (!(await waitForOpen(inst))) return res.status(503).json({ ok: false, error: "not_connected" });
+
+  try {
+    const jid = await resolveJid(inst, number);
+    if (!jid) return res.status(400).json({ ok: false, error: "number_invalid" });
+
+    let image = "";
+    try {
+      image = await inst.socket.profilePictureUrl(jid, preview ? "preview" : "image");
+    } catch {
+      try {
+        image = await inst.socket.profilePictureUrl(jid, "image");
+      } catch {
+        image = "";
+      }
+    }
+
+    return res.json({
+      ok: true,
+      wa_chatid: jid,
+      imagePreview: preview ? image : "",
+      image: preview ? "" : image,
+    });
+  } catch (err) {
+    logger.error({ err }, "Falha ao buscar detalhes do contato");
+    return res.status(502).json({ ok: false, error: "chat_details_failed" });
+  }
+});
+
 app.post("/send/presence", async (req, res) => {
   const instanceId = getInstanceId(req);
   const number = String(req.body?.number || "").trim();
