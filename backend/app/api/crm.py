@@ -310,6 +310,12 @@ class Message(BaseModel):
     sender: str | None = None
     body: str | None = None
     created_at: str
+    kind: str = "text"
+    mime_type: str | None = None
+    media_url: str | None = None
+    file_name: str | None = None
+    caption: str | None = None
+    delivery_status: str = "unknown"
 
 
 class ContactProfileImagesRequest(BaseModel):
@@ -321,6 +327,150 @@ class ContactProfileImagesRequest(BaseModel):
 
 def _digits_only(value: str | None) -> str:
     return "".join(ch for ch in str(value or "") if ch.isdigit())
+
+
+def _raw_candidates(raw: dict[str, Any]) -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = []
+    if isinstance(raw, dict):
+        items.append(raw)
+        data = raw.get("data")
+        if isinstance(data, dict):
+            items.append(data)
+        upstream = raw.get("uazapi")
+        if isinstance(upstream, dict):
+            items.append(upstream)
+    return items
+
+
+def _first_str(payloads: list[dict[str, Any]], keys: tuple[str, ...]) -> str | None:
+    for payload in payloads:
+        for key in keys:
+            value = payload.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+    return None
+
+
+def _first_int(payloads: list[dict[str, Any]], keys: tuple[str, ...]) -> int | None:
+    for payload in payloads:
+        for key in keys:
+            value = payload.get(key)
+            if isinstance(value, bool):
+                continue
+            if isinstance(value, int):
+                return value
+            if isinstance(value, str) and value.strip().isdigit():
+                return int(value.strip())
+    return None
+
+
+def _detect_message_kind(raw: dict[str, Any], body: str | None) -> tuple[str, str | None]:
+    payloads = _raw_candidates(raw)
+    message_type = (_first_str(payloads, ("type", "messageType", "message_type", "mediaType", "media_type")) or "").lower()
+    mime_type = _first_str(payloads, ("mimetype", "mimeType", "mime_type", "fileMimetype"))
+    signature = " ".join(filter(None, [message_type, (mime_type or "").lower(), (body or "").lower()]))
+
+    kind_map = [
+        ("ptt", "ptt"),
+        ("voice", "ptt"),
+        ("audio", "audio"),
+        ("image", "image"),
+        ("video", "video"),
+        ("document", "document"),
+        ("file", "document"),
+        ("sticker", "sticker"),
+        ("location", "location"),
+        ("contact", "contact"),
+        ("link", "link"),
+    ]
+    for token, kind in kind_map:
+        if token in signature:
+            return kind, mime_type
+
+    if "[áudio transcrito]" in (body or "").lower():
+        return "ptt", mime_type or "audio/mpeg"
+
+    if _first_str(payloads, ("imageUrl", "image", "imagePreview", "mediaUrl", "media_url", "url")):
+        return "image", mime_type
+
+    return "text", mime_type
+
+
+def _detect_media_url(raw: dict[str, Any], kind: str) -> str | None:
+    payloads = _raw_candidates(raw)
+    preferred_keys = {
+        "image": ("imageUrl", "image", "imagePreview", "mediaUrl", "media_url", "url"),
+        "video": ("videoUrl", "video", "mediaUrl", "media_url", "url"),
+        "audio": ("audioUrl", "audio", "mediaUrl", "media_url", "url"),
+        "ptt": ("audioUrl", "audio", "voiceUrl", "mediaUrl", "media_url", "url"),
+        "document": ("documentUrl", "document", "mediaUrl", "media_url", "url"),
+    }
+    url = _first_str(payloads, preferred_keys.get(kind, ("mediaUrl", "media_url", "url")))
+    if url and (url.startswith("http://") or url.startswith("https://") or url.startswith("data:")):
+        return url
+    return None
+
+
+def _detect_file_name(raw: dict[str, Any]) -> str | None:
+    return _first_str(_raw_candidates(raw), ("fileName", "filename", "docName", "displayName", "title"))
+
+
+def _detect_caption(raw: dict[str, Any], body: str | None, kind: str) -> str | None:
+    caption = _first_str(_raw_candidates(raw), ("caption", "text", "content"))
+    if kind == "text":
+        return None
+    if caption and caption != body:
+        return caption
+    return None
+
+
+def _detect_delivery_status(raw: dict[str, Any], direction: str) -> str:
+    payloads = _raw_candidates(raw)
+
+    for payload in payloads:
+        ok_value = payload.get("ok")
+        if ok_value is False:
+            return "failed"
+        error_value = payload.get("error")
+        if isinstance(error_value, str) and error_value.strip():
+            return "failed"
+
+    ack = _first_int(payloads, ("ack", "status", "messageStatus", "message_status"))
+    if ack is not None:
+        if ack >= 3:
+            return "read"
+        if ack == 2:
+            return "delivered"
+        if ack >= 1:
+            return "sent"
+
+    if direction == "out":
+        for payload in payloads:
+            if payload.get("processed_by") == "jarvis_ai":
+                return "sent"
+            if isinstance(payload.get("uazapi"), dict) or any(k in payload for k in ("serverId", "messageId", "id", "msgId")):
+                return "sent"
+
+    return "unknown"
+
+
+def _serialize_message(row: crm_repo.MessageRow) -> Message:
+    raw = row.raw or {}
+    kind, mime_type = _detect_message_kind(raw, row.body)
+    return Message(
+        id=row.id,
+        external_id=row.external_id,
+        direction=row.direction,
+        sender=row.sender,
+        body=row.body,
+        created_at=row.created_at,
+        kind=kind,
+        mime_type=mime_type,
+        media_url=_detect_media_url(raw, kind),
+        file_name=_detect_file_name(raw),
+        caption=_detect_caption(raw, row.body, kind),
+        delivery_status=_detect_delivery_status(raw, row.direction),
+    )
 
 
 def _resolve_avatar_provider(preferred: str | None) -> str:
@@ -378,7 +528,7 @@ def list_messages(
     try:
         with connect() as conn:
             rows = crm_repo.list_messages(conn, conversation_id=conversation_id, limit=limit)
-            messages = [Message(**r.__dict__).model_dump() for r in rows]
+            messages = [_serialize_message(r).model_dump() for r in rows]
             return {"ok": True, "messages": messages}
     except DatabaseNotConfiguredError:
         return {"ok": True, "messages": [], "reason": "database_not_configured"}

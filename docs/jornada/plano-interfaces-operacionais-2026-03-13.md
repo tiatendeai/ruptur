@@ -45,6 +45,12 @@ Proximo salto esperado:
 - sinais de entrega/leitura quando o contrato do provider expor isso
 - composer com mais atalhos e templates de operacao
 
+Salto ja executado nesta fase:
+
+- derivacao backend de `kind`, `media_url`, `mime_type` e `delivery_status` a partir do `raw` persistido
+- renderizacao de imagem, audio/PTT, video e documento no `MyChat`
+- exibicao de badge de entrega por mensagem de saida, mesmo sem migracao de schema
+
 ### 2. Campanhas
 
 Objetivo:

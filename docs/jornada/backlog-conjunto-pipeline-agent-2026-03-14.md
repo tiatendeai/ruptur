@@ -255,6 +255,18 @@ Data: 2026-03-14
 
 Data: 2026-03-14
 
+- Itens puxados de `Depois`: elevar o `MyChat` para preview de midia e sinais de entrega sem esperar migracao estrutural
+- Arquivos/modulos alvo: `backend/app/repositories/crm_repo.py`, `backend/app/api/crm.py`, `web/src/lib/ruptur.ts`, `web/src/app/inbox/InboxClient.tsx`
+- Contrato consumido: `messages.raw` ja persistido no banco por `uazapi_webhook` e por `send/text`
+- Contrato produzido: lista de mensagens agora devolve `kind`, `mime_type`, `media_url`, `file_name`, `caption` e `delivery_status`
+- Bloqueios para o outro time: se o Agent/Gateways quiser status de entrega realmente canonico, vai precisar persistir ack/eventos do provider como trilha dedicada
+- Bloqueios para o Diego: nenhum; a entrega atual e best effort e nao muda regra de negocio
+- Resultado do ciclo: o `MyChat` passou a renderizar imagem, audio/PTT, video e documento, e mostra badge de entrega por mensagem de saida mesmo antes da migracao de schema
+
+## Atualizacao de ciclo — Time Cockpit/CRM
+
+Data: 2026-03-14
+
 - Itens puxados de `Agora`:
   - adicionar `manual_override` e `paused`
   - expor `queue_state` consumivel pelo agent

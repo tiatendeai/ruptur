@@ -45,6 +45,12 @@ export type RupturMessage = {
   sender?: string | null;
   body?: string | null;
   created_at: string;
+  kind?: "text" | "image" | "audio" | "ptt" | "video" | "document" | "sticker" | "location" | "contact" | "link" | "unknown";
+  mime_type?: string | null;
+  media_url?: string | null;
+  file_name?: string | null;
+  caption?: string | null;
+  delivery_status?: "unknown" | "sent" | "delivered" | "read" | "failed";
 };
 
 export type RupturContactProfile = {

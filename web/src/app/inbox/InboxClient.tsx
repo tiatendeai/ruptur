@@ -150,6 +150,7 @@ function buildMessageBlocks(items: RupturMessage[]) {
       previous &&
       previous.direction === message.direction &&
       (previous.sender || null) === (message.sender || null) &&
+      (previous.items[previous.items.length - 1]?.kind || "text") === (message.kind || "text") &&
       currentTs - previousTs < 1000 * 60 * 10;
 
     if (canMerge) {
@@ -219,6 +220,101 @@ function linkifyText(value?: string | null) {
     }
     return <span key={`${part}-${index}`}>{part}</span>;
   });
+}
+
+function deliveryLabel(status?: RupturMessage["delivery_status"]) {
+  if (status === "read") return "lida";
+  if (status === "delivered") return "entregue";
+  if (status === "sent") return "enviada";
+  if (status === "failed") return "falhou";
+  return "status indefinido";
+}
+
+function deliveryTone(status?: RupturMessage["delivery_status"]) {
+  if (status === "read") return "border-emerald-700/15 bg-emerald-50 text-emerald-900";
+  if (status === "delivered") return "border-sky-700/15 bg-sky-50 text-sky-900";
+  if (status === "sent") return "border-black/10 bg-[#f4ede2] text-zinc-700";
+  if (status === "failed") return "border-red-700/15 bg-red-50 text-red-800";
+  return "border-black/10 bg-[#f4ede2] text-zinc-700";
+}
+
+function isMediaKind(kind?: RupturMessage["kind"]) {
+  return kind && kind !== "text" && kind !== "link" && kind !== "unknown";
+}
+
+function MessageBubbleBody({ message }: { message: RupturMessage }) {
+  const kind = message.kind || "text";
+  const fileLabel = message.file_name || message.media_url || "arquivo";
+
+  if (kind === "image" && message.media_url) {
+    return (
+      <div className="space-y-2">
+        <a href={message.media_url} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-[16px] border border-black/10">
+          <img src={message.media_url} alt={message.caption || message.file_name || "imagem"} className="max-h-72 w-full object-cover" loading="lazy" />
+        </a>
+        {message.caption ? <div className="whitespace-pre-wrap leading-6">{linkifyText(message.caption)}</div> : null}
+      </div>
+    );
+  }
+
+  if ((kind === "audio" || kind === "ptt") && message.media_url) {
+    return (
+      <div className="space-y-2">
+        <div className="rounded-[16px] border border-black/10 bg-black/[0.03] px-3 py-3">
+          <div className="mb-2 text-[10px] uppercase tracking-[0.2em] text-zinc-500">
+            {kind === "ptt" ? "audio / ptt" : "audio"}
+          </div>
+          <audio controls preload="none" className="w-full">
+            <source src={message.media_url} type={message.mime_type || "audio/mpeg"} />
+          </audio>
+        </div>
+        {message.body ? <div className="whitespace-pre-wrap leading-6">{linkifyText(message.body)}</div> : null}
+      </div>
+    );
+  }
+
+  if (kind === "video" && message.media_url) {
+    return (
+      <div className="space-y-2">
+        <div className="overflow-hidden rounded-[16px] border border-black/10 bg-black">
+          <video controls preload="metadata" className="max-h-80 w-full">
+            <source src={message.media_url} type={message.mime_type || "video/mp4"} />
+          </video>
+        </div>
+        {message.caption ? <div className="whitespace-pre-wrap leading-6">{linkifyText(message.caption)}</div> : null}
+      </div>
+    );
+  }
+
+  if (kind === "document" && message.media_url) {
+    return (
+      <div className="space-y-2">
+        <a
+          href={message.media_url}
+          target="_blank"
+          rel="noreferrer"
+          className="flex items-center justify-between gap-3 rounded-[16px] border border-black/10 bg-black/[0.03] px-4 py-3 transition hover:bg-black/[0.05]"
+        >
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">documento</div>
+            <div className="mt-1 text-sm font-medium">{fileLabel}</div>
+          </div>
+          <div className="text-xs text-[#8f492e]">abrir</div>
+        </a>
+        {message.caption ? <div className="whitespace-pre-wrap leading-6">{linkifyText(message.caption)}</div> : null}
+      </div>
+    );
+  }
+
+  if (kind === "sticker") {
+    return (
+      <div className="rounded-[16px] border border-black/10 bg-black/[0.03] px-4 py-3 text-sm text-zinc-600">
+        figurinha recebida
+      </div>
+    );
+  }
+
+  return <div className="whitespace-pre-wrap leading-6">{linkifyText(message.body || message.caption || "—")}</div>;
 }
 
 const DEFAULT_QUEUE_FILTER = "all";
@@ -298,7 +394,9 @@ export default function InboxClient() {
     if (!messageQuery.trim()) return messages;
     const term = messageQuery.trim().toLowerCase();
     return messages.filter((message) =>
-      [message.body || "", message.sender || ""].some((value) => value.toLowerCase().includes(term)),
+      [message.body || "", message.caption || "", message.file_name || "", message.sender || ""].some((value) =>
+        value.toLowerCase().includes(term),
+      ),
     );
   }, [messageQuery, messages]);
 
@@ -985,13 +1083,27 @@ export default function InboxClient() {
                           ) : null}
                           <div className="space-y-2">
                             {block.items.map((message) => (
-                              <div key={message.id} className="whitespace-pre-wrap leading-6">
-                                {linkifyText(message.body)}
+                              <div key={message.id} className="space-y-2">
+                                <MessageBubbleBody message={message} />
+                                {message.direction === "out" ? (
+                                  <div className="flex justify-end">
+                                    <span
+                                      className={[
+                                        "rounded-full border px-2 py-1 text-[10px] uppercase tracking-[0.18em]",
+                                        deliveryTone(message.delivery_status),
+                                      ].join(" ")}
+                                    >
+                                      {deliveryLabel(message.delivery_status)}
+                                    </span>
+                                  </div>
+                                ) : null}
                               </div>
                             ))}
                           </div>
                           <div className="mt-3 text-right text-[10px] uppercase tracking-[0.2em] text-zinc-500">
-                            {block.direction === "out" ? "saida" : "entrada"} •{" "}
+                            {block.direction === "out" ? "saida" : "entrada"}
+                            {isMediaKind(block.items[block.items.length - 1]?.kind) ? " • mídia" : ""}
+                            {" • "}
                             {fmtTime(block.items[block.items.length - 1]?.created_at || block.createdAt)}
                           </div>
                         </div>
@@ -1035,6 +1147,7 @@ export default function InboxClient() {
               <span className="rounded-full bg-[#f5e8da] px-2.5 py-1 text-[#8f492e]">resposta manual</span>
               <span className="rounded-full bg-[#f0eee9] px-2.5 py-1 text-zinc-600">contexto contínuo</span>
               <span className="rounded-full bg-[#eef4ea] px-2.5 py-1 text-emerald-700">whatsapp-ready</span>
+              <span className="rounded-full bg-[#edf2ff] px-2.5 py-1 text-sky-700">status de entrega vivo</span>
             </div>
             <div className="flex gap-2">
               <textarea
@@ -1172,6 +1285,10 @@ export default function InboxClient() {
                   <div className="flex items-center justify-between gap-3">
                     <dt className="text-zinc-400">Mensagens carregadas</dt>
                     <dd className="text-right">{messages.length}</dd>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <dt className="text-zinc-400">Midias detectadas</dt>
+                    <dd className="text-right">{messages.filter((message) => isMediaKind(message.kind)).length}</dd>
                   </div>
                   <div className="flex items-center justify-between gap-3">
                     <dt className="text-zinc-400">Automacao</dt>

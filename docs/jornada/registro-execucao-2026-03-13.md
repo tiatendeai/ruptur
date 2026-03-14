@@ -53,6 +53,8 @@ Consolidar o que ja foi feito, o que esta em andamento e o que entrou como frent
   - owner/time editavel no proprio inbox
   - labels operacionais editaveis no proprio inbox
   - controles reais de `paused` e `manual_override`
+  - preview de imagem, audio/PTT, video e documento no proprio chat
+  - badge de status de entrega por mensagem de saida, derivado do `raw`
 
 ## Frentes urgentes abertas
 

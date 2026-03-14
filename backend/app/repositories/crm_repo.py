@@ -66,6 +66,7 @@ class MessageRow:
     sender: str | None
     body: str | None
     created_at: str
+    raw: dict[str, Any] | None
 
 
 def list_stages(conn: Connection) -> list[StageRow]:
@@ -407,7 +408,7 @@ def assign_lead(conn: Connection, *, lead_id: str, owner_name: str | None, team:
 def list_messages(conn: Connection, *, conversation_id: str, limit: int) -> list[MessageRow]:
     rows = conn.execute(
         """
-        SELECT id::text, external_id, direction, sender, body, created_at::text
+        SELECT id::text, external_id, direction, sender, body, created_at::text, raw
         FROM messages
         WHERE conversation_id = %s
         ORDER BY created_at DESC
@@ -415,7 +416,10 @@ def list_messages(conn: Connection, *, conversation_id: str, limit: int) -> list
         """,
         (conversation_id, limit),
     ).fetchall()
-    return [MessageRow(id=r[0], external_id=r[1], direction=r[2], sender=r[3], body=r[4], created_at=r[5]) for r in rows]
+    return [
+        MessageRow(id=r[0], external_id=r[1], direction=r[2], sender=r[3], body=r[4], created_at=r[5], raw=r[6] or {})
+        for r in rows
+    ]
 
 
 def get_conversation_external_id(conn: Connection, *, conversation_id: str) -> str | None:
