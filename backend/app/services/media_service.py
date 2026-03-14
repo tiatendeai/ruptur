@@ -1,8 +1,8 @@
 from __future__ import annotations
 import logging
 import os
-import requests
 from typing import Optional
+import httpx
 from openai import OpenAI
 from app.settings import settings
 
@@ -54,7 +54,7 @@ class MediaService:
                     "similarity_boost": 0.5
                 }
             }
-            response = requests.post(url, json=data, headers=headers)
+            response = httpx.post(url, json=data, headers=headers)
             if response.status_code == 200:
                 return response.content
             else:
