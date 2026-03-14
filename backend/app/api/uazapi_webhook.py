@@ -77,6 +77,7 @@ async def process_ai_response(payload: dict[str, Any], lead_id: str, conversatio
                 last_message=last_msg,
                 history=history[:-1]
             )
+            print(f"[DEBUG] Lead: {lead_name}, Msg: '{last_msg}', History Length: {len(history)}")
             print(f"[DEBUG] Jarvis generated response: {response_text[:50]}...")
 
             # Decidir se envia áudio
