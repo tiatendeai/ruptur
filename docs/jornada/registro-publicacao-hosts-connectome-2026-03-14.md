@@ -40,15 +40,18 @@ Data: 2026-03-14
 
 - `api.ruptur.cloud/health` saudavel
 
-## Pendencia conhecida
+## TLS
 
-Os novos hosts do showcase e studio ainda precisam concluir a emissao TLS no Traefik.
+Validado com sucesso:
 
-Roteamento e DNS:
-- ok
+- `https://studio.ruptur.cloud` -> `307 /studio`
+- `https://showcase.ruptur.cloud` -> `200`
+- `https://site.ruptur.cloud` -> `200`
+- `https://lp.ruptur.cloud` -> `200`
+- `https://web.ruptur.cloud` -> `200`
+- `https://ruptur.cloud` -> `200`
 
-Certificado final:
-- pendente
+O certificado servido pelo Traefik passou a cobrir a familia completa de hosts do front.
 
 ## Observacao operacional
 
