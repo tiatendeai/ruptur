@@ -36,10 +36,11 @@ class BaileysClient:
             return {"ok": False, "error": str(e)}
 
     def send_voice_jid(self, jid: str, audio_url: str) -> dict[str, Any]:
-        url = f"{self.base_url}/send/voice"
+        url = f"{self.base_url}/send/media"
         payload = {
             "number": jid,
-            "url": audio_url
+            "url": audio_url,
+            "type": "ptt"
         }
         try:
             with httpx.Client(timeout=60) as client:

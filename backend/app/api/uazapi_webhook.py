@@ -88,13 +88,13 @@ async def process_ai_response(payload: dict[str, Any], lead_id: str, conversatio
                 # Remover o prefixo *Jarvis:* do texto lido para o áudio
                 audio_text = response_text.replace("*Jarvis:* ", "").replace("*Jarvis:*", "").strip()
                 
-                # Tentar ElevenLabs Primeiro (Voz Jarvis personalizada)
-                audio_data = media_service.text_to_speech_elevenlabs(audio_text)
+                # Tentar OpenAI Primeiro (já validado e estável)
+                voice = "onyx" if "1980" in settings.baileys_instance_id else "nova"
+                audio_data = media_service.text_to_speech_openai(audio_text, voice=voice)
                 
                 if not audio_data:
-                    print(f"[DEBUG] ElevenLabs failed or not configured. Falling back to OpenAI...")
-                    voice = "onyx" if "1980" in settings.baileys_instance_id else "nova"
-                    audio_data = media_service.text_to_speech_openai(audio_text, voice=voice)
+                    print(f"[DEBUG] OpenAI TTS failed. Trying ElevenLabs as fallback...")
+                    audio_data = media_service.text_to_speech_elevenlabs(audio_text)
             
             # Salvar no banco
             external_id = crm_repo.store_out_message(
