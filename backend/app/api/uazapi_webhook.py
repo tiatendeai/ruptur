@@ -85,7 +85,7 @@ async def process_ai_response(payload: dict[str, Any], lead_id: str, conversatio
             wants_audio = "[Áudio Transcrito]" in last_msg or any(x in last_msg.lower() for x in ["áudio", "audio", "auio", "voz", "mande um áudio", "manda áudio", "manda audio"])
             audio_data = None
             if wants_audio:
-                print(f"[DEBUG] User seems to want audio. Generating TTS with ElevenLabs...")
+                print(f"[DEBUG] User seems to want audio. Generating TTS with OpenAI...")
                 # Remover o prefixo *Jarvis:* do texto lido para o áudio
                 audio_text = response_text.replace("*Jarvis:* ", "").replace("*Jarvis:*", "").strip()
                 

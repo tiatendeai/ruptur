@@ -43,7 +43,7 @@ class BaileysClient:
             "type": "ptt"
         }
         try:
-            with httpx.Client(timeout=60) as client:
+            with httpx.Client(timeout=120) as client:
                 resp = client.post(url, json=payload, headers=self._headers())
                 resp.raise_for_status()
                 return resp.json()
