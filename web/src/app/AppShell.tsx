@@ -13,7 +13,8 @@ const NAV_ITEMS = [
   { href: "/sendflow", label: "Sendflow", kicker: "Fluxos" },
   { href: "/metrics", label: "Metricas", kicker: "Saude" },
   { href: "/billing", label: "Planos", kicker: "Receita" },
-  { href: "/connectome/index.html", label: "Connectome", kicker: "Neural Map", external: true },
+  { href: "/connectome/showcase.html", label: "Showcase", kicker: "Neural Map", external: true },
+  { href: "/connectome/studio.html", label: "Studio", kicker: "Connectome", external: true },
 ];
 
 export default function AppShell({
