@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { href: "/sendflow", label: "Sendflow", kicker: "Fluxos" },
   { href: "/metrics", label: "Metricas", kicker: "Saude" },
   { href: "/billing", label: "Planos", kicker: "Receita" },
+  { href: "/connectome/index.html", label: "Connectome", kicker: "Neural Map", external: true },
 ];
 
 export default function AppShell({
@@ -62,6 +63,8 @@ export default function AppShell({
                   <Link
                     key={item.href}
                     href={item.href}
+                    target={item.external ? "_blank" : undefined}
+                    rel={item.external ? "noreferrer" : undefined}
                     className={[
                       "group relative overflow-hidden rounded-[22px] border px-4 py-4 transition",
                       active
