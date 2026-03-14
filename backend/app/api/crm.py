@@ -141,6 +141,12 @@ class CreateSavedViewRequest(BaseModel):
     is_shared: bool = True
 
 
+class QueuesSummary(BaseModel):
+    total: int
+    by_queue: dict[str, int]
+    with_conversation: int
+
+
 @router.get("/leads")
 def list_leads(
     status: str | None = Query(default=None),
@@ -164,6 +170,25 @@ def list_labels() -> dict[str, Any]:
             return {"ok": True, "labels": [Label(**r.__dict__).model_dump() for r in rows]}
     except DatabaseNotConfiguredError:
         return {"ok": True, "labels": [], "reason": "database_not_configured"}
+
+
+@router.get("/queues/summary")
+def get_queues_summary() -> dict[str, Any]:
+    try:
+        with connect() as conn:
+            leads = crm_repo.list_leads(conn, limit=1000)
+            summary = {
+                "total": len(leads),
+                "by_queue": {},
+                "with_conversation": sum(1 for l in leads if l.conversation_id)
+            }
+            for l in leads:
+                state = l.queue_state
+                summary["by_queue"][state] = summary["by_queue"].get(state, 0) + 1
+            
+            return {"ok": True, "summary": summary}
+    except DatabaseNotConfiguredError:
+        return {"ok": True, "summary": {"total": 0, "by_queue": {}, "with_conversation": 0}, "reason": "database_not_configured"}
 
 
 @router.post("/labels")

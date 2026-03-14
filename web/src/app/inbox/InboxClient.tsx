@@ -14,6 +14,7 @@ import {
   setLeadLabels,
   updateLeadAutomationState,
   updateLead,
+  getQueuesSummary,
 } from "@/lib/ruptur";
 
 function fmtTime(value?: string | null) {
@@ -35,14 +36,6 @@ function hoursSince(value?: string | null) {
   return (Date.now() - ts) / 1000 / 60 / 60;
 }
 
-function queueState(lead: RupturLead) {
-  if (lead.paused) return "paused";
-  if (lead.manual_override) return "manual";
-  if (!lead.conversation_id) return "no_conversation";
-  if (lead.last_message_direction === "in") return "awaiting_us";
-  if (lead.last_message_direction === "out") return "awaiting_contact";
-  return "active";
-}
 
 function statusTone(status: string) {
   const normalized = status.toLowerCase();
@@ -85,6 +78,7 @@ export default function InboxClient() {
   const [draftLabels, setDraftLabels] = useState<string[]>([]);
   const [draftPaused, setDraftPaused] = useState(false);
   const [draftManualOverride, setDraftManualOverride] = useState(false);
+  const [summary, setSummary] = useState<{ total: number; by_queue: Record<string, number>; with_conversation: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
@@ -103,24 +97,23 @@ export default function InboxClient() {
 
   const counts = useMemo(() => {
     const byStatus = new Map<string, number>();
-    const byQueue = new Map<string, number>();
+    const localByQueue = new Map<string, number>();
     for (const lead of leads) {
       byStatus.set(lead.status, (byStatus.get(lead.status) || 0) + 1);
-      const queue = queueState(lead);
-      byQueue.set(queue, (byQueue.get(queue) || 0) + 1);
+      localByQueue.set(lead.queue_state, (localByQueue.get(lead.queue_state) || 0) + 1);
     }
     return {
-      total: leads.length,
-      withConversation: leads.filter((lead) => lead.conversation_id).length,
+      total: summary?.total ?? leads.length,
+      withConversation: summary?.with_conversation ?? leads.filter((lead) => lead.conversation_id).length,
       byStatus,
-      byQueue,
+      byQueue: summary ? new Map(Object.entries(summary.by_queue)) : localByQueue,
     };
-  }, [leads]);
+  }, [leads, summary]);
 
   const filteredLeads = useMemo(() => {
     return leads.filter((lead) => {
       if (statusFilter !== DEFAULT_STATUS_FILTER && lead.status !== statusFilter) return false;
-      if (queueFilter !== DEFAULT_QUEUE_FILTER && queueState(lead) !== queueFilter) return false;
+      if (queueFilter !== DEFAULT_QUEUE_FILTER && lead.queue_state !== queueFilter) return false;
       if (!query.trim()) return true;
       const term = query.trim().toLowerCase();
       return [lead.name || "", lead.phone || "", lead.last_message_body || ""].some((value) =>
@@ -146,16 +139,18 @@ export default function InboxClient() {
     setLoading(true);
     setError(null);
     try {
-      const [leadItems, stageItems, labelItems, viewItems] = await Promise.all([
+      const [leadItems, stageItems, labelItems, viewItems, summaryData] = await Promise.all([
         listLeads(),
         listStages(),
         listLabels(),
         listSavedViews("inbox"),
+        getQueuesSummary(),
       ]);
       setLeads(leadItems);
       setStages(stageItems);
       setLabels(labelItems);
       setSavedViews(viewItems);
+      setSummary(summaryData);
       setSelectedLeadId((current) => {
         if (current && leadItems.some((lead) => lead.id === current)) return current;
         return leadItems[0]?.id || null;
@@ -415,7 +410,7 @@ export default function InboxClient() {
                 <div className="mt-3 space-y-2">
                   {items.length ? (
                     items.map((lead) => {
-                      const waiting = queueState(lead) === "awaiting_us";
+                      const waiting = lead.queue_state === "awaiting_us";
                       const stale = (hoursSince(lead.last_message_at) || 0) > 12;
                       return (
                         <button
@@ -677,15 +672,15 @@ export default function InboxClient() {
               <div className="rounded-[20px] border border-white/10 bg-white/[0.04] p-4">
                 <div className="text-xs uppercase tracking-[0.25em] text-zinc-500">Leitura de fila</div>
                 <div className="mt-2 text-sm text-zinc-200">
-                  {queueState(selected) === "paused"
+                  {selected.queue_state === "paused"
                     ? "automacao pausada; nenhuma resposta automatica deve sair."
-                    : queueState(selected) === "manual"
+                    : selected.queue_state === "manual"
                       ? "intervencao humana ativa; o agente deve ficar suprimido."
-                      : queueState(selected) === "awaiting_us"
+                      : selected.queue_state === "awaiting_us"
                     ? "ultima mensagem veio do lead; merece resposta."
-                    : queueState(selected) === "awaiting_contact"
+                    : selected.queue_state === "awaiting_contact"
                       ? "equipe ja respondeu; aguardando retorno."
-                      : queueState(selected) === "no_conversation"
+                      : selected.queue_state === "no_conversation"
                         ? "lead ainda sem conversa aberta."
                         : "conversa em andamento."}
                 </div>

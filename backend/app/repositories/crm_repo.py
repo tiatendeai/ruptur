@@ -206,7 +206,15 @@ def list_leads(conn: Connection, *, status: str | None, q: str | None, limit: in
           la.owner_name,
           la.team,
           l.paused,
-          l.manual_override
+          l.manual_override,
+          CASE
+            WHEN l.paused THEN 'paused'
+            WHEN l.manual_override THEN 'manual'
+            WHEN conv.conversation_id IS NULL THEN 'no_conversation'
+            WHEN last_msg.last_message_direction = 'in' THEN 'awaiting_us'
+            WHEN last_msg.last_message_direction = 'out' THEN 'awaiting_contact'
+            ELSE 'active'
+          END as queue_state
         FROM leads l
         LEFT JOIN conv ON conv.lead_id = l.id
         LEFT JOIN last_msg ON last_msg.conversation_id = conv.conversation_id

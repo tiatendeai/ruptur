@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+import os
 
 from app.settings import settings
 from app.api.crm import router as crm_router
@@ -32,6 +34,13 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # Criar pasta static se não existir
+    static_path = os.path.join(os.getcwd(), "static")
+    os.makedirs(static_path, exist_ok=True)
+    os.makedirs(os.path.join(static_path, "audio"), exist_ok=True)
+
+    app.mount("/static", StaticFiles(directory=static_path), name="static")
 
     app.include_router(health_router)
     app.include_router(uazapi_webhook_router)

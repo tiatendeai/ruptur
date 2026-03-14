@@ -34,3 +34,18 @@ class BaileysClient:
         except Exception as e:
             logger.error(f"Error sending message via Baileys: {e}")
             return {"ok": False, "error": str(e)}
+
+    def send_voice_jid(self, jid: str, audio_url: str) -> dict[str, Any]:
+        url = f"{self.base_url}/send/voice"
+        payload = {
+            "number": jid,
+            "url": audio_url
+        }
+        try:
+            with httpx.Client(timeout=60) as client:
+                resp = client.post(url, json=payload, headers=self._headers())
+                resp.raise_for_status()
+                return resp.json()
+        except Exception as e:
+            logger.error(f"Error sending voice via Baileys: {e}")
+            return {"ok": False, "error": str(e)}

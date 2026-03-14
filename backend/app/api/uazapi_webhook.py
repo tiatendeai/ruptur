@@ -1,5 +1,6 @@
 from __future__ import annotations
-
+import os
+import uuid
 import logging
 from typing import Any
 
@@ -10,6 +11,7 @@ from app.services.uazapi_ingest import ingest_uazapi_webhook, extract_message_fi
 from app.services.agent_service import agent_service
 from app.clients.uazapi import UazapiClient
 from app.clients.baileys import BaileysClient
+from app.services.media_service import media_service
 from app.repositories import crm_repo
 from app.settings import settings
 
@@ -77,34 +79,70 @@ async def process_ai_response(payload: dict[str, Any], lead_id: str, conversatio
             )
             print(f"[DEBUG] Jarvis generated response: {response_text[:50]}...")
 
+            # Decidir se envia áudio
+            # Se a última mensagem do usuário foi áudio (marcada pelo gateway) ou se ele pediu explicitamente
+            wants_audio = "[Áudio Transcrito]" in last_msg or any(x in last_msg.lower() for x in ["áudio", "voz", "mande um áudio", "manda áudio"])
+            audio_data = None
+            if wants_audio:
+                print(f"[DEBUG] User seems to want audio. Generating TTS with ElevenLabs...")
+                # Remover o prefixo *Jarvis:* do texto lido para o áudio
+                audio_text = response_text.replace("*Jarvis:* ", "").replace("*Jarvis:*", "").strip()
+                
+                # Tentar ElevenLabs Primeiro (Voz Jarvis personalizada)
+                audio_data = media_service.text_to_speech_elevenlabs(audio_text)
+                
+                if not audio_data:
+                    print(f"[DEBUG] ElevenLabs failed or not configured. Falling back to OpenAI...")
+                    voice = "onyx" if "1980" in settings.baileys_instance_id else "nova"
+                    audio_data = media_service.text_to_speech_openai(audio_text, voice=voice)
+            
             # Salvar no banco
             external_id = crm_repo.store_out_message(
                 conn, 
                 conversation_id=conversation_id, 
                 text=response_text, 
-                raw={"processed_by": "jarvis_ai"}
+                raw={"processed_by": "jarvis_ai", "audio_generated": audio_data is not None}
             )
             conn.commit()
             print(f"[DEBUG] Stored Jarvis response message id: {external_id}")
 
             # Enviar via Provedor correto
-            # Neutralizar o número para garantir o sync no celular (apenas se não tivermos o jid original)
             chatid = payload.get("data", {}).get("chatid")
             is_baileys = "instance" in payload or "jid" in payload.get("data", {})
             
             if is_baileys and settings.baileys_base_url:
                 client = BaileysClient(base_url=settings.baileys_base_url, instance_id=settings.baileys_instance_id)
-                # Se temos o chatid original do Baileys, usamos ele (pode ser @lid ou @g.us)
                 target_jid = chatid if chatid and "@" in chatid else f"{neutralize_br_number(lead_phone)}@s.whatsapp.net"
-                print(f"[DEBUG] Sending via Baileys to {target_jid}")
-                res = client.send_text_jid(jid=target_jid, text=response_text)
+                
+                if audio_data:
+                    # Salvar áudio localmente e expor via URL
+                    filename = f"{uuid.uuid4()}.mp3"
+                    file_path = os.path.join("static", "audio", filename)
+                    with open(file_path, "wb") as f:
+                        f.write(audio_data)
+                    
+                    audio_url = f"{settings.public_url}/static/audio/{filename}"
+                    print(f"[DEBUG] Sending via Baileys to {target_jid} with audio: {audio_url}")
+                    res = client.send_voice_jid(jid=target_jid, audio_url=audio_url)
+                else:
+                    print(f"[DEBUG] Sending via Baileys to {target_jid}")
+                    res = client.send_text_jid(jid=target_jid, text=response_text)
                 print(f"[DEBUG] Baileys response: {res}")
             elif settings.uazapi_base_url and settings.uazapi_token:
-                # UAZAPI via gateway (usa clean number)
                 clean_number = neutralize_br_number(lead_phone)
-                print(f"[DEBUG] Sending via UAZAPI to {clean_number}")
                 client = UazapiClient(base_url=settings.uazapi_base_url, token=settings.uazapi_token)
-                res = client.send_text(number=clean_number, text=response_text)
+                
+                if audio_data:
+                    filename = f"{uuid.uuid4()}.mp3"
+                    file_path = os.path.join("static", "audio", filename)
+                    with open(file_path, "wb") as f:
+                        f.write(audio_data)
+                    audio_url = f"{settings.public_url}/static/audio/{filename}"
+                    print(f"[DEBUG] Sending PTT via UAZAPI to {clean_number}: {audio_url}")
+                    res = client.send_ptt(number=clean_number, url=audio_url)
+                else:
+                    print(f"[DEBUG] Sending via UAZAPI to {clean_number}")
+                    res = client.send_text(number=clean_number, text=response_text)
                 print(f"[DEBUG] UAZAPI response: {res}")
             else:
                 print("[DEBUG] No provider configured for sending response")

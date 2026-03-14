@@ -21,6 +21,8 @@ class Settings(BaseSettings):
         description="Lista separada por vírgula de origins permitidos (ou *).",
     )
 
+    public_url: str = Field(default="https://api.ruptur.cloud", alias="RUPTUR_PUBLIC_URL")
+
     uazapi_base_url: str | None = Field(default=None, alias="RUPTUR_UAZAPI_BASE_URL")
     uazapi_token: str | None = Field(default=None, alias="RUPTUR_UAZAPI_TOKEN")
     uazapi_admin_token: str | None = Field(default=None, alias="RUPTUR_UAZAPI_ADMIN_TOKEN")

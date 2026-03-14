@@ -254,3 +254,13 @@ export async function createCampaign(input: {
   });
   return data as { ok: boolean; id: string };
 }
+
+export async function getQueuesSummary() {
+  const data = await apiFetch("/crm/queues/summary");
+  if (!data.summary) return { total: 0, by_queue: {}, with_conversation: 0 };
+  return data.summary as {
+    total: number;
+    by_queue: Record<string, number>;
+    with_conversation: number;
+  };
+}

@@ -156,6 +156,18 @@ class UazapiClient:
             return {"raw": data}
         return data
 
+    def send_ptt(self, *, number: str, url: str) -> dict[str, Any]:
+        endpoint = f"{self.base_url.rstrip('/')}/send/voice"
+        payload = {"number": number, "url": url}
+        try:
+            with httpx.Client(timeout=60) as client:
+                resp = client.post(endpoint, json=payload, headers=self._headers())
+                resp.raise_for_status()
+                return resp.json()
+        except Exception as e:
+            logger.error(f"Error sending PTT via UAZAPI: {e}")
+            return {"ok": False, "error": str(e)}
+
     def instance_status(self) -> dict[str, Any]:
         url = f"{self.base_url.rstrip('/')}/instance/status"
         try:
