@@ -241,6 +241,9 @@ export default function InboxClient() {
   const [queueFilter, setQueueFilter] = useState(DEFAULT_QUEUE_FILTER);
   const [mobilePane, setMobilePane] = useState<"list" | "chat" | "context">("list");
   const [profileImages, setProfileImages] = useState<Record<string, string>>({});
+  const [pinnedContacts, setPinnedContacts] = useState<Record<string, boolean>>({});
+  const [notesByContact, setNotesByContact] = useState<Record<string, string>>({});
+  const [draftNote, setDraftNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
@@ -275,8 +278,13 @@ export default function InboxClient() {
       return [contact.name || "", contact.phone || "", contact.lastMessageBody || ""].some((value) =>
         value.toLowerCase().includes(term),
       );
+    }).sort((a, b) => {
+      const aPinned = pinnedContacts[a.key] ? 1 : 0;
+      const bPinned = pinnedContacts[b.key] ? 1 : 0;
+      if (aPinned !== bPinned) return bPinned - aPinned;
+      return compareLeadFreshness(a.primaryLead, b.primaryLead);
     });
-  }, [contacts, query, queueFilter]);
+  }, [contacts, pinnedContacts, query, queueFilter]);
 
   const visibleMessages = useMemo(() => {
     if (!messageQuery.trim()) return messages;
@@ -295,9 +303,31 @@ export default function InboxClient() {
       "Recebi seu contato. Ja estou verificando e volto em instantes.",
       "Perfeito. Pode me confirmar seu objetivo para eu te responder com mais precisao?",
       "Se preferir, posso continuar esse atendimento por aqui e te atualizar em tempo real.",
+      "Posso te mandar os proximos passos agora, por aqui mesmo.",
     ],
     [],
   );
+  const selectedNote = selectedContact ? notesByContact[selectedContact.key] || "" : "";
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const rawPinned = window.localStorage.getItem("ruptur-mychat-pinned");
+      const rawNotes = window.localStorage.getItem("ruptur-mychat-notes");
+      if (rawPinned) setPinnedContacts(JSON.parse(rawPinned) as Record<string, boolean>);
+      if (rawNotes) setNotesByContact(JSON.parse(rawNotes) as Record<string, string>);
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("ruptur-mychat-pinned", JSON.stringify(pinnedContacts));
+  }, [pinnedContacts]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("ruptur-mychat-notes", JSON.stringify(notesByContact));
+  }, [notesByContact]);
 
   const refreshLeads = useCallback(async () => {
     setLoading(true);
@@ -398,6 +428,10 @@ export default function InboxClient() {
     if (selectedLeadId) setMobilePane("chat");
   }, [selectedLeadId]);
 
+  useEffect(() => {
+    setDraftNote(selectedNote);
+  }, [selectedNote]);
+
   function handleMessagesScroll() {
     const node = messagesContainerRef.current;
     if (!node) return;
@@ -417,6 +451,21 @@ export default function InboxClient() {
     try {
       await navigator.clipboard.writeText(selectedPhone);
     } catch {}
+  }
+
+  function togglePinned(contactKey: string) {
+    setPinnedContacts((current) => ({
+      ...current,
+      [contactKey]: !current[contactKey],
+    }));
+  }
+
+  function saveDraftNote() {
+    if (!selectedContact) return;
+    setNotesByContact((current) => ({
+      ...current,
+      [selectedContact.key]: draftNote.trim(),
+    }));
   }
 
   async function onSend() {
@@ -463,16 +512,22 @@ export default function InboxClient() {
 
   return (
     <div className="space-y-4">
-      <section className="overflow-hidden rounded-[28px] border border-black/10 bg-[#f5ecdf] text-zinc-950">
+      <section className="overflow-hidden rounded-[28px] border border-black/10 bg-[radial-gradient(circle_at_top_left,#fff3df_0%,#f4e7d5_38%,#ead9c6_100%)] text-zinc-950 shadow-[0_24px_60px_rgba(118,74,47,0.10)]">
         <div className="grid gap-px lg:grid-cols-[minmax(0,1.35fr)_420px]">
-          <div className="bg-[#f5ecdf] px-5 py-5 sm:px-6 sm:py-6">
+          <div className="bg-transparent px-5 py-5 sm:px-6 sm:py-6">
             <div className="text-[11px] uppercase tracking-[0.38em] text-[#9d4e31]">MyChat</div>
             <h1 className="mt-3 max-w-4xl text-4xl font-semibold leading-[0.9] tracking-[-0.07em] sm:text-[3.5rem]">
-              inbox limpo para ler, responder e seguir a conversa.
+              inbox premium para conversar, priorizar e fechar sem ruído.
             </h1>
             <p className="mt-4 max-w-2xl text-sm leading-6 text-zinc-600">
-              aqui fica so a operacao de inbox: contatos consolidados, avatar, historico agrupado e resposta rapida.
+              leitura forte de WhatsApp, com contexto vivo, contatos priorizados e uma bancada melhor para resposta manual.
             </p>
+            <div className="mt-5 flex flex-wrap gap-2 text-[11px] uppercase tracking-[0.22em] text-zinc-600">
+              <span className="rounded-full border border-black/10 bg-white/70 px-3 py-1.5">contatos consolidados</span>
+              <span className="rounded-full border border-black/10 bg-white/70 px-3 py-1.5">notas internas</span>
+              <span className="rounded-full border border-black/10 bg-white/70 px-3 py-1.5">pinos operacionais</span>
+              <span className="rounded-full border border-black/10 bg-white/70 px-3 py-1.5">respostas rápidas</span>
+            </div>
           </div>
 
           <div className="grid gap-px bg-black/10 sm:grid-cols-3 lg:grid-cols-1">
@@ -574,7 +629,7 @@ export default function InboxClient() {
 
         <aside
           className={[
-            "rounded-[26px] border border-black/10 bg-white p-4 shadow-[0_14px_40px_rgba(70,43,31,0.06)]",
+            "rounded-[26px] border border-[#d7c2ad] bg-[linear-gradient(180deg,#fffdf9_0%,#fbf4ea_100%)] p-4 shadow-[0_18px_48px_rgba(70,43,31,0.08)]",
             mobilePane === "list" ? "block" : "hidden xl:block",
           ].join(" ")}
         >
@@ -664,6 +719,11 @@ export default function InboxClient() {
                             </div>
                           </div>
                           <div className="flex flex-col items-end gap-1">
+                            {pinnedContacts[contact.key] ? (
+                              <span className="rounded-full bg-[#221815] px-2.5 py-1 text-[10px] uppercase tracking-[0.2em] text-[#fff7ef]">
+                                pin
+                              </span>
+                            ) : null}
                             {lead.paused ? (
                               <span className="rounded-full bg-zinc-900 px-2.5 py-1 text-[10px] uppercase tracking-[0.2em] text-white">
                                 pausado
@@ -682,6 +742,11 @@ export default function InboxClient() {
                         <div className="mt-3 flex items-end justify-between gap-3">
                           <div className="min-w-0">
                             <div className="line-clamp-2 text-xs text-zinc-500">{contact.lastMessageBody || "Sem ultima mensagem"}</div>
+                            {notesByContact[contact.key] ? (
+                              <div className="mt-2 line-clamp-1 rounded-full bg-[#f5e4d3] px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-[#8f492e]">
+                                nota interna ativa
+                              </div>
+                            ) : null}
                             <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-[0.18em] text-zinc-400">
                               <span>{contact.lastMessageDirection === "out" ? "saida" : "entrada"}</span>
                               <span>{fmtRelative(contact.lastMessageAt || lead.updated_at)}</span>
@@ -704,7 +769,7 @@ export default function InboxClient() {
 
         <section
           className={[
-            "rounded-[26px] border border-black/10 bg-[#f8f2e8] p-4 shadow-[0_14px_40px_rgba(70,43,31,0.06)]",
+            "rounded-[26px] border border-[#d7c2ad] bg-[radial-gradient(circle_at_top,#fff9ef_0%,#f4e7d8_34%,#eadbc8_100%)] p-4 shadow-[0_18px_48px_rgba(70,43,31,0.08)]",
             mobilePane === "chat" ? "block" : "hidden xl:block",
           ].join(" ")}
         >
@@ -765,6 +830,15 @@ export default function InboxClient() {
               >
                 Copiar numero
               </button>
+              {selectedContact ? (
+                <button
+                  type="button"
+                  className="rounded-full border border-black/10 bg-white px-4 py-2 text-sm text-zinc-700 transition hover:bg-[#f6efe4]"
+                  onClick={() => togglePinned(selectedContact.key)}
+                >
+                  {pinnedContacts[selectedContact.key] ? "Desafixar" : "Fixar"}
+                </button>
+              ) : null}
               {waLink ? (
                 <a
                   href={waLink}
@@ -786,25 +860,32 @@ export default function InboxClient() {
           </div>
 
           <div className="relative">
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            <input
-              className="min-w-[220px] flex-1 rounded-[16px] border border-black/10 bg-white px-4 py-2.5 text-sm outline-none placeholder:text-zinc-400 focus:border-[#9d4e31]/40"
-              placeholder="Buscar dentro da conversa"
-              value={messageQuery}
-              onChange={(e) => setMessageQuery(e.target.value)}
-            />
-            {quickReplies.map((reply) => (
-              <button
-                key={reply}
-                type="button"
-                onClick={() => setText((current) => (current ? `${current}\n${reply}` : reply))}
-                className="rounded-full border border-black/10 bg-white px-3 py-2 text-xs text-zinc-600 transition hover:bg-[#f6efe4]"
-              >
-                + resposta rapida
-              </button>
-            ))}
-          </div>
-          <div ref={messagesContainerRef} onScroll={handleMessagesScroll} className="max-h-[62dvh] overflow-auto py-4">
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <input
+                className="min-w-[220px] flex-1 rounded-[16px] border border-black/10 bg-white px-4 py-2.5 text-sm outline-none placeholder:text-zinc-400 focus:border-[#9d4e31]/40"
+                placeholder="Buscar dentro da conversa"
+                value={messageQuery}
+                onChange={(e) => setMessageQuery(e.target.value)}
+              />
+              {quickReplies.map((reply, index) => (
+                <button
+                  key={reply}
+                  type="button"
+                  onClick={() => setText((current) => (current ? `${current}\n${reply}` : reply))}
+                  className={[
+                    "rounded-full border border-black/10 bg-white px-3 py-2 text-xs text-zinc-600 transition hover:bg-[#f6efe4]",
+                    index > 1 ? "hidden lg:inline-flex" : "",
+                  ].join(" ")}
+                >
+                  + resposta rapida
+                </button>
+              ))}
+            </div>
+          <div
+            ref={messagesContainerRef}
+            onScroll={handleMessagesScroll}
+            className="mt-4 max-h-[62dvh] overflow-auto rounded-[24px] border border-[#d8c4b1] bg-[radial-gradient(circle_at_top,#fffdf9_0%,#f7ecde_36%,#efe0ce_100%)] px-3 py-4"
+          >
             {!selectedContact?.conversationIds.length ? (
               <div className="rounded-[20px] border border-dashed border-black/10 bg-white/70 p-6 text-sm text-zinc-500">
                 Este lead ainda nao tem conversa aberta.
@@ -882,9 +963,15 @@ export default function InboxClient() {
                 </button>
               ))}
             </div>
+            <div className="rounded-[24px] border border-[#dcc8b5] bg-white/80 p-3 shadow-[0_14px_30px_rgba(70,43,31,0.08)]">
+            <div className="mb-3 flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-zinc-500">
+              <span className="rounded-full bg-[#f5e8da] px-2.5 py-1 text-[#8f492e]">resposta manual</span>
+              <span className="rounded-full bg-[#f0eee9] px-2.5 py-1 text-zinc-600">contexto contínuo</span>
+              <span className="rounded-full bg-[#eef4ea] px-2.5 py-1 text-emerald-700">whatsapp-ready</span>
+            </div>
             <div className="flex gap-2">
               <textarea
-                className="min-h-24 w-full rounded-[20px] border border-black/10 bg-white px-4 py-3 text-sm text-zinc-950 outline-none placeholder:text-zinc-400 focus:border-[#9d4e31]/40"
+                className="min-h-24 w-full rounded-[20px] border border-black/10 bg-[#fffdfa] px-4 py-3 text-sm text-zinc-950 outline-none placeholder:text-zinc-400 focus:border-[#9d4e31]/40"
                 placeholder="Digite para responder manualmente pela conta conectada..."
                 value={text}
                 onChange={(e) => setText(e.target.value)}
@@ -909,12 +996,13 @@ export default function InboxClient() {
               <span>`Enter` envia, `Shift + Enter` quebra linha.</span>
               <span>{text.trim().length} caracteres</span>
             </div>
+            </div>
           </div>
         </section>
 
         <aside
           className={[
-            "rounded-[26px] border border-black/10 bg-[#201714] p-4 text-[#fff7ef] shadow-[0_14px_40px_rgba(70,43,31,0.12)]",
+            "rounded-[26px] border border-[#33231c] bg-[linear-gradient(180deg,#241916_0%,#1a1210_100%)] p-4 text-[#fff7ef] shadow-[0_20px_50px_rgba(24,15,11,0.30)]",
             mobilePane === "context" ? "block" : "hidden xl:block",
           ].join(" ")}
         >
@@ -1013,6 +1101,23 @@ export default function InboxClient() {
                     </dd>
                   </div>
                 </dl>
+              </div>
+
+              <div className="rounded-[20px] border border-white/10 bg-white/[0.04] p-4">
+                <div className="text-xs uppercase tracking-[0.25em] text-zinc-500">Nota interna</div>
+                <textarea
+                  value={draftNote}
+                  onChange={(e) => setDraftNote(e.target.value)}
+                  placeholder="anote contexto, objeções, próximos passos, tom da conversa..."
+                  className="mt-3 min-h-28 w-full rounded-[18px] border border-white/10 bg-[#2a1d19] px-4 py-3 text-sm text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-[#d9875f]/40"
+                />
+                <button
+                  type="button"
+                  onClick={saveDraftNote}
+                  className="mt-3 w-full rounded-[18px] border border-[#d9875f]/30 bg-[#d9875f]/14 px-4 py-3 text-sm font-medium text-[#ffe0cf] transition hover:bg-[#d9875f]/22"
+                >
+                  Salvar nota do contato
+                </button>
               </div>
 
               {selectedContact?.labels.length ? (
