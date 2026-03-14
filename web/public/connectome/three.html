@@ -1,0 +1,587 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Connectome Three</title>
+    <style>
+      :root {
+        --bg-0: #020407;
+        --bg-1: #07101a;
+        --panel: rgba(4, 10, 18, 0.72);
+        --line: rgba(255, 255, 255, 0.1);
+        --text: #eff6ff;
+        --muted: #91a2b6;
+        --accent: #79d8ff;
+        --accent-hot: #ff7b54;
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        overflow: hidden;
+        color: var(--text);
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background:
+          radial-gradient(circle at 30% 15%, rgba(121,216,255,.1), transparent 22%),
+          radial-gradient(circle at 75% 25%, rgba(255,123,84,.1), transparent 20%),
+          radial-gradient(circle at 55% 80%, rgba(255,209,102,.06), transparent 24%),
+          linear-gradient(180deg, var(--bg-0), var(--bg-1));
+      }
+
+      #app {
+        position: fixed;
+        inset: 0;
+      }
+
+      canvas {
+        display: block;
+      }
+
+      .hud {
+        position: fixed;
+        inset: 16px 16px auto 16px;
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        pointer-events: none;
+      }
+
+      .panel {
+        pointer-events: auto;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        backdrop-filter: blur(18px);
+        box-shadow: 0 24px 80px rgba(0,0,0,.32);
+      }
+
+      .left {
+        padding: 16px 18px;
+        width: min(360px, calc(100vw - 32px));
+      }
+
+      .right {
+        padding: 10px;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .eyebrow {
+        margin: 0;
+        font-size: 11px;
+        letter-spacing: .34em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      h1 {
+        margin: 8px 0 0;
+        font-size: clamp(28px, 3vw, 48px);
+        letter-spacing: -.06em;
+        line-height: .92;
+      }
+
+      p {
+        margin: 12px 0 0;
+        color: var(--muted);
+        line-height: 1.45;
+        font-size: 14px;
+      }
+
+      .btn {
+        border: 1px solid var(--line);
+        background: rgba(255,255,255,.06);
+        color: var(--text);
+        border-radius: 16px;
+        height: 44px;
+        min-width: 44px;
+        padding: 0 14px;
+        cursor: pointer;
+      }
+
+      .btn.primary {
+        background: linear-gradient(180deg, rgba(121,216,255,.22), rgba(111,140,255,.12));
+      }
+
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 14px;
+      }
+
+      .chip {
+        border: 1px solid var(--line);
+        background: rgba(255,255,255,.05);
+        color: var(--text);
+        border-radius: 999px;
+        padding: 8px 12px;
+        font-size: 12px;
+        cursor: pointer;
+      }
+
+      .chip.active {
+        background: rgba(255,255,255,.12);
+      }
+
+      .details {
+        position: fixed;
+        right: 16px;
+        bottom: 16px;
+        width: min(340px, calc(100vw - 32px));
+        padding: 16px 18px;
+        pointer-events: auto;
+      }
+
+      .details h2 {
+        margin: 0;
+        font-size: 22px;
+      }
+
+      .details .mini {
+        margin-top: 6px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      @media (max-width: 900px) {
+        .hud {
+          inset: 12px 12px auto 12px;
+          flex-direction: column;
+        }
+        .right {
+          align-self: flex-start;
+        }
+        .details {
+          left: 12px;
+          right: 12px;
+          width: auto;
+        }
+      }
+    </style>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.174.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.174.0/examples/jsm/"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <div class="hud">
+      <section class="panel left">
+        <p class="eyebrow">Neural Map</p>
+        <h1>Jarvis / Ruptur</h1>
+        <p>
+          Viewer 3D real do connectome. O colapsado assume forma de cerebro e a
+          massa interna vira tempestade neural sob controle.
+        </p>
+        <div class="chips" id="vision-chips"></div>
+      </section>
+
+      <section class="panel right">
+        <button class="btn primary" id="collapse-brain">🧠</button>
+        <button class="btn" id="expand-layout">Expandir</button>
+        <button class="btn" id="reset-camera">Reset</button>
+      </section>
+    </div>
+
+    <section class="panel details" id="details">
+      <h2>Connectome Three</h2>
+      <div class="mini">orbit · drag · depth · shell</div>
+      <p>Arraste para orbitar. Clique em uma esfera para inspecionar.</p>
+    </section>
+
+    <script type="module">
+      import * as THREE from "three";
+      import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+      const app = document.getElementById("app");
+      const details = document.getElementById("details");
+      const visionChips = document.getElementById("vision-chips");
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 4000);
+      camera.position.set(0, 0, 650);
+
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      app.appendChild(renderer.domElement);
+
+      const controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.06;
+      controls.minDistance = 260;
+      controls.maxDistance = 1200;
+      controls.autoRotate = true;
+      controls.autoRotateSpeed = 0.28;
+
+      const ambient = new THREE.AmbientLight(0xffffff, 0.8);
+      scene.add(ambient);
+
+      const pointA = new THREE.PointLight(0x79d8ff, 1600, 1600);
+      pointA.position.set(-220, 180, 320);
+      scene.add(pointA);
+
+      const pointB = new THREE.PointLight(0xff7b54, 1200, 1400);
+      pointB.position.set(280, -80, 260);
+      scene.add(pointB);
+
+      const pointC = new THREE.PointLight(0xffd166, 900, 1300);
+      pointC.position.set(40, -220, -180);
+      scene.add(pointC);
+
+      const dataset = [
+        { id: "adk", label: "ADK", layer: "brain", mass: 1.6, context: ["all", "jarvis", "factory"], base: [-90, 110, -80] },
+        { id: "jarvis", label: "Jarvis", layer: "brain", mass: 1.8, context: ["all", "jarvis", "factory"], base: [70, 130, -140] },
+        { id: "ruptur", label: "Ruptur", layer: "app", mass: 2.1, context: ["all", "ruptur", "growth"], base: [40, 20, 30] },
+        { id: "whatsapp", label: "WhatsApp", layer: "channel", mass: 1.8, context: ["all", "jarvis", "ruptur", "growth"], base: [200, 15, 110] },
+        { id: "lead", label: "Lead", layer: "domain", mass: 1.9, context: ["all", "growth", "ruptur"], base: [-60, -120, 40] },
+        { id: "crm", label: "CRM", layer: "domain", mass: 1.5, context: ["all", "ruptur", "growth"], base: [-80, -10, 0] },
+        { id: "messaging", label: "Messaging", layer: "domain", mass: 1.4, context: ["all", "ruptur"], base: [150, -55, 80] },
+        { id: "automation", label: "Automation", layer: "domain", mass: 1.2, context: ["all", "ruptur", "factory"], base: [70, -130, 120] },
+        { id: "machine_builder", label: "Machine Builder", layer: "brain", mass: 1.45, context: ["all", "factory"], base: [10, 120, -30] },
+        { id: "prospect", label: "Prospect", layer: "domain", mass: 1.0, context: ["all", "growth"], base: [-170, -20, 90] },
+        { id: "qualification", label: "Qualification", layer: "domain", mass: 1.0, context: ["all", "growth"], base: [-130, -80, 80] },
+        { id: "followup", label: "Follow-up", layer: "domain", mass: 1.2, context: ["all", "growth", "ruptur"], base: [40, -185, 90] },
+        { id: "opportunity", label: "Opportunity", layer: "domain", mass: 1.2, context: ["all", "growth"], base: [140, -145, 80] },
+        { id: "cockpit", label: "Cockpit", layer: "app", mass: 1.1, context: ["all", "ruptur"], base: [180, 85, 20] }
+      ];
+
+      const links = [
+        ["adk", "jarvis"],
+        ["adk", "machine_builder"],
+        ["jarvis", "whatsapp"],
+        ["ruptur", "crm"],
+        ["ruptur", "messaging"],
+        ["ruptur", "automation"],
+        ["ruptur", "cockpit"],
+        ["crm", "lead"],
+        ["lead", "followup"],
+        ["followup", "opportunity"],
+        ["prospect", "qualification"],
+        ["qualification", "lead"],
+        ["messaging", "whatsapp"],
+        ["machine_builder", "jarvis"]
+      ];
+
+      const palette = {
+        brain: 0x79d8ff,
+        app: 0xff7b54,
+        domain: 0xff6b6b,
+        channel: 0xffd166,
+        governance: 0xf472d0,
+        infra: 0x8f96a3
+      };
+
+      let currentVision = "all";
+      const visions = ["all", "jarvis", "factory", "ruptur", "growth"];
+      const groups = new THREE.Group();
+      scene.add(groups);
+
+      const shellGroup = new THREE.Group();
+      scene.add(shellGroup);
+
+      const stars = new THREE.Points(
+        new THREE.BufferGeometry().setAttribute(
+          "position",
+          new THREE.Float32BufferAttribute(
+            Array.from({ length: 1600 }, () => [
+              THREE.MathUtils.randFloatSpread(2200),
+              THREE.MathUtils.randFloatSpread(1600),
+              THREE.MathUtils.randFloatSpread(2000)
+            ]).flat(),
+            3
+          )
+        ),
+        new THREE.PointsMaterial({ color: 0xffffff, size: 1.4, transparent: true, opacity: 0.32 })
+      );
+      scene.add(stars);
+
+      const raycaster = new THREE.Raycaster();
+      const pointer = new THREE.Vector2();
+      const nodeMeshes = [];
+      const nodeMap = new Map();
+      const linkMeshes = [];
+
+      function buildBrainShell() {
+        shellGroup.clear();
+
+        const shellGeometry = new THREE.SphereGeometry(260, 40, 32);
+        shellGeometry.scale(1.15, 0.92, 0.96);
+        const shellMat = new THREE.MeshPhysicalMaterial({
+          color: 0x0c1a28,
+          transparent: true,
+          opacity: 0.08,
+          roughness: 0.35,
+          metalness: 0.1,
+          transmission: 0.2,
+          side: THREE.DoubleSide,
+        });
+        const shell = new THREE.Mesh(shellGeometry, shellMat);
+        shellGroup.add(shell);
+
+        const wire = new THREE.LineSegments(
+          new THREE.WireframeGeometry(shellGeometry),
+          new THREE.LineBasicMaterial({ color: 0x79d8ff, transparent: true, opacity: 0.18 })
+        );
+        shellGroup.add(wire);
+
+        const split = new THREE.TorusGeometry(160, 1.5, 12, 120);
+        const splitMesh = new THREE.Mesh(
+          split,
+          new THREE.MeshBasicMaterial({ color: 0xff7b54, transparent: true, opacity: 0.24 })
+        );
+        splitMesh.rotation.y = Math.PI / 2;
+        shellGroup.add(splitMesh);
+      }
+
+      function createAtomSprite(color) {
+        const canvas = document.createElement("canvas");
+        canvas.width = 128;
+        canvas.height = 128;
+        const ctx = canvas.getContext("2d");
+        ctx.strokeStyle = `#${color.toString(16).padStart(6, "0")}`;
+        ctx.lineWidth = 2;
+        ctx.globalAlpha = 0.72;
+        ctx.beginPath();
+        ctx.ellipse(64, 64, 34, 14, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.ellipse(64, 64, 26, 12, Math.PI / 3, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = "#ffffff";
+        ctx.beginPath();
+        ctx.arc(92, 64, 4, 0, Math.PI * 2);
+        ctx.fill();
+        return new THREE.CanvasTexture(canvas);
+      }
+
+      function visibleForVision(node) {
+        return node.context.includes("all") || node.context.includes(currentVision);
+      }
+
+      function buildNodes() {
+        groups.clear();
+        nodeMeshes.length = 0;
+        linkMeshes.length = 0;
+        nodeMap.clear();
+
+        dataset.forEach((node) => {
+          const color = palette[node.layer] || 0xffffff;
+          const radius = 10 + node.mass * 10;
+          const sphere = new THREE.Mesh(
+            new THREE.SphereGeometry(radius, 28, 28),
+            new THREE.MeshPhysicalMaterial({
+              color,
+              roughness: 0.28,
+              metalness: 0.08,
+              clearcoat: 0.9,
+              clearcoatRoughness: 0.16,
+              transmission: 0.08,
+              emissive: new THREE.Color(color).multiplyScalar(0.12)
+            })
+          );
+          sphere.position.set(...node.base);
+          sphere.userData = { ...node, radius };
+
+          const wire = new THREE.LineSegments(
+            new THREE.WireframeGeometry(new THREE.SphereGeometry(radius * 1.005, 18, 16)),
+            new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.12 })
+          );
+          sphere.add(wire);
+
+          const sprite = new THREE.Sprite(
+            new THREE.SpriteMaterial({
+              map: createAtomSprite(color),
+              transparent: true,
+              opacity: 0.85,
+              depthWrite: false
+            })
+          );
+          sprite.scale.set(radius * 2.6, radius * 2.6, 1);
+          sphere.add(sprite);
+
+          const labelCanvas = document.createElement("canvas");
+          labelCanvas.width = 512;
+          labelCanvas.height = 160;
+          const lctx = labelCanvas.getContext("2d");
+          lctx.fillStyle = "rgba(239,246,255,0.95)";
+          lctx.font = "600 42px system-ui";
+          lctx.textAlign = "center";
+          lctx.fillText(node.label, 256, 74);
+          lctx.fillStyle = "rgba(145,162,182,0.9)";
+          lctx.font = "26px system-ui";
+          lctx.fillText(node.layer, 256, 120);
+          const label = new THREE.Sprite(
+            new THREE.SpriteMaterial({
+              map: new THREE.CanvasTexture(labelCanvas),
+              transparent: true,
+              depthWrite: false
+            })
+          );
+          label.position.set(0, radius + 24, 0);
+          label.scale.set(110, 34, 1);
+          sphere.add(label);
+
+          groups.add(sphere);
+          nodeMeshes.push({ sphere, sprite, label, node });
+          nodeMap.set(node.id, sphere);
+        });
+
+        links.forEach(([fromId, toId]) => {
+          const from = nodeMap.get(fromId);
+          const to = nodeMap.get(toId);
+          if (!from || !to) return;
+          const geom = new THREE.BufferGeometry().setFromPoints([from.position, to.position]);
+          const mat = new THREE.LineBasicMaterial({ color: 0x79d8ff, transparent: true, opacity: 0.28 });
+          const line = new THREE.Line(geom, mat);
+          line.userData = { fromId, toId };
+          groups.add(line);
+          linkMeshes.push(line);
+        });
+
+        applyVision();
+      }
+
+      function setBrainLayout() {
+        dataset.forEach((node, index) => {
+          const angle = (index / dataset.length) * Math.PI * 2;
+          const side = index % 2 === 0 ? -1 : 1;
+          const cluster = node.mass * 18;
+          node.base = [
+            side * (70 + Math.cos(angle) * (65 + cluster)),
+            Math.sin(angle * 1.8) * (120 + cluster * 0.6),
+            Math.cos(angle * 1.4) * (90 + cluster)
+          ];
+        });
+        buildNodes();
+      }
+
+      function setExpandedLayout() {
+        const map = {
+          adk: [-90, 110, -80],
+          jarvis: [70, 130, -140],
+          ruptur: [40, 20, 30],
+          whatsapp: [200, 15, 110],
+          lead: [-60, -120, 40],
+          crm: [-80, -10, 0],
+          messaging: [150, -55, 80],
+          automation: [70, -130, 120],
+          machine_builder: [10, 120, -30],
+          prospect: [-170, -20, 90],
+          qualification: [-130, -80, 80],
+          followup: [40, -185, 90],
+          opportunity: [140, -145, 80],
+          cockpit: [180, 85, 20]
+        };
+        dataset.forEach((node) => { node.base = map[node.id] || [0, 0, 0]; });
+        buildNodes();
+      }
+
+      function applyVision() {
+        nodeMeshes.forEach(({ sphere, node }) => {
+          const visible = visibleForVision(node);
+          sphere.visible = visible;
+        });
+        linkMeshes.forEach((line) => {
+          const from = dataset.find((item) => item.id === line.userData.fromId);
+          const to = dataset.find((item) => item.id === line.userData.toId);
+          line.visible = visibleForVision(from) && visibleForVision(to);
+        });
+      }
+
+      function setDetails(title, text) {
+        details.innerHTML = `
+          <h2>${title}</h2>
+          <div class="mini">three.js · connectome · depth</div>
+          <p>${text}</p>
+        `;
+      }
+
+      visions.forEach((vision) => {
+        const btn = document.createElement("button");
+        btn.className = `chip ${vision === currentVision ? "active" : ""}`;
+        btn.textContent = vision;
+        btn.addEventListener("click", () => {
+          currentVision = vision;
+          [...visionChips.children].forEach((chip) => chip.classList.remove("active"));
+          btn.classList.add("active");
+          applyVision();
+        });
+        visionChips.appendChild(btn);
+      });
+
+      document.getElementById("collapse-brain").addEventListener("click", () => {
+        setBrainLayout();
+        setDetails("Modo Cerebro", "A tempestade neural recolhe para dentro do envelope do cerebro.");
+      });
+
+      document.getElementById("expand-layout").addEventListener("click", () => {
+        setExpandedLayout();
+        setDetails("Modo Expandido", "Os dominios voltam a se abrir e revelar mais claramente suas relacoes.");
+      });
+
+      document.getElementById("reset-camera").addEventListener("click", () => {
+        camera.position.set(0, 0, 650);
+        controls.target.set(0, 0, 0);
+        controls.update();
+      });
+
+      renderer.domElement.addEventListener("pointerdown", () => {
+        controls.autoRotate = false;
+      });
+
+      renderer.domElement.addEventListener("click", (event) => {
+        const rect = renderer.domElement.getBoundingClientRect();
+        pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+        raycaster.setFromCamera(pointer, camera);
+        const hits = raycaster.intersectObjects(nodeMeshes.map((item) => item.sphere), false);
+        if (hits.length) {
+          const hit = hits[0].object.userData;
+          setDetails(hit.label, `${hit.layer} · massa ${hit.mass.toFixed(1)} · contextos ${hit.context.join(", ")}`);
+        }
+      });
+
+      buildBrainShell();
+      setBrainLayout();
+
+      const clock = new THREE.Clock();
+
+      function animate() {
+        const t = clock.getElapsedTime();
+        nodeMeshes.forEach(({ sphere, sprite, node }, index) => {
+          const wave = 1 + Math.sin(t * 1.1 + index) * 0.015;
+          sphere.scale.setScalar(wave);
+          sprite.material.rotation = t * (0.18 + node.mass * 0.02);
+        });
+
+        linkMeshes.forEach((line) => {
+          const from = nodeMap.get(line.userData.fromId);
+          const to = nodeMap.get(line.userData.toId);
+          line.geometry.setFromPoints([from.position, to.position]);
+        });
+
+        shellGroup.rotation.y = t * 0.05;
+        controls.update();
+        renderer.render(scene, camera);
+        requestAnimationFrame(animate);
+      }
+
+      animate();
+
+      window.addEventListener("resize", () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+    </script>
+  </body>
+</html>
