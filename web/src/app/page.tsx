@@ -1,5 +1,15 @@
-import { redirect } from "next/navigation";
-
 export default function Home() {
-  redirect("/inbox");
+  return (
+    <iframe
+      src="/showcase"
+      title="Ruptur Showcase"
+      style={{
+        border: "0",
+        width: "100vw",
+        height: "100vh",
+        display: "block",
+        background: "#020407",
+      }}
+    />
+  );
 }

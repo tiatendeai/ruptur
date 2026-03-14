@@ -3,7 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const NAV_ITEMS = [
+type NavItem = {
+  href: string;
+  label: string;
+  kicker: string;
+  external?: boolean;
+};
+
+const NAV_ITEMS: NavItem[] = [
   { href: "/inbox", label: "MyChat", kicker: "Inbox" },
   { href: "/crm", label: "CRM", kicker: "Modulo" },
   { href: "/pipeline", label: "Pipeline", kicker: "CRM" },
@@ -13,8 +20,7 @@ const NAV_ITEMS = [
   { href: "/sendflow", label: "Sendflow", kicker: "Fluxos" },
   { href: "/metrics", label: "Metricas", kicker: "Saude" },
   { href: "/billing", label: "Planos", kicker: "Receita" },
-  { href: "/connectome/showcase.html", label: "Showcase", kicker: "Neural Map", external: true },
-  { href: "/connectome/studio.html", label: "Studio", kicker: "Connectome", external: true },
+  { href: "/studio", label: "Studio", kicker: "Connectome" },
 ];
 
 export default function AppShell({
@@ -23,6 +29,11 @@ export default function AppShell({
   children: React.ReactNode;
 }>) {
   const pathname = usePathname();
+
+  if (pathname === "/" || pathname.startsWith("/showcase")) {
+    return <>{children}</>;
+  }
+
   const currentItem = NAV_ITEMS.find((item) => pathname.startsWith(item.href)) ?? NAV_ITEMS[0];
 
   return (
