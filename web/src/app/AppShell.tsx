@@ -67,6 +67,7 @@ export default function AppShell({
                     rel={item.external ? "noreferrer" : undefined}
                     className={[
                       "group relative overflow-hidden rounded-[22px] border px-4 py-4 transition",
+                      item.external ? "sm:col-span-2 lg:col-span-1" : "",
                       active
                         ? "border-[#9d4e31]/30 bg-[#fff8ef] text-zinc-950 shadow-[0_14px_32px_rgba(70,43,31,0.1)]"
                         : "border-black/8 bg-[#fbf7f0] text-zinc-700 hover:border-black/15 hover:bg-white",
