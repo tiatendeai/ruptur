@@ -23,7 +23,7 @@ class BaileysClient:
     def send_text_jid(self, jid: str, text: str) -> dict[str, Any]:
         url = f"{self.base_url}/send/text"
         payload = {
-            "jid": jid,
+            "number": jid,
             "text": text
         }
         try:
