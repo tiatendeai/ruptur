@@ -676,84 +676,56 @@ export default function InboxClient() {
   }
 
   return (
-    <div className="space-y-4">
-      <section className="overflow-hidden rounded-[28px] border border-black/10 bg-[radial-gradient(circle_at_top_left,#fff3df_0%,#f4e7d5_38%,#ead9c6_100%)] text-zinc-950 shadow-[0_24px_60px_rgba(118,74,47,0.10)]">
-        <div className="grid gap-px lg:grid-cols-[minmax(0,1.35fr)_420px]">
-          <div className="bg-transparent px-5 py-5 sm:px-6 sm:py-6">
-            <div className="text-[11px] uppercase tracking-[0.38em] text-[#9d4e31]">MyChat</div>
-            <h1 className="mt-3 max-w-4xl text-4xl font-semibold leading-[0.9] tracking-[-0.07em] sm:text-[3.5rem]">
-              inbox premium para conversar, priorizar e fechar sem ruído.
-            </h1>
-            <p className="mt-4 max-w-2xl text-sm leading-6 text-zinc-600">
-              leitura forte de WhatsApp, com contexto vivo, contatos priorizados e uma bancada melhor para resposta manual.
-            </p>
-            <div className="mt-5 flex flex-wrap gap-2 text-[11px] uppercase tracking-[0.22em] text-zinc-600">
-              <span className="rounded-full border border-black/10 bg-white/70 px-3 py-1.5">contatos consolidados</span>
-              <span className="rounded-full border border-black/10 bg-white/70 px-3 py-1.5">notas internas</span>
-              <span className="rounded-full border border-black/10 bg-white/70 px-3 py-1.5">pinos operacionais</span>
-              <span className="rounded-full border border-black/10 bg-white/70 px-3 py-1.5">respostas rápidas</span>
-            </div>
-          </div>
-
-          <div className="grid gap-px bg-black/10 sm:grid-cols-3 lg:grid-cols-1">
-            <div className="bg-[#eadcca] px-5 py-4">
-              <div className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">leads</div>
-              <div className="mt-2 text-3xl font-semibold tracking-[-0.05em]">{counts.total}</div>
-            </div>
-            <div className="bg-[#9d4e31] px-5 py-4 text-[#fff8f1]">
-              <div className="text-[10px] uppercase tracking-[0.25em] text-zinc-200">conversas ativas</div>
-              <div className="mt-2 text-3xl font-semibold tracking-[-0.05em]">{counts.withConversation}</div>
-            </div>
-            <div className="bg-[#eadcca] px-5 py-4">
-              <div className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">na fila agora</div>
-              <div className="mt-2 text-3xl font-semibold tracking-[-0.05em]">{filteredContacts.length}</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {error ? <div className="rounded-[22px] border border-red-500/20 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div> : null}
-
-      <section className="overflow-hidden rounded-[26px] border border-black/10 bg-white shadow-[0_14px_40px_rgba(70,43,31,0.06)]">
-        <div className="border-b border-black/10 px-5 py-4">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+    <div className="space-y-3 text-zinc-100">
+      <section className="overflow-hidden rounded-[28px] border border-white/10 bg-[#0b141a] shadow-[0_28px_80px_rgba(0,0,0,0.28)]">
+        <div className="border-b border-white/10 bg-[linear-gradient(180deg,#111b21_0%,#0f171d_100%)] px-4 py-4 sm:px-5">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div>
-              <div className="text-[11px] uppercase tracking-[0.34em] text-zinc-500">inbox control</div>
-              <div className="mt-2 text-2xl font-semibold tracking-[-0.05em]">recorte rapido da operacao de conversa</div>
+              <div className="text-[11px] uppercase tracking-[0.34em] text-[#7ba998]">MyChat</div>
+              <div className="mt-2 text-2xl font-semibold tracking-[-0.05em] text-[#e9edef]">Inbox operacional</div>
+              <div className="mt-2 text-sm text-[#8696a0]">conversa, fila e contexto no mesmo fluxo.</div>
             </div>
-            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-              {QUEUE_FILTERS.map((filter) => {
-                const total = filter.key === "all" ? counts.total : counts.byQueue.get(filter.key) || 0;
-                const active = queueFilter === filter.key;
-                return (
-                  <button
-                    key={filter.key}
-                    type="button"
-                    onClick={() => setQueueFilter(filter.key)}
-                    className={[
-                      "rounded-[18px] border px-4 py-3 text-left transition",
-                      active
-                        ? "border-[#9d4e31]/30 bg-[#fbefe4] shadow-[0_10px_24px_rgba(70,43,31,0.08)]"
-                        : "border-black/10 bg-[#fcfaf5] hover:bg-[#f7efe4]",
-                    ].join(" ")}
-                  >
-                    <div className="text-[10px] uppercase tracking-[0.28em] text-zinc-500">{filter.description}</div>
-                    <div className="mt-2 flex items-end justify-between gap-4">
-                      <span className="text-base font-semibold tracking-[-0.03em]">{filter.label}</span>
-                      <span className="text-2xl font-semibold tracking-[-0.06em]">{total}</span>
-                    </div>
-                  </button>
-                );
-              })}
+
+            <div className="grid gap-2 sm:grid-cols-3">
+              {[
+                { label: "conversas", value: counts.total },
+                { label: "ativas", value: counts.withConversation },
+                { label: "na fila", value: filteredContacts.length },
+              ].map((item) => (
+                <div key={item.label} className="rounded-[18px] border border-white/10 bg-[#111b21] px-4 py-3">
+                  <div className="text-[10px] uppercase tracking-[0.24em] text-[#7d8a91]">{item.label}</div>
+                  <div className="mt-2 text-2xl font-semibold tracking-[-0.05em] text-[#e9edef]">{item.value}</div>
+                </div>
+              ))}
             </div>
           </div>
-          <div className="mt-4 flex flex-wrap items-center gap-2">
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            {QUEUE_FILTERS.map((filter) => {
+              const total = filter.key === "all" ? counts.total : counts.byQueue.get(filter.key) || 0;
+              const active = queueFilter === filter.key;
+              return (
+                <button
+                  key={filter.key}
+                  type="button"
+                  onClick={() => setQueueFilter(filter.key)}
+                  className={[
+                    "rounded-full border px-3 py-2 text-xs transition",
+                    active
+                      ? "border-[#25d366]/30 bg-[#103529] text-[#d7ffe7]"
+                      : "border-white/10 bg-[#111b21] text-[#aebac1] hover:bg-[#17232a]",
+                  ].join(" ")}
+                >
+                  {filter.label} <span className="ml-1 text-[#7d8a91]">{total}</span>
+                </button>
+              );
+            })}
             {savedViews.map((view) => (
               <button
                 key={view.id}
                 type="button"
                 onClick={() => applySavedView(view)}
-                className="rounded-full border border-black/10 bg-[#fcfaf5] px-3 py-1.5 text-xs text-zinc-600 transition hover:bg-[#f6efe4]"
+                className="rounded-full border border-white/10 bg-[#111b21] px-3 py-2 text-xs text-[#aebac1] transition hover:bg-[#17232a]"
               >
                 {view.name}
               </button>
@@ -761,15 +733,17 @@ export default function InboxClient() {
             <button
               type="button"
               onClick={() => void onCreateSavedView()}
-              className="rounded-full border border-[#9d4e31]/25 bg-[#fbefe4] px-3 py-1.5 text-xs text-[#8f492e] transition hover:bg-[#f5e2d3]"
+              className="rounded-full border border-white/10 bg-[#1f2c34] px-3 py-2 text-xs text-[#d9e6eb] transition hover:bg-[#24333c]"
             >
-              Salvar leitura atual
+              salvar view
             </button>
           </div>
         </div>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[330px_minmax(0,1fr)_320px]">
+      {error ? <div className="rounded-[18px] border border-red-500/20 bg-red-950/40 px-4 py-3 text-sm text-red-200">{error}</div> : null}
+
+      <section className="grid gap-3 xl:grid-cols-[340px_minmax(0,1fr)_320px]">
         <div className="flex gap-2 xl:hidden">
           {[
             { key: "list", label: "Conversas" },
@@ -783,8 +757,8 @@ export default function InboxClient() {
               className={[
                 "flex-1 rounded-[18px] border px-3 py-3 text-sm font-medium transition",
                 mobilePane === item.key
-                  ? "border-[#9d4e31]/30 bg-[#fbefe4] text-[#8f492e]"
-                  : "border-black/10 bg-white text-zinc-600",
+                  ? "border-[#25d366]/30 bg-[#103529] text-[#d7ffe7]"
+                  : "border-white/10 bg-[#111b21] text-[#aebac1]",
               ].join(" ")}
             >
               {item.label}
@@ -794,17 +768,17 @@ export default function InboxClient() {
 
         <aside
           className={[
-            "rounded-[26px] border border-[#d7c2ad] bg-[linear-gradient(180deg,#fffdf9_0%,#fbf4ea_100%)] p-4 shadow-[0_18px_48px_rgba(70,43,31,0.08)]",
+            "rounded-[26px] border border-white/10 bg-[#111b21] p-4 shadow-[0_22px_56px_rgba(0,0,0,0.22)]",
             mobilePane === "list" ? "block" : "hidden xl:block",
           ].join(" ")}
         >
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="text-lg font-semibold tracking-[-0.03em]">Fila detalhada</h2>
-              <p className="text-sm text-zinc-500">busca, recorte e leitura rapida da ultima interacao.</p>
+              <h2 className="text-lg font-semibold tracking-[-0.03em] text-[#e9edef]">Conversas</h2>
+              <p className="text-sm text-[#8696a0]">um contato por linha, sem duplicidade.</p>
             </div>
             <button
-              className="rounded-full border border-black/10 px-4 py-2 text-sm text-zinc-700 transition hover:bg-[#f6efe4]"
+              className="rounded-full border border-white/10 bg-[#1f2c34] px-4 py-2 text-sm text-[#d9e6eb] transition hover:bg-[#24333c]"
               onClick={() => void refreshLeads()}
               type="button"
             >
@@ -814,41 +788,16 @@ export default function InboxClient() {
 
           <div className="mt-4 space-y-3">
             <input
-              className="w-full rounded-[18px] border border-black/10 bg-[#fcfaf5] px-4 py-3 text-sm outline-none placeholder:text-zinc-400 focus:border-[#9d4e31]/40"
+              className="w-full rounded-[18px] border border-white/10 bg-[#0b141a] px-4 py-3 text-sm text-[#e9edef] outline-none placeholder:text-[#6a7c85] focus:border-[#25d366]/30"
               placeholder="Buscar por nome, telefone ou mensagem"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
-
-            <div className="rounded-[18px] border border-black/10 bg-[#fcfaf5] px-4 py-3 text-xs text-zinc-500">
-              contatos unificados por telefone, com avatar, ultima direcao de mensagem e estado operacional.
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              {QUEUE_FILTERS.map((filter) => (
-                <button
-                  key={filter.key}
-                  type="button"
-                  onClick={() => setQueueFilter(filter.key)}
-                  className={[
-                    "rounded-full border px-3 py-1.5 text-xs transition",
-                    queueFilter === filter.key
-                      ? "border-[#9d4e31]/30 bg-[#f7ebe1] text-[#8f492e]"
-                      : "border-black/10 text-zinc-500 hover:bg-[#f6efe4]",
-                  ].join(" ")}
-                >
-                  {filter.label}{" "}
-                  <span className="ml-1 text-zinc-500">
-                    {filter.key === "all" ? counts.total : counts.byQueue.get(filter.key) || 0}
-                  </span>
-                </button>
-              ))}
-            </div>
           </div>
 
           <div className="mt-4 max-h-[68dvh] overflow-auto pr-1">
             {loading ? (
-              <div className="rounded-[20px] border border-dashed border-black/10 bg-[#fcfaf5] p-5 text-sm text-zinc-500">
+              <div className="rounded-[20px] border border-dashed border-white/10 bg-[#0b141a] p-5 text-sm text-[#8696a0]">
                 Carregando conversas...
               </div>
             ) : filteredContacts.length ? (
@@ -866,8 +815,8 @@ export default function InboxClient() {
                         className={[
                           "w-full rounded-[20px] border px-4 py-3 text-left transition",
                           selectedLeadId === lead.id
-                            ? "border-[#9d4e31]/25 bg-[#fbf1e7] shadow-[0_10px_25px_rgba(70,43,31,0.08)]"
-                            : "border-black/10 bg-[#fffdf9] hover:border-black/15 hover:bg-[#fcf7ef]",
+                            ? "border-[#25d366]/30 bg-[#1f2c34] shadow-[0_10px_30px_rgba(0,0,0,0.18)]"
+                            : "border-white/10 bg-[#0b141a] hover:border-white/15 hover:bg-[#101a20]",
                         ].join(" ")}
                       >
                         <div className="flex items-start justify-between gap-3">
@@ -879,26 +828,26 @@ export default function InboxClient() {
                               className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
                             />
                             <div className="min-w-0">
-                              <div className="truncate text-sm font-medium">{contact.name || contact.phone || "Sem nome"}</div>
-                              <div className="mt-1 truncate text-xs text-zinc-500">{contact.phone || "telefone_indefinido"}</div>
+                              <div className="truncate text-sm font-medium text-[#e9edef]">{contact.name || contact.phone || "Sem nome"}</div>
+                              <div className="mt-1 truncate text-xs text-[#8696a0]">{contact.phone || "telefone_indefinido"}</div>
                             </div>
                           </div>
                           <div className="flex flex-col items-end gap-1">
                             {pinnedContacts[contact.key] ? (
-                              <span className="rounded-full bg-[#221815] px-2.5 py-1 text-[10px] uppercase tracking-[0.2em] text-[#fff7ef]">
+                              <span className="rounded-full bg-[#103529] px-2.5 py-1 text-[10px] uppercase tracking-[0.2em] text-[#d7ffe7]">
                                 pin
                               </span>
                             ) : null}
                             {lead.paused ? (
-                              <span className="rounded-full bg-zinc-900 px-2.5 py-1 text-[10px] uppercase tracking-[0.2em] text-white">
+                              <span className="rounded-full bg-zinc-700 px-2.5 py-1 text-[10px] uppercase tracking-[0.2em] text-white">
                                 pausado
                               </span>
                             ) : lead.manual_override ? (
-                              <span className="rounded-full bg-[#d9875f] px-2.5 py-1 text-[10px] uppercase tracking-[0.2em] text-white">
+                              <span className="rounded-full bg-[#7a4b2f] px-2.5 py-1 text-[10px] uppercase tracking-[0.2em] text-white">
                                 manual
                               </span>
                             ) : lead.queue_state === "awaiting_us" ? (
-                              <span className="rounded-full bg-[#9d4e31] px-2.5 py-1 text-[10px] uppercase tracking-[0.2em] text-white">
+                              <span className="rounded-full bg-[#25d366] px-2.5 py-1 text-[10px] uppercase tracking-[0.2em] text-[#042b14]">
                                 responder
                               </span>
                             ) : null}
@@ -906,18 +855,18 @@ export default function InboxClient() {
                         </div>
                         <div className="mt-3 flex items-end justify-between gap-3">
                           <div className="min-w-0">
-                            <div className="line-clamp-2 text-xs text-zinc-500">{contact.lastMessageBody || "Sem ultima mensagem"}</div>
+                            <div className="line-clamp-2 text-xs text-[#aebac1]">{contact.lastMessageBody || "Sem ultima mensagem"}</div>
                             {notesByContact[contact.key] ? (
-                              <div className="mt-2 line-clamp-1 rounded-full bg-[#f5e4d3] px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-[#8f492e]">
+                              <div className="mt-2 line-clamp-1 rounded-full bg-[#1f2c34] px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-[#7ba998]">
                                 nota interna ativa
                               </div>
                             ) : null}
-                            <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-[0.18em] text-zinc-400">
+                            <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-[0.18em] text-[#6a7c85]">
                               <span>{contact.lastMessageDirection === "out" ? "saida" : "entrada"}</span>
                               <span>{fmtRelative(contact.lastMessageAt || lead.updated_at)}</span>
                             </div>
                           </div>
-                          <div className="shrink-0 text-[10px] text-zinc-500">{fmtTime(contact.lastMessageAt || lead.updated_at)}</div>
+                          <div className="shrink-0 text-[10px] text-[#6a7c85]">{fmtTime(contact.lastMessageAt || lead.updated_at)}</div>
                         </div>
                       </button>
                     </li>
@@ -925,7 +874,7 @@ export default function InboxClient() {
                 })}
               </ul>
             ) : (
-              <div className="rounded-[20px] border border-dashed border-black/10 bg-[#fcfaf5] p-5 text-sm text-zinc-500">
+              <div className="rounded-[20px] border border-dashed border-white/10 bg-[#0b141a] p-5 text-sm text-[#8696a0]">
                 Nenhum lead bate com o filtro atual.
               </div>
             )}
@@ -934,11 +883,11 @@ export default function InboxClient() {
 
         <section
           className={[
-            "rounded-[26px] border border-[#d7c2ad] bg-[radial-gradient(circle_at_top,#fff9ef_0%,#f4e7d8_34%,#eadbc8_100%)] p-4 shadow-[0_18px_48px_rgba(70,43,31,0.08)]",
+            "rounded-[26px] border border-white/10 bg-[#0b141a] p-4 shadow-[0_22px_56px_rgba(0,0,0,0.22)]",
             mobilePane === "chat" ? "block" : "hidden xl:block",
           ].join(" ")}
         >
-          <div className="flex flex-col gap-4 border-b border-black/10 pb-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-4 border-b border-white/10 pb-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
               <ContactAvatar
                 name={selectedContact?.name}
@@ -947,14 +896,14 @@ export default function InboxClient() {
                 className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-sm font-semibold uppercase tracking-[0.18em]"
               />
               <div>
-                <div className="text-[11px] uppercase tracking-[0.3em] text-[#9d4e31]">conversa ativa</div>
-                <div className="mt-2 text-2xl font-semibold tracking-[-0.04em]">
+                <div className="text-[11px] uppercase tracking-[0.3em] text-[#7ba998]">conversa ativa</div>
+                <div className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-[#e9edef]">
                   {selectedContact?.name || selectedContact?.phone || "Selecione uma conversa"}
                 </div>
-                <div className="mt-1 flex flex-wrap gap-2 text-xs text-zinc-500">
+                <div className="mt-1 flex flex-wrap gap-2 text-xs text-[#8696a0]">
                   <span>{selectedContact?.phone || "sem_telefone"}</span>
                   {selectedContact && selectedContact.leads.length > 1 ? (
-                    <span className="rounded-full border border-black/10 bg-white px-2 py-0.5">
+                    <span className="rounded-full border border-white/10 bg-[#111b21] px-2 py-0.5">
                       {selectedContact.leads.length} registros unidos
                     </span>
                   ) : null}
@@ -964,7 +913,7 @@ export default function InboxClient() {
                     </span>
                   ) : null}
                   {selectedContact?.labels.length ? (
-                    <span className="rounded-full border border-black/10 bg-white px-2 py-0.5">
+                    <span className="rounded-full border border-white/10 bg-[#111b21] px-2 py-0.5 text-[#aebac1]">
                       {selectedContact.labels.length} labels
                     </span>
                   ) : null}
@@ -974,14 +923,14 @@ export default function InboxClient() {
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                className="rounded-full border border-black/10 bg-white px-4 py-2 text-sm text-zinc-700 transition hover:bg-[#f6efe4] xl:hidden"
+                className="rounded-full border border-white/10 bg-[#1f2c34] px-4 py-2 text-sm text-[#d9e6eb] transition hover:bg-[#24333c] xl:hidden"
                 onClick={() => setMobilePane("list")}
               >
                 Voltar
               </button>
               <button
                 type="button"
-                className="rounded-full border border-black/10 bg-white px-4 py-2 text-sm text-zinc-700 transition hover:bg-[#f6efe4] disabled:opacity-50"
+                className="rounded-full border border-white/10 bg-[#1f2c34] px-4 py-2 text-sm text-[#d9e6eb] transition hover:bg-[#24333c] disabled:opacity-50"
                 onClick={() => selectedContact?.conversationIds.length && void refreshMessages(selectedContact.conversationIds)}
                 disabled={!selectedContact?.conversationIds.length}
               >
@@ -989,7 +938,7 @@ export default function InboxClient() {
               </button>
               <button
                 type="button"
-                className="rounded-full border border-black/10 bg-white px-4 py-2 text-sm text-zinc-700 transition hover:bg-[#f6efe4] disabled:opacity-50"
+                className="rounded-full border border-white/10 bg-[#1f2c34] px-4 py-2 text-sm text-[#d9e6eb] transition hover:bg-[#24333c] disabled:opacity-50"
                 onClick={() => void copySelectedPhone()}
                 disabled={!selectedPhone}
               >
@@ -998,7 +947,7 @@ export default function InboxClient() {
               {selectedContact ? (
                 <button
                   type="button"
-                  className="rounded-full border border-black/10 bg-white px-4 py-2 text-sm text-zinc-700 transition hover:bg-[#f6efe4]"
+                  className="rounded-full border border-white/10 bg-[#1f2c34] px-4 py-2 text-sm text-[#d9e6eb] transition hover:bg-[#24333c]"
                   onClick={() => togglePinned(selectedContact.key)}
                 >
                   {pinnedContacts[selectedContact.key] ? "Desafixar" : "Fixar"}
@@ -1009,14 +958,14 @@ export default function InboxClient() {
                   href={waLink}
                   target="_blank"
                   rel="noreferrer"
-                  className="rounded-full border border-black/10 bg-white px-4 py-2 text-sm text-zinc-700 transition hover:bg-[#f6efe4]"
+                  className="rounded-full border border-[#25d366]/20 bg-[#103529] px-4 py-2 text-sm text-[#d7ffe7] transition hover:bg-[#12402f]"
                 >
                   Abrir no WhatsApp
                 </a>
               ) : null}
               <button
                 type="button"
-                className="rounded-full border border-black/10 bg-white px-4 py-2 text-sm text-zinc-700 transition hover:bg-[#f6efe4] xl:hidden"
+                className="rounded-full border border-white/10 bg-[#1f2c34] px-4 py-2 text-sm text-[#d9e6eb] transition hover:bg-[#24333c] xl:hidden"
                 onClick={() => setMobilePane("context")}
               >
                 Contato
@@ -1027,18 +976,18 @@ export default function InboxClient() {
           <div className="relative">
             <div className="mt-4 flex flex-wrap items-center gap-2">
               <input
-                className="min-w-[220px] flex-1 rounded-[16px] border border-black/10 bg-white px-4 py-2.5 text-sm outline-none placeholder:text-zinc-400 focus:border-[#9d4e31]/40"
+                className="min-w-[220px] flex-1 rounded-[16px] border border-white/10 bg-[#111b21] px-4 py-2.5 text-sm text-[#e9edef] outline-none placeholder:text-[#6a7c85] focus:border-[#25d366]/30"
                 placeholder="Buscar dentro da conversa"
                 value={messageQuery}
                 onChange={(e) => setMessageQuery(e.target.value)}
               />
-              {quickReplies.map((reply, index) => (
+              {quickReplies.slice(0, 3).map((reply, index) => (
                 <button
                   key={reply}
                   type="button"
                   onClick={() => setText((current) => (current ? `${current}\n${reply}` : reply))}
                   className={[
-                    "rounded-full border border-black/10 bg-white px-3 py-2 text-xs text-zinc-600 transition hover:bg-[#f6efe4]",
+                    "rounded-full border border-white/10 bg-[#111b21] px-3 py-2 text-xs text-[#aebac1] transition hover:bg-[#17232a]",
                     index > 1 ? "hidden lg:inline-flex" : "",
                   ].join(" ")}
                 >
@@ -1049,10 +998,10 @@ export default function InboxClient() {
           <div
             ref={messagesContainerRef}
             onScroll={handleMessagesScroll}
-            className="mt-4 max-h-[62dvh] overflow-auto rounded-[24px] border border-[#d8c4b1] bg-[radial-gradient(circle_at_top,#fffdf9_0%,#f7ecde_36%,#efe0ce_100%)] px-3 py-4"
+            className="mt-4 max-h-[62dvh] overflow-auto rounded-[24px] border border-white/10 bg-[radial-gradient(circle_at_top,#182229_0%,#111b21_38%,#0b141a_100%)] px-3 py-4"
           >
             {!selectedContact?.conversationIds.length ? (
-              <div className="rounded-[20px] border border-dashed border-black/10 bg-white/70 p-6 text-sm text-zinc-500">
+              <div className="rounded-[20px] border border-dashed border-white/10 bg-[#111b21] p-6 text-sm text-[#8696a0]">
                 Este lead ainda nao tem conversa aberta.
               </div>
             ) : messages.length ? (
@@ -1064,7 +1013,7 @@ export default function InboxClient() {
                     <div key={block.key}>
                       {dayLabel && dayLabel !== previousDayLabel ? (
                         <div className="mb-3 flex items-center justify-center">
-                          <span className="rounded-full border border-black/10 bg-white px-3 py-1 text-[10px] uppercase tracking-[0.22em] text-zinc-500">
+                          <span className="rounded-full border border-white/10 bg-[#1f2c34] px-3 py-1 text-[10px] uppercase tracking-[0.22em] text-[#aebac1]">
                             {dayLabel}
                           </span>
                         </div>
@@ -1073,11 +1022,13 @@ export default function InboxClient() {
                         <div
                           className={[
                             "max-w-[82%] rounded-[20px] border px-4 py-3 text-sm shadow-[0_12px_30px_rgba(0,0,0,0.12)]",
-                            block.direction === "out" ? "border-[#9d4e31]/20 bg-[#fff4e9]" : "border-black/10 bg-white",
+                            block.direction === "out"
+                              ? "border-[#25d366]/20 bg-[#005c4b] text-[#e9edef]"
+                              : "border-white/10 bg-[#202c33] text-[#e9edef]",
                           ].join(" ")}
                         >
                           {block.direction === "in" ? (
-                            <div className="mb-2 text-[10px] uppercase tracking-[0.2em] text-zinc-500">
+                            <div className="mb-2 text-[10px] uppercase tracking-[0.2em] text-[#7d8a91]">
                               {block.sender || selectedContact?.name || selectedContact?.phone || "contato"}
                             </div>
                           ) : null}
@@ -1100,7 +1051,7 @@ export default function InboxClient() {
                               </div>
                             ))}
                           </div>
-                          <div className="mt-3 text-right text-[10px] uppercase tracking-[0.2em] text-zinc-500">
+                          <div className="mt-3 text-right text-[10px] uppercase tracking-[0.2em] text-[#93a1a8]">
                             {block.direction === "out" ? "saida" : "entrada"}
                             {isMediaKind(block.items[block.items.length - 1]?.kind) ? " • mídia" : ""}
                             {" • "}
@@ -1113,7 +1064,7 @@ export default function InboxClient() {
                 })}
               </div>
             ) : (
-              <div className="rounded-[20px] border border-dashed border-black/10 bg-white/70 p-6 text-sm text-zinc-500">
+              <div className="rounded-[20px] border border-dashed border-white/10 bg-[#111b21] p-6 text-sm text-[#8696a0]">
                 {messageQuery.trim() ? "Nenhuma mensagem bate com a busca atual." : "Sem mensagens ainda."}
               </div>
             )}
@@ -1122,102 +1073,96 @@ export default function InboxClient() {
               <button
                 type="button"
                 onClick={scrollMessagesToBottom}
-                className="absolute bottom-4 right-3 rounded-full border border-black/10 bg-white px-3 py-2 text-xs font-medium text-zinc-700 shadow-[0_12px_24px_rgba(0,0,0,0.08)] transition hover:bg-[#f6efe4]"
+                className="absolute bottom-4 right-3 rounded-full border border-white/10 bg-[#1f2c34] px-3 py-2 text-xs font-medium text-[#d9e6eb] shadow-[0_12px_24px_rgba(0,0,0,0.22)] transition hover:bg-[#24333c]"
               >
                 Ir para o fim
               </button>
             ) : null}
           </div>
 
-          <div className="border-t border-black/10 pt-4">
+          <div className="border-t border-white/10 pt-4">
             <div className="mb-3 flex flex-wrap gap-2">
-              {quickReplies.map((reply) => (
+              {quickReplies.slice(0, 4).map((reply) => (
                 <button
                   key={`composer-${reply}`}
                   type="button"
                   onClick={() => setText(reply)}
-                  className="rounded-full border border-black/10 bg-white px-3 py-1.5 text-xs text-zinc-600 transition hover:bg-[#f6efe4]"
+                  className="rounded-full border border-white/10 bg-[#111b21] px-3 py-1.5 text-xs text-[#aebac1] transition hover:bg-[#17232a]"
                 >
                   usar modelo
                 </button>
               ))}
             </div>
-            <div className="rounded-[24px] border border-[#dcc8b5] bg-white/80 p-3 shadow-[0_14px_30px_rgba(70,43,31,0.08)]">
-            <div className="mb-3 flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-zinc-500">
-              <span className="rounded-full bg-[#f5e8da] px-2.5 py-1 text-[#8f492e]">resposta manual</span>
-              <span className="rounded-full bg-[#f0eee9] px-2.5 py-1 text-zinc-600">contexto contínuo</span>
-              <span className="rounded-full bg-[#eef4ea] px-2.5 py-1 text-emerald-700">whatsapp-ready</span>
-              <span className="rounded-full bg-[#edf2ff] px-2.5 py-1 text-sky-700">status de entrega vivo</span>
-            </div>
-            <div className="flex gap-2">
-              <textarea
-                className="min-h-24 w-full rounded-[20px] border border-black/10 bg-[#fffdfa] px-4 py-3 text-sm text-zinc-950 outline-none placeholder:text-zinc-400 focus:border-[#9d4e31]/40"
-                placeholder="Digite para responder manualmente pela conta conectada..."
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    void onSend();
-                  }
-                }}
-                disabled={!selected?.conversation_id || sending}
-              />
-              <button
-                type="button"
-                className="rounded-[20px] bg-[#9d4e31] px-5 text-sm font-medium text-[#fff8f1] transition hover:bg-[#b35b3a] disabled:cursor-not-allowed disabled:opacity-50"
-                onClick={() => void onSend()}
-                disabled={!selected?.conversation_id || sending}
-              >
-                {sending ? "Enviando..." : "Responder"}
-              </button>
-            </div>
-            <div className="mt-3 flex items-center justify-between gap-3 text-[11px] text-zinc-500">
-              <span>`Enter` envia, `Shift + Enter` quebra linha.</span>
-              <span>{text.trim().length} caracteres</span>
-            </div>
+            <div className="rounded-[24px] border border-white/10 bg-[#111b21] p-3 shadow-[0_14px_30px_rgba(0,0,0,0.22)]">
+              <div className="flex gap-2">
+                <textarea
+                  className="min-h-24 w-full rounded-[20px] border border-white/10 bg-[#0b141a] px-4 py-3 text-sm text-[#e9edef] outline-none placeholder:text-[#6a7c85] focus:border-[#25d366]/30"
+                  placeholder="Digite sua resposta..."
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      void onSend();
+                    }
+                  }}
+                  disabled={!selected?.conversation_id || sending}
+                />
+                <button
+                  type="button"
+                  className="rounded-[20px] bg-[#25d366] px-5 text-sm font-medium text-[#042b14] transition hover:bg-[#34e07b] disabled:cursor-not-allowed disabled:opacity-50"
+                  onClick={() => void onSend()}
+                  disabled={!selected?.conversation_id || sending}
+                >
+                  {sending ? "Enviando..." : "Responder"}
+                </button>
+              </div>
+              <div className="mt-3 flex items-center justify-between gap-3 text-[11px] text-[#8696a0]">
+                <span>`Enter` envia, `Shift + Enter` quebra linha.</span>
+                <span>{text.trim().length} caracteres</span>
+              </div>
             </div>
           </div>
         </section>
 
         <aside
           className={[
-            "rounded-[26px] border border-[#33231c] bg-[linear-gradient(180deg,#241916_0%,#1a1210_100%)] p-4 text-[#fff7ef] shadow-[0_20px_50px_rgba(24,15,11,0.30)]",
+            "rounded-[26px] border border-white/10 bg-[#111b21] p-4 text-[#e9edef] shadow-[0_20px_50px_rgba(0,0,0,0.22)]",
             mobilePane === "context" ? "block" : "hidden xl:block",
           ].join(" ")}
         >
           <div className="mb-4 xl:hidden">
             <button
               type="button"
-              className="rounded-full border border-white/10 bg-white/[0.06] px-4 py-2 text-sm text-zinc-200 transition hover:bg-white/[0.12]"
+              className="rounded-full border border-white/10 bg-[#1f2c34] px-4 py-2 text-sm text-[#d9e6eb] transition hover:bg-[#24333c]"
               onClick={() => setMobilePane("chat")}
             >
               Voltar ao chat
             </button>
           </div>
-          <h2 className="text-lg font-semibold tracking-[-0.03em]">Contexto da conversa</h2>
-          <p className="mt-1 text-sm text-zinc-400">painel de leitura do inbox, sem editar CRM ou pipeline aqui.</p>
+          <h2 className="text-lg font-semibold tracking-[-0.03em] text-[#e9edef]">Contexto da conversa</h2>
+          <p className="mt-1 text-sm text-[#8696a0]">informações do contato e ações rápidas.</p>
 
           {selected ? (
             <div className="mt-5 space-y-4">
-              <div className="rounded-[20px] border border-white/10 bg-white/[0.04] p-4">
-                <div className="text-xs uppercase tracking-[0.25em] text-zinc-500">Ultima atividade</div>
-                <div className="mt-2 text-sm text-zinc-200">{fmtTime(selected.last_message_at || selected.updated_at) || "Sem atividade"}</div>
+              <div className="rounded-[20px] border border-white/10 bg-[#0b141a] p-4">
+                <div className="text-xs uppercase tracking-[0.25em] text-[#6a7c85]">Ultima atividade</div>
+                <div className="mt-2 text-sm text-[#d9e6eb]">{fmtTime(selected.last_message_at || selected.updated_at) || "Sem atividade"}</div>
               </div>
 
-              <div className="rounded-[20px] border border-white/10 bg-white/[0.04] p-4">
-                <div className="text-xs uppercase tracking-[0.25em] text-zinc-500">Contato consolidado</div>
-                <div className="mt-2 text-lg font-semibold tracking-[-0.03em]">
+              <div className="rounded-[20px] border border-white/10 bg-[#0b141a] p-4">
+                <div className="text-xs uppercase tracking-[0.25em] text-[#6a7c85]">Contato consolidado</div>
+                <div className="mt-2 text-lg font-semibold tracking-[-0.03em] text-[#e9edef]">
                   {selectedContact?.name || selected.phone || "Sem nome"}
                 </div>
-                <p className="mt-2 text-sm text-zinc-400">{selectedContact?.phone || "sem_telefone"}</p>
+                <p className="mt-2 text-sm text-[#8696a0]">{selectedContact?.phone || "sem_telefone"}</p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {waLink ? (
                     <a
                       href={waLink}
                       target="_blank"
                       rel="noreferrer"
-                      className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-xs text-zinc-200 transition hover:bg-white/[0.12]"
+                      className="rounded-full border border-[#25d366]/20 bg-[#103529] px-3 py-1.5 text-xs text-[#d7ffe7] transition hover:bg-[#12402f]"
                     >
                       abrir no WhatsApp
                     </a>
@@ -1225,16 +1170,16 @@ export default function InboxClient() {
                   <button
                     type="button"
                     onClick={() => void copySelectedPhone()}
-                    className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-xs text-zinc-200 transition hover:bg-white/[0.12]"
+                    className="rounded-full border border-white/10 bg-[#1f2c34] px-3 py-1.5 text-xs text-[#d9e6eb] transition hover:bg-[#24333c]"
                   >
                     copiar numero
                   </button>
                 </div>
               </div>
 
-              <div className="rounded-[20px] border border-white/10 bg-white/[0.04] p-4">
-                <div className="text-xs uppercase tracking-[0.25em] text-zinc-500">Estado operacional</div>
-                <div className="mt-2 text-sm text-zinc-200">
+              <div className="rounded-[20px] border border-white/10 bg-[#0b141a] p-4">
+                <div className="text-xs uppercase tracking-[0.25em] text-[#6a7c85]">Estado operacional</div>
+                <div className="mt-2 text-sm text-[#d9e6eb]">
                   {selected.queue_state === "paused"
                     ? "automacao pausada; nenhuma resposta automatica deve sair."
                     : selected.queue_state === "manual"
@@ -1252,7 +1197,7 @@ export default function InboxClient() {
                     type="button"
                     disabled={savingContext}
                     onClick={() => void setAutomationState({ paused: !selected.paused })}
-                    className="rounded-[16px] border border-white/10 bg-white/[0.06] px-4 py-3 text-left text-sm text-zinc-100 transition hover:bg-white/[0.12] disabled:opacity-50"
+                    className="rounded-[16px] border border-white/10 bg-[#1f2c34] px-4 py-3 text-left text-sm text-[#e9edef] transition hover:bg-[#24333c] disabled:opacity-50"
                   >
                     {selected.paused ? "Retomar automacao" : "Pausar automacao"}
                   </button>
@@ -1260,96 +1205,58 @@ export default function InboxClient() {
                     type="button"
                     disabled={savingContext}
                     onClick={() => void setAutomationState({ manual_override: !selected.manual_override })}
-                    className="rounded-[16px] border border-white/10 bg-white/[0.06] px-4 py-3 text-left text-sm text-zinc-100 transition hover:bg-white/[0.12] disabled:opacity-50"
+                    className="rounded-[16px] border border-white/10 bg-[#1f2c34] px-4 py-3 text-left text-sm text-[#e9edef] transition hover:bg-[#24333c] disabled:opacity-50"
                   >
                     {selected.manual_override ? "Liberar atendimento automatico" : "Assumir atendimento manual"}
                   </button>
                 </div>
               </div>
 
-              <div className="rounded-[20px] border border-white/10 bg-white/[0.04] p-4">
-                <div className="text-xs uppercase tracking-[0.25em] text-zinc-500">Resumo rapido</div>
-                <dl className="mt-3 space-y-3 text-sm">
-                  <div className="flex items-center justify-between gap-3">
-                    <dt className="text-zinc-400">Telefone</dt>
-                    <dd className="text-right">{selectedContact?.phone || selected.phone || "sem_telefone"}</dd>
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <dt className="text-zinc-400">Registros unidos</dt>
-                    <dd className="text-right">{selectedContact?.leads.length || 1}</dd>
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <dt className="text-zinc-400">Conversas ativas</dt>
-                    <dd className="text-right">{selectedContact?.conversationIds.length || 0}</dd>
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <dt className="text-zinc-400">Mensagens carregadas</dt>
-                    <dd className="text-right">{messages.length}</dd>
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <dt className="text-zinc-400">Midias detectadas</dt>
-                    <dd className="text-right">{messages.filter((message) => isMediaKind(message.kind)).length}</dd>
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <dt className="text-zinc-400">Automacao</dt>
-                    <dd className="text-right">
-                      {selected.paused ? "pausada" : selected.manual_override ? "manual" : "liberada"}
-                    </dd>
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <dt className="text-zinc-400">Responsavel</dt>
-                    <dd className="text-right">
-                      {selected.assignee_name || "sem owner"} {selected.assignee_team ? `• ${selected.assignee_team}` : ""}
-                    </dd>
-                  </div>
-                </dl>
-              </div>
-
-              <div className="rounded-[20px] border border-white/10 bg-white/[0.04] p-4">
-                <div className="text-xs uppercase tracking-[0.25em] text-zinc-500">Responsavel e time</div>
+              <div className="rounded-[20px] border border-white/10 bg-[#0b141a] p-4">
+                <div className="text-xs uppercase tracking-[0.25em] text-[#6a7c85]">Responsavel e time</div>
                 <div className="mt-3 grid gap-3">
                   <input
                     value={assigneeNameDraft}
                     onChange={(e) => setAssigneeNameDraft(e.target.value)}
                     placeholder="nome do responsavel"
-                    className="w-full rounded-[16px] border border-white/10 bg-[#2a1d19] px-4 py-3 text-sm text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-[#d9875f]/40"
+                    className="w-full rounded-[16px] border border-white/10 bg-[#111b21] px-4 py-3 text-sm text-[#e9edef] outline-none placeholder:text-[#6a7c85] focus:border-[#25d366]/30"
                   />
                   <input
                     value={assigneeTeamDraft}
                     onChange={(e) => setAssigneeTeamDraft(e.target.value)}
                     placeholder="time ou squad"
-                    className="w-full rounded-[16px] border border-white/10 bg-[#2a1d19] px-4 py-3 text-sm text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-[#d9875f]/40"
+                    className="w-full rounded-[16px] border border-white/10 bg-[#111b21] px-4 py-3 text-sm text-[#e9edef] outline-none placeholder:text-[#6a7c85] focus:border-[#25d366]/30"
                   />
                   <button
                     type="button"
                     disabled={savingContext}
                     onClick={() => void saveAssignment()}
-                    className="rounded-[16px] border border-[#d9875f]/30 bg-[#d9875f]/14 px-4 py-3 text-sm font-medium text-[#ffe0cf] transition hover:bg-[#d9875f]/22 disabled:opacity-50"
+                    className="rounded-[16px] border border-[#25d366]/20 bg-[#103529] px-4 py-3 text-sm font-medium text-[#d7ffe7] transition hover:bg-[#12402f] disabled:opacity-50"
                   >
                     Salvar responsavel
                   </button>
                 </div>
               </div>
 
-              <div className="rounded-[20px] border border-white/10 bg-white/[0.04] p-4">
-                <div className="text-xs uppercase tracking-[0.25em] text-zinc-500">Nota interna</div>
+              <div className="rounded-[20px] border border-white/10 bg-[#0b141a] p-4">
+                <div className="text-xs uppercase tracking-[0.25em] text-[#6a7c85]">Nota interna</div>
                 <textarea
                   value={draftNote}
                   onChange={(e) => setDraftNote(e.target.value)}
                   placeholder="anote contexto, objeções, próximos passos, tom da conversa..."
-                  className="mt-3 min-h-28 w-full rounded-[18px] border border-white/10 bg-[#2a1d19] px-4 py-3 text-sm text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-[#d9875f]/40"
+                  className="mt-3 min-h-28 w-full rounded-[18px] border border-white/10 bg-[#111b21] px-4 py-3 text-sm text-[#e9edef] outline-none placeholder:text-[#6a7c85] focus:border-[#25d366]/30"
                 />
                 <button
                   type="button"
                   onClick={saveDraftNote}
-                  className="mt-3 w-full rounded-[18px] border border-[#d9875f]/30 bg-[#d9875f]/14 px-4 py-3 text-sm font-medium text-[#ffe0cf] transition hover:bg-[#d9875f]/22"
+                  className="mt-3 w-full rounded-[18px] border border-[#25d366]/20 bg-[#103529] px-4 py-3 text-sm font-medium text-[#d7ffe7] transition hover:bg-[#12402f]"
                 >
                   Salvar nota do contato
                 </button>
               </div>
 
-              <div className="rounded-[20px] border border-white/10 bg-white/[0.04] p-4">
-                <div className="text-xs uppercase tracking-[0.25em] text-zinc-500">Labels operacionais</div>
+              <div className="rounded-[20px] border border-white/10 bg-[#0b141a] p-4">
+                <div className="text-xs uppercase tracking-[0.25em] text-[#6a7c85]">Labels operacionais</div>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {availableLabels.length ? (
                     availableLabels.map((label) => {
@@ -1363,8 +1270,8 @@ export default function InboxClient() {
                           className={[
                             "rounded-full border px-3 py-1.5 text-xs transition disabled:opacity-50",
                             active
-                              ? "border-[#d9875f]/40 bg-[#d9875f]/18 text-[#ffe0cf]"
-                              : "border-white/10 bg-white/[0.06] text-zinc-300 hover:bg-white/[0.12]",
+                              ? "border-[#25d366]/20 bg-[#103529] text-[#d7ffe7]"
+                              : "border-white/10 bg-[#111b21] text-[#aebac1] hover:bg-[#17232a]",
                           ].join(" ")}
                         >
                           {label.name}
@@ -1372,13 +1279,13 @@ export default function InboxClient() {
                       );
                     })
                   ) : (
-                    <span className="text-sm text-zinc-500">nenhuma label carregada</span>
+                    <span className="text-sm text-[#8696a0]">nenhuma label carregada</span>
                   )}
                 </div>
               </div>
             </div>
           ) : (
-            <div className="mt-5 rounded-[20px] border border-dashed border-white/15 bg-white/[0.04] p-5 text-sm text-zinc-400">
+            <div className="mt-5 rounded-[20px] border border-dashed border-white/15 bg-[#0b141a] p-5 text-sm text-[#8696a0]">
               Selecione uma conversa para acompanhar o contexto do inbox.
             </div>
           )}
