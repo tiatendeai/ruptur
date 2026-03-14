@@ -18,6 +18,12 @@ Em [`/.agent/mcp_config.json`](/Users/diego/Downloads/ruptur/.agent/mcp_config.j
 - `context7`: documentacao tecnica e referencia de bibliotecas
 - `shadcn`: apoio de componentes para o console
 
+Uso recomendado hoje:
+
+- `context7` continua como fonte de referencia tecnica para biblioteca, framework e componentes
+- estado real de produto e operacao deve ser registrado em `docs/jornada/` e `docs/governanca/`
+- nao usar `context7` como substituto de historico de execucao ou backlog
+
 ## Integracoes recomendadas
 
 ### Prioridade alta

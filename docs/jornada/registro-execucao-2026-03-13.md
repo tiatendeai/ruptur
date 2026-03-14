@@ -43,6 +43,16 @@ Consolidar o que ja foi feito, o que esta em andamento e o que entrou como frent
 - rotacao de segredos expostos em historico local e sessao operacional
 - consolidacao da topologia de deploy real
 - alinhamento entre o dominio antigo `statuspersianas.com.br` e o dominio canonico `ruptur.cloud`
+- elevacao progressiva do `MyChat` para padrao premium de inbox operacional
+  - contatos consolidados por telefone
+  - avatar por contato quando disponivel
+  - busca dentro da conversa
+  - respostas rapidas
+  - notas internas por contato
+  - fixacao de contatos prioritarios
+  - owner/time editavel no proprio inbox
+  - labels operacionais editaveis no proprio inbox
+  - controles reais de `paused` e `manual_override`
 
 ## Frentes urgentes abertas
 
@@ -53,6 +63,7 @@ Consolidar o que ja foi feito, o que esta em andamento e o que entrou como frent
   - filtros por status
   - intervencao rapida
   - leitura operacional mais forte
+  - preview e operacao de midia como proximo salto
 - elevar `Campanhas` para um painel estilo Mlabs/ManyChat
 - transformar `Warmup` em operacao real de aquecimento e maturacao
 - aproximar `Pipeline` de uma visao de kanban operacional

@@ -29,6 +29,22 @@ Escopo minimo:
 - resposta manual
 - troca de status do lead
 
+Capacidades operacionais ja incorporadas no `MyChat`:
+
+- consolidacao de contatos por telefone
+- avatar e identidade visual do contato quando o provider expoe imagem
+- notas internas por contato
+- fixacao de contatos prioritarios
+- labels editaveis dentro do inbox
+- owner e time editaveis dentro do inbox
+- controle de `paused` e `manual_override` no painel lateral
+
+Proximo salto esperado:
+
+- preview de audio, imagem e documento
+- sinais de entrega/leitura quando o contrato do provider expor isso
+- composer com mais atalhos e templates de operacao
+
 ### 2. Campanhas
 
 Objetivo:

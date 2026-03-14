@@ -34,10 +34,18 @@ portfolio:
       name: oracle-micro-1
       ip: 129.148.17.85
       role: landing + app web
+      access:
+        ssh_user: unknown
+        ssh_key_ref: pending-validation
     host2:
       name: oracle-micro-2
       ip: 167.234.228.71
       role: traefik + baileys + whisper + ruptur-backend + postgres
+      access:
+        ssh_user: ubuntu
+        ssh_key_ref: /Users/diego/.ssh/id_ed25519
+        app_root: /home/ubuntu/apps/ruptur-backend
+        legacy_root: /home/ubuntu/apps/ruptur-host2/host2
 
   domains:
     apex:

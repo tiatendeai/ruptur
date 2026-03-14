@@ -3,12 +3,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RupturContactProfile, RupturLead, RupturMessage, RupturSavedView } from "@/lib/ruptur";
 import {
+  assignLead,
   createSavedView,
   listContactProfiles,
+  listLabels,
   listLeads,
   listMessages,
   listSavedViews,
   sendConversationText,
+  setLeadLabels,
+  updateLeadAutomationState,
 } from "@/lib/ruptur";
 
 function fmtTime(value?: string | null) {
@@ -231,7 +235,9 @@ const QUEUE_FILTERS = [
 export default function InboxClient() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [savingContext, setSavingContext] = useState(false);
   const [leads, setLeads] = useState<RupturLead[]>([]);
+  const [availableLabels, setAvailableLabels] = useState<{ key: string; name: string; color: string }[]>([]);
   const [savedViews, setSavedViews] = useState<RupturSavedView[]>([]);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [messages, setMessages] = useState<RupturMessage[]>([]);
@@ -244,6 +250,8 @@ export default function InboxClient() {
   const [pinnedContacts, setPinnedContacts] = useState<Record<string, boolean>>({});
   const [notesByContact, setNotesByContact] = useState<Record<string, string>>({});
   const [draftNote, setDraftNote] = useState("");
+  const [assigneeNameDraft, setAssigneeNameDraft] = useState("");
+  const [assigneeTeamDraft, setAssigneeTeamDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
@@ -331,8 +339,8 @@ export default function InboxClient() {
 
   const refreshLeads = useCallback(async () => {
     setLoading(true);
-    const results = await Promise.allSettled([listLeads(), listSavedViews("inbox")]);
-    const [leadItems, viewItems] = results;
+    const results = await Promise.allSettled([listLeads(), listSavedViews("inbox"), listLabels()]);
+    const [leadItems, viewItems, labelItems] = results;
     const errors: string[] = [];
 
     if (leadItems.status === "fulfilled") {
@@ -350,6 +358,12 @@ export default function InboxClient() {
       setSavedViews(viewItems.value);
     } else {
       errors.push(`views: ${viewItems.reason instanceof Error ? viewItems.reason.message : String(viewItems.reason)}`);
+    }
+
+    if (labelItems.status === "fulfilled") {
+      setAvailableLabels(labelItems.value);
+    } else {
+      errors.push(`labels: ${labelItems.reason instanceof Error ? labelItems.reason.message : String(labelItems.reason)}`);
     }
 
     setError(errors.length ? errors.join(" | ") : null);
@@ -432,6 +446,11 @@ export default function InboxClient() {
     setDraftNote(selectedNote);
   }, [selectedNote]);
 
+  useEffect(() => {
+    setAssigneeNameDraft(selected?.assignee_name || "");
+    setAssigneeTeamDraft(selected?.assignee_team || "");
+  }, [selected?.assignee_name, selected?.assignee_team, selectedLeadId]);
+
   function handleMessagesScroll() {
     const node = messagesContainerRef.current;
     if (!node) return;
@@ -466,6 +485,54 @@ export default function InboxClient() {
       ...current,
       [selectedContact.key]: draftNote.trim(),
     }));
+  }
+
+  async function toggleLeadLabel(labelKey: string) {
+    if (!selected) return;
+    const current = new Set(selected.labels || []);
+    if (current.has(labelKey)) current.delete(labelKey);
+    else current.add(labelKey);
+    setSavingContext(true);
+    setError(null);
+    try {
+      await setLeadLabels(selected.id, Array.from(current));
+      await refreshLeads();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSavingContext(false);
+    }
+  }
+
+  async function saveAssignment() {
+    if (!selected) return;
+    setSavingContext(true);
+    setError(null);
+    try {
+      await assignLead(selected.id, {
+        owner_name: assigneeNameDraft.trim() || undefined,
+        team: assigneeTeamDraft.trim() || undefined,
+      });
+      await refreshLeads();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSavingContext(false);
+    }
+  }
+
+  async function setAutomationState(input: { paused?: boolean; manual_override?: boolean }) {
+    if (!selected) return;
+    setSavingContext(true);
+    setError(null);
+    try {
+      await updateLeadAutomationState(selected.id, input);
+      await refreshLeads();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSavingContext(false);
+    }
   }
 
   async function onSend() {
@@ -1060,12 +1127,30 @@ export default function InboxClient() {
                     : selected.queue_state === "manual"
                       ? "intervencao humana ativa; o agente deve ficar suprimido."
                       : selected.queue_state === "awaiting_us"
-                    ? "ultima mensagem veio do lead; merece resposta."
-                    : selected.queue_state === "awaiting_contact"
+                      ? "ultima mensagem veio do lead; merece resposta."
+                      : selected.queue_state === "awaiting_contact"
                       ? "equipe ja respondeu; aguardando retorno."
                       : selected.queue_state === "no_conversation"
                         ? "lead ainda sem conversa aberta."
                         : "conversa em andamento."}
+                </div>
+                <div className="mt-4 grid gap-2">
+                  <button
+                    type="button"
+                    disabled={savingContext}
+                    onClick={() => void setAutomationState({ paused: !selected.paused })}
+                    className="rounded-[16px] border border-white/10 bg-white/[0.06] px-4 py-3 text-left text-sm text-zinc-100 transition hover:bg-white/[0.12] disabled:opacity-50"
+                  >
+                    {selected.paused ? "Retomar automacao" : "Pausar automacao"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={savingContext}
+                    onClick={() => void setAutomationState({ manual_override: !selected.manual_override })}
+                    className="rounded-[16px] border border-white/10 bg-white/[0.06] px-4 py-3 text-left text-sm text-zinc-100 transition hover:bg-white/[0.12] disabled:opacity-50"
+                  >
+                    {selected.manual_override ? "Liberar atendimento automatico" : "Assumir atendimento manual"}
+                  </button>
                 </div>
               </div>
 
@@ -1104,6 +1189,32 @@ export default function InboxClient() {
               </div>
 
               <div className="rounded-[20px] border border-white/10 bg-white/[0.04] p-4">
+                <div className="text-xs uppercase tracking-[0.25em] text-zinc-500">Responsavel e time</div>
+                <div className="mt-3 grid gap-3">
+                  <input
+                    value={assigneeNameDraft}
+                    onChange={(e) => setAssigneeNameDraft(e.target.value)}
+                    placeholder="nome do responsavel"
+                    className="w-full rounded-[16px] border border-white/10 bg-[#2a1d19] px-4 py-3 text-sm text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-[#d9875f]/40"
+                  />
+                  <input
+                    value={assigneeTeamDraft}
+                    onChange={(e) => setAssigneeTeamDraft(e.target.value)}
+                    placeholder="time ou squad"
+                    className="w-full rounded-[16px] border border-white/10 bg-[#2a1d19] px-4 py-3 text-sm text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-[#d9875f]/40"
+                  />
+                  <button
+                    type="button"
+                    disabled={savingContext}
+                    onClick={() => void saveAssignment()}
+                    className="rounded-[16px] border border-[#d9875f]/30 bg-[#d9875f]/14 px-4 py-3 text-sm font-medium text-[#ffe0cf] transition hover:bg-[#d9875f]/22 disabled:opacity-50"
+                  >
+                    Salvar responsavel
+                  </button>
+                </div>
+              </div>
+
+              <div className="rounded-[20px] border border-white/10 bg-white/[0.04] p-4">
                 <div className="text-xs uppercase tracking-[0.25em] text-zinc-500">Nota interna</div>
                 <textarea
                   value={draftNote}
@@ -1120,21 +1231,34 @@ export default function InboxClient() {
                 </button>
               </div>
 
-              {selectedContact?.labels.length ? (
-                <div className="rounded-[20px] border border-white/10 bg-white/[0.04] p-4">
-                  <div className="text-xs uppercase tracking-[0.25em] text-zinc-500">Labels do contato</div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {selectedContact.labels.map((label) => (
-                      <span
-                        key={label}
-                        className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-xs text-zinc-200"
-                      >
-                        {label}
-                      </span>
-                    ))}
-                  </div>
+              <div className="rounded-[20px] border border-white/10 bg-white/[0.04] p-4">
+                <div className="text-xs uppercase tracking-[0.25em] text-zinc-500">Labels operacionais</div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {availableLabels.length ? (
+                    availableLabels.map((label) => {
+                      const active = (selected.labels || []).includes(label.key);
+                      return (
+                        <button
+                          key={label.key}
+                          type="button"
+                          disabled={savingContext}
+                          onClick={() => void toggleLeadLabel(label.key)}
+                          className={[
+                            "rounded-full border px-3 py-1.5 text-xs transition disabled:opacity-50",
+                            active
+                              ? "border-[#d9875f]/40 bg-[#d9875f]/18 text-[#ffe0cf]"
+                              : "border-white/10 bg-white/[0.06] text-zinc-300 hover:bg-white/[0.12]",
+                          ].join(" ")}
+                        >
+                          {label.name}
+                        </button>
+                      );
+                    })
+                  ) : (
+                    <span className="text-sm text-zinc-500">nenhuma label carregada</span>
+                  )}
                 </div>
-              ) : null}
+              </div>
             </div>
           ) : (
             <div className="mt-5 rounded-[20px] border border-dashed border-white/15 bg-white/[0.04] p-5 text-sm text-zinc-400">

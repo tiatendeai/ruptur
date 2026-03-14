@@ -284,3 +284,32 @@ Data: 2026-03-14
   - loop atual de IA ja respeita pausa e intervencao manual
   - `queue_state` passou a ser fronteira explicita de API
   - resumo agregado de fila exposto pelo backend em `GET /crm/queues/summary`
+
+## Atualizacao de ciclo — Time Cockpit/CRM
+
+Data: 2026-03-14 19:22 BRT
+
+- Itens puxados de `Agora`:
+  - preparar surface no `MyChat` para exibir automacao, bloqueio manual e owner
+  - fortalecer ergonomia do inbox para leitura e intervencao humana
+- Arquivos/modulos alvo:
+  - `web/src/app/inbox/InboxClient.tsx`
+  - `docs/jornada/plano-interfaces-operacionais-2026-03-13.md`
+  - `docs/jornada/registro-execucao-2026-03-13.md`
+- Contrato consumido:
+  - `GET /crm/leads`
+  - `GET /crm/labels`
+  - `PATCH /crm/leads/{lead_id}/labels`
+  - `PATCH /crm/leads/{lead_id}/assign`
+  - `PATCH /crm/leads/{lead_id}/automation`
+- Contrato produzido:
+  - surface unica no `MyChat` para editar owner/time, labels e estado de automacao
+  - contexto lateral mais forte com notas internas e acoes operacionais reais
+- Bloqueios para o outro time:
+  - para mostrar ciclo completo de IA ainda faltam `agent_run` e `dispatch_job` expostos pelo backend
+- Bloqueios para o Diego:
+  - nenhum novo bloqueio de produto nesta fatia
+- Resultado do ciclo:
+  - `MyChat` ganhou painel premium com capacidade real de operacao
+  - owner, labels e guard rails agora podem ser manipulados sem sair do inbox
+  - a interface ficou mais proxima de um inbox comercial serio e menos de um reader basico
