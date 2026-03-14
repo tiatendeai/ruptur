@@ -116,16 +116,8 @@ async def process_ai_response(payload: dict[str, Any], lead_id: str, conversatio
                 target_jid = chatid if chatid and "@" in chatid else f"{lead_phone}@s.whatsapp.net"
                 
                 if audio_data:
-                    # Salvar áudio localmente e expor via URL
-                    filename = f"{uuid.uuid4()}.mp3"
-                    file_path = os.path.join("static", "audio", filename)
-                    with open(file_path, "wb") as f:
-                        f.write(audio_data)
-                    
-                    # Usar rede interna do Docker para o Baileys baixar o arquivo rápido
-                    audio_url = f"http://ruptur-backend:8000/static/audio/{filename}"
-                    print(f"[DEBUG] Sending via Baileys to {target_jid} with audio (internal): {audio_url}")
-                    res = client.send_voice_jid(jid=target_jid, audio_url=audio_url)
+                    print(f"[DEBUG] Sending PTT via Baileys to {target_jid} (base64, {len(audio_data)} bytes)")
+                    res = client.send_voice_jid(jid=target_jid, audio_data=audio_data)
                 else:
                     print(f"[DEBUG] Sending via Baileys to {target_jid}")
                     res = client.send_text_jid(jid=target_jid, text=response_text)

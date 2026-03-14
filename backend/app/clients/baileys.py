@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import base64
 import httpx
 import logging
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
 
 class BaileysClient:
     def __init__(self, base_url: str, instance_id: str = "default"):
@@ -35,15 +37,22 @@ class BaileysClient:
             logger.error(f"Error sending message via Baileys: {e}")
             return {"ok": False, "error": str(e)}
 
-    def send_voice_jid(self, jid: str, audio_url: str) -> dict[str, Any]:
+    def send_voice_jid(self, jid: str, audio_data: bytes) -> dict[str, Any]:
+        """Envia áudio como PTT embutindo os bytes em base64.
+
+        Isso elimina o download externo pelo Baileys e resolve os timeouts.
+        O Baileys já suporta data URIs base64 via 'decodeMaybeBase64File'.
+        """
         url = f"{self.base_url}/send/media"
+        b64 = base64.b64encode(audio_data).decode("utf-8")
         payload = {
             "number": jid,
-            "url": audio_url,
-            "type": "ptt"
+            "file": f"data:audio/mpeg;base64,{b64}",
+            "type": "ptt",
+            "mimetype": "audio/mpeg"
         }
         try:
-            with httpx.Client(timeout=120) as client:
+            with httpx.Client(timeout=60) as client:
                 resp = client.post(url, json=payload, headers=self._headers())
                 resp.raise_for_status()
                 return resp.json()
