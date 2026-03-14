@@ -20,6 +20,10 @@
         --governance: #f472d0;
         --accent: #79d8ff;
         --accent-hot: #ff7b54;
+        --ghost: #5a6572;
+        --wired: #61d8ff;
+        --live: #ff7b54;
+        --scaled: #ffe082;
       }
 
       * { box-sizing: border-box; }
@@ -185,6 +189,26 @@
         background: rgba(255,255,255,.12);
       }
 
+      .legend {
+        display: grid;
+        gap: 8px;
+      }
+
+      .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+
+      .swatch {
+        width: 12px;
+        height: 12px;
+        border-radius: 999px;
+        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
+      }
+
       .details {
         position: fixed;
         right: 16px;
@@ -310,6 +334,28 @@
       </section>
 
       <section class="section">
+        <h2>Layers</h2>
+        <div class="legend">
+          <div class="legend-item"><span class="swatch" style="background: var(--brain)"></span>brain</div>
+          <div class="legend-item"><span class="swatch" style="background: var(--app)"></span>app</div>
+          <div class="legend-item"><span class="swatch" style="background: var(--domain)"></span>domain</div>
+          <div class="legend-item"><span class="swatch" style="background: var(--channel)"></span>channel</div>
+          <div class="legend-item"><span class="swatch" style="background: var(--infra)"></span>infra</div>
+          <div class="legend-item"><span class="swatch" style="background: var(--governance)"></span>governance</div>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>Estados</h2>
+        <div class="legend">
+          <div class="legend-item"><span class="swatch" style="background: var(--ghost)"></span>ghost</div>
+          <div class="legend-item"><span class="swatch" style="background: var(--wired)"></span>wired</div>
+          <div class="legend-item"><span class="swatch" style="background: var(--live)"></span>live</div>
+          <div class="legend-item"><span class="swatch" style="background: var(--scaled)"></span>scaled</div>
+        </div>
+      </section>
+
+      <section class="section">
         <h2>Leitura</h2>
         <p>
           Nucleos densos, ramos vivos e envelope cerebral sob controle. O colapsado deve parecer cerebro; o expandido, estrutura revelada.
@@ -365,163 +411,52 @@
       scene.add(pointC);
 
       const dataset = [
-        {
-          id: "adk",
-          label: "ADK",
-          layer: "brain",
-          mass: 1.6,
-          context: ["all", "jarvis", "factory"],
-          tags: ["brain", "orchestration", "memory"],
-          description: "Camada mestra de orquestracao, contexto e governanca que sustenta o Jarvis e a fabrica de maquinas.",
-          base: [-90, 110, -80]
-        },
-        {
-          id: "jarvis",
-          label: "Jarvis",
-          layer: "brain",
-          mass: 1.8,
-          context: ["all", "jarvis", "factory"],
-          tags: ["ai", "operator", "clone"],
-          description: "Inteligencia operacional viva que pensa, coordena, traduz contexto e aciona as camadas do ecossistema.",
-          base: [70, 130, -140]
-        },
-        {
-          id: "ruptur",
-          label: "Ruptur",
-          layer: "app",
-          mass: 2.1,
-          context: ["all", "ruptur", "growth"],
-          tags: ["app", "crm", "operations"],
-          description: "Aplicacao operacional que recebe a inteligencia do ADK e a converte em CRM, mensageria e cockpit comercial.",
-          base: [40, 20, 30]
-        },
-        {
-          id: "whatsapp",
-          label: "WhatsApp",
-          layer: "channel",
-          mass: 1.8,
-          context: ["all", "jarvis", "ruptur", "growth"],
-          tags: ["channel", "sales", "interface"],
-          description: "Canal transversal do ecossistema: interface do Jarvis, prospeccao, follow-up e conversa operacional.",
-          base: [200, 15, 110]
-        },
-        {
-          id: "lead",
-          label: "Lead",
-          layer: "domain",
-          mass: 1.9,
-          context: ["all", "growth", "ruptur"],
-          tags: ["crm", "commercial", "funnel"],
-          description: "Unidade central da maquina comercial. Tudo gravita em torno da captura, qualificacao, nutricao e conversao do lead.",
-          base: [-60, -120, 40]
-        },
-        {
-          id: "crm",
-          label: "CRM",
-          layer: "domain",
-          mass: 1.5,
-          context: ["all", "ruptur", "growth"],
-          tags: ["pipeline", "records", "journey"],
-          description: "Dominio de jornada comercial, pipeline, estagios e memoria de relacionamento.",
-          base: [-80, -10, 0]
-        },
-        {
-          id: "messaging",
-          label: "Messaging",
-          layer: "domain",
-          mass: 1.4,
-          context: ["all", "ruptur"],
-          tags: ["dispatch", "providers", "delivery"],
-          description: "Camada de envio, roteamento e abstracao entre provedores como UAZAPI e Baileys.",
-          base: [150, -55, 80]
-        },
-        {
-          id: "automation",
-          label: "Automation",
-          layer: "domain",
-          mass: 1.2,
-          context: ["all", "ruptur", "factory"],
-          tags: ["runs", "workflows", "jobs"],
-          description: "Execucao da automacao, cadencias, jobs, dispatches e acoplamento controlado entre decisao e operacao.",
-          base: [70, -130, 120]
-        },
-        {
-          id: "machine_builder",
-          label: "Machine Builder",
-          layer: "brain",
-          mass: 1.45,
-          context: ["all", "factory"],
-          tags: ["builder", "templates", "synthesis"],
-          description: "Camada que traduz metodo em sistema e permite construir novas maquinas comerciais com menos atrito.",
-          base: [10, 120, -30]
-        },
-        {
-          id: "prospect",
-          label: "Prospect",
-          layer: "domain",
-          mass: 1.0,
-          context: ["all", "growth"],
-          tags: ["top-funnel", "source"],
-          description: "Entrada inicial do funil, antes da qualificacao e antes da oportunidade real existir.",
-          base: [-170, -20, 90]
-        },
-        {
-          id: "qualification",
-          label: "Qualification",
-          layer: "domain",
-          mass: 1.0,
-          context: ["all", "growth"],
-          tags: ["filter", "scoring", "fit"],
-          description: "Camada que separa curiosidade de aderencia real e evita desperdiço de operacao comercial.",
-          base: [-130, -80, 80]
-        },
-        {
-          id: "followup",
-          label: "Follow-up",
-          layer: "domain",
-          mass: 1.2,
-          context: ["all", "growth", "ruptur"],
-          tags: ["cadence", "reminder", "advance"],
-          description: "Motor de cadencia e proximo passo. Onde previsibilidade deixa de ser discurso e vira ritmo operacional.",
-          base: [40, -185, 90]
-        },
-        {
-          id: "opportunity",
-          label: "Opportunity",
-          layer: "domain",
-          mass: 1.2,
-          context: ["all", "growth"],
-          tags: ["deal", "revenue", "closing"],
-          description: "Entidade onde o pipeline se aproxima do dinheiro e exige leitura de risco, timing e fechamento.",
-          base: [140, -145, 80]
-        },
-        {
-          id: "cockpit",
-          label: "Cockpit",
-          layer: "app",
-          mass: 1.1,
-          context: ["all", "ruptur"],
-          tags: ["ui", "operations", "human-loop"],
-          description: "Superficie humana do sistema: leitura, override, rastreabilidade e controle operacional.",
-          base: [180, 85, 20]
-        }
+        { id: "adk", label: "ADK", layer: "brain", state: "wired", mass: 1.6, context: ["all", "jarvis", "factory"], tags: ["brain", "orchestration", "memory"], description: "Camada mestra de orquestracao, contexto e governanca que sustenta o Jarvis e a fabrica de maquinas.", base: [-90, 110, -80] },
+        { id: "jarvis", label: "Jarvis", layer: "brain", state: "ghost", mass: 1.8, context: ["all", "jarvis", "factory"], tags: ["ai", "operator", "clone"], description: "Inteligencia operacional viva que pensa, coordena, traduz contexto e aciona as camadas do ecossistema.", base: [70, 130, -140] },
+        { id: "machine_builder", label: "Machine Builder", layer: "brain", state: "ghost", mass: 1.45, context: ["all", "factory"], tags: ["builder", "templates", "synthesis"], description: "Camada que traduz metodo em sistema e permite construir novas maquinas comerciais com menos atrito.", base: [10, 120, -30] },
+        { id: "ruptur", label: "Ruptur", layer: "app", state: "live", mass: 2.1, context: ["all", "ruptur", "growth"], tags: ["app", "crm", "operations"], description: "Aplicacao operacional que recebe a inteligencia do ADK e a converte em CRM, mensageria e cockpit comercial.", base: [40, 20, 30] },
+        { id: "cockpit", label: "Cockpit", layer: "app", state: "live", mass: 1.1, context: ["all", "ruptur"], tags: ["ui", "operations", "human-loop"], description: "Superficie humana do sistema: leitura, override, rastreabilidade e controle operacional.", base: [180, 85, 20] },
+        { id: "crm", label: "CRM", layer: "domain", state: "wired", mass: 1.5, context: ["all", "ruptur", "growth"], tags: ["pipeline", "records", "journey"], description: "Dominio de jornada comercial, pipeline, estagios e memoria de relacionamento.", base: [-80, -10, 0] },
+        { id: "lead", label: "Lead", layer: "domain", state: "wired", mass: 1.9, context: ["all", "growth", "ruptur"], tags: ["crm", "commercial", "funnel"], description: "Unidade central da maquina comercial. Tudo gravita em torno da captura, qualificacao, nutricao e conversao do lead.", base: [-60, -120, 40] },
+        { id: "messaging", label: "Messaging", layer: "domain", state: "ghost", mass: 1.4, context: ["all", "ruptur"], tags: ["dispatch", "providers", "delivery"], description: "Camada de envio, roteamento e abstracao entre provedores como UAZAPI e Baileys.", base: [150, -55, 80] },
+        { id: "automation", label: "Automation", layer: "domain", state: "ghost", mass: 1.2, context: ["all", "ruptur", "factory"], tags: ["runs", "workflows", "jobs"], description: "Execucao da automacao, cadencias, jobs, dispatches e acoplamento controlado entre decisao e operacao.", base: [70, -130, 120] },
+        { id: "receita_previsivel", label: "Receita Previsivel", layer: "domain", state: "wired", mass: 1.15, context: ["all", "growth", "factory"], tags: ["method", "predictable-revenue", "sales"], description: "Metodo-fonte que orienta a decomposicao das maquinas comerciais do ecossistema.", base: [-240, 36, 95] },
+        { id: "sales_machine_diego", label: "Sales Machine Diego", layer: "app", state: "ghost", mass: 1.2, context: ["all", "growth", "factory"], tags: ["sales", "diego", "acquisition"], description: "Maquina comercial usada para vender a propria solucao para as imobiliarias.", base: [-185, -34, 74] },
+        { id: "imob_client", label: "Imobiliaria Cliente", layer: "domain", state: "wired", mass: 1.0, context: ["all", "growth", "ruptur"], tags: ["customer", "b2b", "imob"], description: "Cliente direto que compra a maquina e depois a usa com seus proprios clientes.", base: [-260, -90, 140] },
+        { id: "prospect", label: "Prospect", layer: "domain", state: "ghost", mass: 1.0, context: ["all", "growth"], tags: ["top-funnel", "source"], description: "Entrada inicial do funil, antes da qualificacao e antes da oportunidade real existir.", base: [-170, -20, 90] },
+        { id: "qualification", label: "Qualification", layer: "domain", state: "ghost", mass: 1.0, context: ["all", "growth"], tags: ["filter", "scoring", "fit"], description: "Camada que separa curiosidade de aderencia real e evita desperdicio de operacao comercial.", base: [-130, -80, 80] },
+        { id: "followup", label: "Follow-up", layer: "domain", state: "ghost", mass: 1.2, context: ["all", "growth", "ruptur"], tags: ["cadence", "reminder", "advance"], description: "Motor de cadencia e proximo passo. Onde previsibilidade deixa de ser discurso e vira ritmo operacional.", base: [40, -185, 90] },
+        { id: "opportunity", label: "Opportunity", layer: "domain", state: "ghost", mass: 1.2, context: ["all", "growth"], tags: ["deal", "revenue", "closing"], description: "Entidade onde o pipeline se aproxima do dinheiro e exige leitura de risco, timing e fechamento.", base: [140, -145, 80] },
+        { id: "close", label: "Close", layer: "domain", state: "ghost", mass: 1.0, context: ["all", "growth"], tags: ["conversion", "revenue", "closing"], description: "Fase final de fechamento e captura do dinheiro na logica do funil reverso.", base: [220, -205, 118] },
+        { id: "whatsapp", label: "WhatsApp", layer: "channel", state: "wired", mass: 1.8, context: ["all", "jarvis", "ruptur", "growth"], tags: ["channel", "sales", "interface"], description: "Canal transversal do ecossistema: interface do Jarvis, prospeccao, follow-up e conversa operacional.", base: [200, 15, 110] },
+        { id: "uazapi", label: "UAZAPI", layer: "channel", state: "live", mass: 1.0, context: ["all", "ruptur"], tags: ["provider", "whatsapp", "delivery"], description: "Provider atual do fluxo operacional de WhatsApp e dispatch em producao.", base: [250, -40, 180] },
+        { id: "baileys", label: "Baileys", layer: "channel", state: "wired", mass: 0.95, context: ["all", "ruptur"], tags: ["provider", "fallback", "whatsapp"], description: "Gateway alternativo e fallback para operacao do WhatsApp.", base: [270, -120, 210] },
+        { id: "vps_oracle", label: "VPS Oracle", layer: "infra", state: "wired", mass: 1.0, context: ["all", "ruptur"], tags: ["infra", "hosting", "runtime"], description: "Camada de infra, host, provisionamento e sustentacao dos runtimes.", base: [210, -185, 250] }
       ];
 
       const links = [
-        ["adk", "jarvis"],
-        ["adk", "machine_builder"],
-        ["jarvis", "whatsapp"],
-        ["ruptur", "crm"],
-        ["ruptur", "messaging"],
-        ["ruptur", "automation"],
-        ["ruptur", "cockpit"],
-        ["crm", "lead"],
-        ["lead", "followup"],
-        ["followup", "opportunity"],
-        ["prospect", "qualification"],
-        ["qualification", "lead"],
-        ["messaging", "whatsapp"],
-        ["machine_builder", "jarvis"]
+        { from: "adk", to: "jarvis", state: "wired", relation: "contains" },
+        { from: "adk", to: "machine_builder", state: "ghost", relation: "enables" },
+        { from: "jarvis", to: "whatsapp", state: "ghost", relation: "uses_as_channel" },
+        { from: "machine_builder", to: "jarvis", state: "ghost", relation: "contains" },
+        { from: "ruptur", to: "crm", state: "live", relation: "contains" },
+        { from: "ruptur", to: "messaging", state: "ghost", relation: "contains" },
+        { from: "ruptur", to: "automation", state: "ghost", relation: "contains" },
+        { from: "ruptur", to: "cockpit", state: "live", relation: "contains" },
+        { from: "ruptur", to: "whatsapp", state: "live", relation: "uses_as_channel" },
+        { from: "crm", to: "lead", state: "wired", relation: "contains" },
+        { from: "lead", to: "followup", state: "ghost", relation: "enables" },
+        { from: "followup", to: "opportunity", state: "ghost", relation: "creates" },
+        { from: "opportunity", to: "close", state: "ghost", relation: "enables" },
+        { from: "prospect", to: "qualification", state: "ghost", relation: "qualifies_to" },
+        { from: "qualification", to: "lead", state: "ghost", relation: "creates" },
+        { from: "messaging", to: "whatsapp", state: "wired", relation: "uses_channel" },
+        { from: "messaging", to: "uazapi", state: "live", relation: "routes_to" },
+        { from: "messaging", to: "baileys", state: "wired", relation: "routes_to" },
+        { from: "vps_oracle", to: "baileys", state: "wired", relation: "enables" },
+        { from: "receita_previsivel", to: "sales_machine_diego", state: "wired", relation: "enables" },
+        { from: "sales_machine_diego", to: "imob_client", state: "ghost", relation: "targets" },
+        { from: "sales_machine_diego", to: "prospect", state: "ghost", relation: "creates" }
       ];
 
       const palette = {
@@ -531,6 +466,13 @@
         channel: 0xffd166,
         governance: 0xf472d0,
         infra: 0x8f96a3
+      };
+
+      const statePalette = {
+        ghost: 0x5a6572,
+        wired: 0x61d8ff,
+        live: 0xff7b54,
+        scaled: 0xffe082
       };
 
       let currentVision = "all";
@@ -671,19 +613,20 @@
 
         dataset.forEach((node) => {
           const color = palette[node.layer] || 0xffffff;
+          const stateColor = statePalette[node.state] || color;
           const radius = 10 + node.mass * 10;
           const sphere = new THREE.Mesh(
             new THREE.SphereGeometry(radius, 28, 28),
             new THREE.MeshPhysicalMaterial({
               color: 0x07111a,
-              roughness: 0.22,
+              roughness: node.state === "ghost" ? 0.34 : 0.22,
               metalness: 0.04,
               clearcoat: 0.95,
               clearcoatRoughness: 0.14,
-              transmission: 0.12,
+              transmission: node.state === "ghost" ? 0.05 : 0.14,
               transparent: true,
-              opacity: 0.92,
-              emissive: new THREE.Color(color).multiplyScalar(0.08)
+              opacity: node.state === "ghost" ? 0.76 : 0.92,
+              emissive: new THREE.Color(stateColor).multiplyScalar(node.state === "live" ? 0.18 : 0.08)
             })
           );
           sphere.position.set(...node.base);
@@ -691,16 +634,16 @@
 
           const wire = new THREE.LineSegments(
             new THREE.WireframeGeometry(new THREE.SphereGeometry(radius * 1.005, 18, 16)),
-            new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.36 })
+            new THREE.LineBasicMaterial({ color, transparent: true, opacity: node.state === "ghost" ? 0.18 : 0.36 })
           );
           sphere.add(wire);
 
           const halo = new THREE.Mesh(
             new THREE.SphereGeometry(radius * 1.06, 20, 20),
             new THREE.MeshBasicMaterial({
-              color,
+              color: stateColor,
               transparent: true,
-              opacity: 0.06
+              opacity: node.state === "live" ? 0.12 : 0.06
             })
           );
           sphere.add(halo);
@@ -718,7 +661,7 @@
           lctx.fillText(node.label, 256, 74);
           lctx.fillStyle = "rgba(145,162,182,0.9)";
           lctx.font = "26px system-ui";
-          lctx.fillText(node.layer, 256, 120);
+          lctx.fillText(`${node.layer} · ${node.state}`, 256, 120);
           const label = new THREE.Sprite(
             new THREE.SpriteMaterial({
               map: new THREE.CanvasTexture(labelCanvas),
@@ -735,14 +678,18 @@
           nodeMap.set(node.id, sphere);
         });
 
-        links.forEach(([fromId, toId]) => {
-          const from = nodeMap.get(fromId);
-          const to = nodeMap.get(toId);
+        links.forEach((edge) => {
+          const from = nodeMap.get(edge.from);
+          const to = nodeMap.get(edge.to);
           if (!from || !to) return;
           const geom = new THREE.BufferGeometry();
-          const mat = new THREE.LineBasicMaterial({ color: 0x79d8ff, transparent: true, opacity: 0.34 });
+          const mat = new THREE.LineBasicMaterial({
+            color: statePalette[edge.state] || 0x79d8ff,
+            transparent: true,
+            opacity: edge.state === "live" ? 0.52 : edge.state === "ghost" ? 0.2 : 0.34
+          });
           const line = new THREE.Line(geom, mat);
-          line.userData = { fromId, toId };
+          line.userData = { fromId: edge.from, toId: edge.to, state: edge.state, relation: edge.relation };
           groups.add(line);
           linkMeshes.push(line);
         });
@@ -765,7 +712,14 @@
           prospect: [-182, 24, 70],
           qualification: [-144, -44, 82],
           followup: [6, -152, 82],
-          opportunity: [118, -124, 72]
+          opportunity: [118, -124, 72],
+          close: [198, -120, 86],
+          receita_previsivel: [-205, 18, 46],
+          sales_machine_diego: [-182, -28, 56],
+          imob_client: [-228, -92, 98],
+          uazapi: [212, 12, 156],
+          baileys: [214, -72, 176],
+          vps_oracle: [172, -146, 214]
         };
         dataset.forEach((node, index) => {
           const base = compactMap[node.id] || [0, 0, 0];
@@ -794,7 +748,14 @@
           qualification: [-130, -80, 80],
           followup: [40, -185, 90],
           opportunity: [140, -145, 80],
-          cockpit: [180, 85, 20]
+          cockpit: [180, 85, 20],
+          close: [220, -205, 118],
+          receita_previsivel: [-240, 36, 95],
+          sales_machine_diego: [-185, -34, 74],
+          imob_client: [-260, -90, 140],
+          uazapi: [250, -40, 180],
+          baileys: [270, -120, 210],
+          vps_oracle: [210, -185, 250]
         };
         dataset.forEach((node) => { node.base = map[node.id] || [0, 0, 0]; });
         buildNodes();
@@ -813,7 +774,7 @@
       }
 
       function relatedCount(nodeId) {
-        return links.filter(([fromId, toId]) => fromId === nodeId || toId === nodeId).length;
+        return links.filter((edge) => edge.from === nodeId || edge.to === nodeId).length;
       }
 
       function setDetailsFromNode(node) {
@@ -821,10 +782,11 @@
         const tags = node.tags.join(", ");
         details.innerHTML = `
           <h2>${node.label}</h2>
-          <div class="mini">${node.layer} · massa ${node.mass.toFixed(1)} · ${contexts}</div>
+          <div class="mini">${node.layer} · ${node.state} · massa ${node.mass.toFixed(1)} · ${contexts}</div>
           <p>${node.description}</p>
           <dl>
             <dt>Layer</dt><dd>${node.layer}</dd>
+            <dt>Estado</dt><dd>${node.state}</dd>
             <dt>Contextos</dt><dd>${contexts}</dd>
             <dt>Tags</dt><dd>${tags}</dd>
             <dt>Ligacoes</dt><dd>${relatedCount(node.id)}</dd>
@@ -845,7 +807,7 @@
           tooltip.style.display = "none";
           return;
         }
-        tooltip.innerHTML = `<strong>${node.label}</strong><span>${node.layer} · ${node.context.join(" · ")}</span>`;
+        tooltip.innerHTML = `<strong>${node.label}</strong><span>${node.layer} · ${node.state} · ${node.context.join(" · ")}</span>`;
         tooltip.style.display = "block";
         tooltip.style.left = `${Math.min(window.innerWidth - 252, x + 16)}px`;
         tooltip.style.top = `${Math.min(window.innerHeight - 82, y + 16)}px`;
@@ -853,12 +815,12 @@
 
       function applySelection(nextSphere) {
         if (selectedSphere && selectedSphere.material) {
-          const color = palette[selectedSphere.userData.layer] || 0xffffff;
+          const color = statePalette[selectedSphere.userData.state] || palette[selectedSphere.userData.layer] || 0xffffff;
           selectedSphere.material.emissive = new THREE.Color(color).multiplyScalar(0.12);
         }
         selectedSphere = nextSphere;
         if (selectedSphere?.material) {
-          const color = palette[selectedSphere.userData.layer] || 0xffffff;
+          const color = statePalette[selectedSphere.userData.state] || palette[selectedSphere.userData.layer] || 0xffffff;
           selectedSphere.material.emissive = new THREE.Color(color).multiplyScalar(0.28);
         }
       }
@@ -967,6 +929,7 @@
         linkMeshes.forEach((line) => {
           const from = nodeMap.get(line.userData.fromId);
           const to = nodeMap.get(line.userData.toId);
+          if (!from || !to) return;
           const midpoint = from.position.clone().add(to.position).multiplyScalar(0.5);
           const lift = 26 + Math.abs(from.position.x - to.position.x) * 0.08;
           midpoint.y += lift;
