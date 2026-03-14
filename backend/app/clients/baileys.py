@@ -18,9 +18,12 @@ class BaileysClient:
         }
 
     def send_text(self, number: str, text: str) -> dict[str, Any]:
+        return self.send_text_jid(f"{number}@s.whatsapp.net", text)
+
+    def send_text_jid(self, jid: str, text: str) -> dict[str, Any]:
         url = f"{self.base_url}/send/text"
         payload = {
-            "jid": f"{number}@s.whatsapp.net",
+            "jid": jid,
             "text": text
         }
         try:

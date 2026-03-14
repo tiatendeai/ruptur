@@ -76,17 +76,20 @@ async def process_ai_response(payload: dict[str, Any], lead_id: str, conversatio
             print(f"[DEBUG] Stored Jarvis response message id: {external_id}")
 
             # Enviar via Provedor correto
-            # Neutralizar o número para garantir o sync no celular
-            clean_number = neutralize_br_number(lead_phone)
-            
+            # Neutralizar o número para garantir o sync no celular (apenas se não tivermos o jid original)
+            chatid = payload.get("data", {}).get("chatid")
             is_baileys = "instance" in payload or "jid" in payload.get("data", {})
             
             if is_baileys and settings.baileys_base_url:
-                print(f"[DEBUG] Sending via Baileys to {clean_number}")
                 client = BaileysClient(base_url=settings.baileys_base_url, instance_id=settings.baileys_instance_id)
-                res = client.send_text(number=clean_number, text=response_text)
+                # Se temos o chatid original do Baileys, usamos ele (pode ser @lid ou @g.us)
+                target_jid = chatid if chatid and "@" in chatid else f"{neutralize_br_number(lead_phone)}@s.whatsapp.net"
+                print(f"[DEBUG] Sending via Baileys to {target_jid}")
+                res = client.send_text_jid(jid=target_jid, text=response_text)
                 print(f"[DEBUG] Baileys response: {res}")
             elif settings.uazapi_base_url and settings.uazapi_token:
+                # UAZAPI via gateway (usa clean number)
+                clean_number = neutralize_br_number(lead_phone)
                 print(f"[DEBUG] Sending via UAZAPI to {clean_number}")
                 client = UazapiClient(base_url=settings.uazapi_base_url, token=settings.uazapi_token)
                 res = client.send_text(number=clean_number, text=response_text)
