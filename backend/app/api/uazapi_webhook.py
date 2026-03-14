@@ -81,7 +81,7 @@ async def process_ai_response(payload: dict[str, Any], lead_id: str, conversatio
 
             # Decidir se envia áudio
             # Se a última mensagem do usuário foi áudio (marcada pelo gateway) ou se ele pediu explicitamente
-            wants_audio = "[Áudio Transcrito]" in last_msg or any(x in last_msg.lower() for x in ["áudio", "voz", "mande um áudio", "manda áudio"])
+            wants_audio = "[Áudio Transcrito]" in last_msg or any(x in last_msg.lower() for x in ["áudio", "audio", "auio", "voz", "mande um áudio", "manda áudio", "manda audio"])
             audio_data = None
             if wants_audio:
                 print(f"[DEBUG] User seems to want audio. Generating TTS with ElevenLabs...")
