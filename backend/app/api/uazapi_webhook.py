@@ -112,9 +112,8 @@ async def process_ai_response(payload: dict[str, Any], lead_id: str, conversatio
             
             if is_baileys and settings.baileys_base_url:
                 client = BaileysClient(base_url=settings.baileys_base_url, instance_id=settings.baileys_instance_id)
-                # Garantir neutralização do JID para evitar "mensagens fantasma" no mobile
-                raw_jid = chatid if chatid and "@" in chatid else f"{lead_phone}@s.whatsapp.net"
-                target_jid = neutralize_br_number(raw_jid.split("@")[0]) + "@s.whatsapp.net" if "@s.whatsapp.net" in raw_jid else raw_jid
+                # Priorizar o chatid original para evitar "mensagens fantasma" no mobile
+                target_jid = chatid if chatid and "@" in chatid else f"{lead_phone}@s.whatsapp.net"
                 
                 if audio_data:
                     # Salvar áudio localmente e expor via URL
