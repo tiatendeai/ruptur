@@ -5,10 +5,12 @@ import { rupturApiBaseUrl } from "@/lib/config";
 import { connectBaileysInstance, getBaileysStatus, listBaileysInstances, listChannelHealth, listUazapiInstances, type RupturBaileysInstance, type RupturBaileysStatus, type RupturChannelHealth } from "@/lib/ruptur";
 
 type UazapiInstance = {
+  id?: string;
   name?: string;
   status?: string;
   token?: string;
   qrcode?: string;
+  paircode?: string;
   number?: string;
 };
 
@@ -30,51 +32,102 @@ export default function ConnectionsClient() {
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
   const [baileysStatus, setBaileysStatus] = useState<RupturBaileysStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [failedQrUrl, setFailedQrUrl] = useState<string | null>(null);
+
+  async function loadConnectionsData(activeProvider: "uazapi" | "baileys") {
+    const [instanceResponse, healthResponse, baileysResponse] = await Promise.allSettled([
+      listUazapiInstances(),
+      listChannelHealth(),
+      listBaileysInstances(),
+    ]);
+
+    const errors: string[] = [];
+    let nextUazapiItems = instances;
+    let nextBaileysItems = baileysInstances;
+
+    if (instanceResponse.status === "fulfilled") {
+      nextUazapiItems = extractUazapiInstances(instanceResponse.value);
+      setInstances(nextUazapiItems);
+    } else {
+      errors.push(`uazapi: ${instanceResponse.reason instanceof Error ? instanceResponse.reason.message : String(instanceResponse.reason)}`);
+    }
+
+    if (healthResponse.status === "fulfilled") {
+      setHealth(healthResponse.value);
+    } else {
+      errors.push(`health: ${healthResponse.reason instanceof Error ? healthResponse.reason.message : String(healthResponse.reason)}`);
+    }
+
+    if (baileysResponse.status === "fulfilled") {
+      nextBaileysItems = baileysResponse.value;
+      setBaileysInstances(nextBaileysItems);
+    } else {
+      errors.push(`baileys: ${baileysResponse.reason instanceof Error ? baileysResponse.reason.message : String(baileysResponse.reason)}`);
+    }
+
+    setError(errors.length ? errors.join(" | ") : null);
+    setSelectedInstanceId((current) => {
+      if (activeProvider === "uazapi") {
+        return current || nextUazapiItems[0]?.name || null;
+      }
+      return current || nextBaileysItems[0]?.instance || null;
+    });
+  }
 
   async function refresh() {
-    setError(null);
-    try {
-      const [instanceResponse, healthResponse, baileysResponse] = await Promise.all([
-        listUazapiInstances(),
-        listChannelHealth(),
-        listBaileysInstances(),
-      ]);
-      const uazapiItems = extractUazapiInstances(instanceResponse);
-      setInstances(uazapiItems);
-      setBaileysInstances(baileysResponse);
-      setHealth(healthResponse);
-      setSelectedInstanceId((current) => {
-        if (provider === "uazapi") return current || uazapiItems[0]?.name || null;
-        return current || baileysResponse[0]?.instance || null;
-      });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    }
+    await loadConnectionsData(provider);
   }
 
   useEffect(() => {
     let cancelled = false;
-    void Promise.all([listUazapiInstances(), listChannelHealth(), listBaileysInstances()])
-      .then(([instanceResponse, healthResponse, baileysResponse]) => {
-        if (cancelled) return;
-        const uazapiItems = extractUazapiInstances(instanceResponse);
-        setError(null);
-        setInstances(uazapiItems);
-        setBaileysInstances(baileysResponse);
-        setHealth(healthResponse);
-        setSelectedInstanceId((current) => {
-          if (provider === "uazapi") return current || uazapiItems[0]?.name || null;
-          return current || baileysResponse[0]?.instance || null;
-        });
-      })
-      .catch((e) => {
-        if (cancelled) return;
-        setError(e instanceof Error ? e.message : String(e));
+    void (async () => {
+      const [instanceResponse, healthResponse, baileysResponse] = await Promise.allSettled([
+        listUazapiInstances(),
+        listChannelHealth(),
+        listBaileysInstances(),
+      ]);
+
+      if (cancelled) return;
+
+      const errors: string[] = [];
+      let nextUazapiItems = instances;
+      let nextBaileysItems = baileysInstances;
+
+      if (instanceResponse.status === "fulfilled") {
+        nextUazapiItems = extractUazapiInstances(instanceResponse.value);
+        setInstances(nextUazapiItems);
+      } else {
+        errors.push(`uazapi: ${instanceResponse.reason instanceof Error ? instanceResponse.reason.message : String(instanceResponse.reason)}`);
+      }
+
+      if (healthResponse.status === "fulfilled") {
+        setHealth(healthResponse.value);
+      } else {
+        errors.push(`health: ${healthResponse.reason instanceof Error ? healthResponse.reason.message : String(healthResponse.reason)}`);
+      }
+
+      if (baileysResponse.status === "fulfilled") {
+        nextBaileysItems = baileysResponse.value;
+        setBaileysInstances(nextBaileysItems);
+      } else {
+        errors.push(`baileys: ${baileysResponse.reason instanceof Error ? baileysResponse.reason.message : String(baileysResponse.reason)}`);
+      }
+
+      setError(errors.length ? errors.join(" | ") : null);
+      setSelectedInstanceId((current) => {
+        if (provider === "uazapi") {
+          return current || nextUazapiItems[0]?.name || null;
+        }
+        return current || nextBaileysItems[0]?.instance || null;
       });
+    })().catch((e) => {
+      if (cancelled) return;
+      setError(e instanceof Error ? e.message : String(e));
+    });
     return () => {
       cancelled = true;
     };
-  }, [provider]);
+  }, [baileysInstances, instances, provider]);
 
   useEffect(() => {
     if (provider !== "baileys" || !selectedInstanceId) return;
@@ -99,14 +152,20 @@ export default function ConnectionsClient() {
     };
   }, [instances, health, provider, baileysInstances]);
 
+  const selectedUazapiInstance = useMemo(
+    () => instances.find((instance) => (instance.name || null) === selectedInstanceId) || null,
+    [instances, selectedInstanceId],
+  );
+
   const qrUrl =
     provider === "uazapi"
-      ? selectedInstanceId
+      ? selectedUazapiInstance?.qrcode || (selectedInstanceId
         ? `${rupturApiBaseUrl()}/integrations/uazapi/qrcode.png?instance=${encodeURIComponent(selectedInstanceId)}`
-        : null
+        : null)
       : selectedInstanceId
         ? `${rupturApiBaseUrl()}/integrations/baileys/qrcode.png?instance=${encodeURIComponent(selectedInstanceId)}`
         : null;
+  const qrFailed = Boolean(qrUrl && failedQrUrl === qrUrl);
 
   return (
     <div className="space-y-6">
@@ -243,6 +302,18 @@ export default function ConnectionsClient() {
             <div className="mt-2 text-lg font-medium">{provider === "uazapi" ? "UAZAPI" : "Baileys"}</div>
             <div className="mt-4 text-xs uppercase tracking-[0.25em] text-zinc-500">instancia selecionada</div>
             <div className="mt-2 text-sm text-zinc-200">{selectedInstanceId || "nenhuma"}</div>
+            {provider === "uazapi" ? (
+              <>
+                <div className="mt-4 text-xs uppercase tracking-[0.25em] text-zinc-500">status</div>
+                <div className="mt-2 text-sm text-zinc-200">{selectedUazapiInstance?.status || "sem_status"}</div>
+                <div className="mt-4 text-xs uppercase tracking-[0.25em] text-zinc-500">numero</div>
+                <div className="mt-2 text-sm text-zinc-200">{selectedUazapiInstance?.number || "sem_numero"}</div>
+                <div className="mt-4 text-xs uppercase tracking-[0.25em] text-zinc-500">codigo de conexao</div>
+                <div className="mt-2 rounded-2xl border border-dashed border-white/10 bg-black/20 px-4 py-3 text-sm text-zinc-200">
+                  {selectedUazapiInstance?.paircode || "sem_codigo_disponivel"}
+                </div>
+              </>
+            ) : null}
             {provider === "baileys" ? (
               <div className="mt-4">
                 <div className="text-xs uppercase tracking-[0.25em] text-zinc-500">status</div>
@@ -268,12 +339,19 @@ export default function ConnectionsClient() {
               <div className="mt-5">
                 <div className="text-xs uppercase tracking-[0.25em] text-zinc-500">qr code</div>
                 <div className="mt-3 rounded-[20px] border border-white/10 bg-white p-4">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    alt={`QR ${selectedInstanceId}`}
-                    src={qrUrl || ""}
-                    className="mx-auto max-h-64 w-full max-w-64 rounded-xl object-contain"
-                  />
+                  {qrUrl && !qrFailed ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      alt={`QR ${selectedInstanceId}`}
+                      src={qrUrl}
+                      className="mx-auto max-h-64 w-full max-w-64 rounded-xl object-contain"
+                      onError={() => setFailedQrUrl(qrUrl)}
+                    />
+                  ) : (
+                    <div className="mx-auto flex min-h-64 max-w-64 items-center justify-center rounded-xl border border-dashed border-zinc-300/60 px-4 text-center text-sm text-zinc-500">
+                      QR indisponivel no momento. Use o codigo de conexao acima ou atualize a instancia.
+                    </div>
+                  )}
                 </div>
               </div>
             ) : null}

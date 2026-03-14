@@ -100,7 +100,8 @@ export default function InboxClient() {
     const localByQueue = new Map<string, number>();
     for (const lead of leads) {
       byStatus.set(lead.status, (byStatus.get(lead.status) || 0) + 1);
-      localByQueue.set(lead.queue_state, (localByQueue.get(lead.queue_state) || 0) + 1);
+      const queueKey = lead.queue_state || "active";
+      localByQueue.set(queueKey, (localByQueue.get(queueKey) || 0) + 1);
     }
     return {
       total: summary?.total ?? leads.length,
@@ -137,29 +138,52 @@ export default function InboxClient() {
 
   const refreshLeads = useCallback(async () => {
     setLoading(true);
-    setError(null);
-    try {
-      const [leadItems, stageItems, labelItems, viewItems, summaryData] = await Promise.all([
-        listLeads(),
-        listStages(),
-        listLabels(),
-        listSavedViews("inbox"),
-        getQueuesSummary(),
-      ]);
-      setLeads(leadItems);
-      setStages(stageItems);
-      setLabels(labelItems);
-      setSavedViews(viewItems);
-      setSummary(summaryData);
+    const results = await Promise.allSettled([
+      listLeads(),
+      listStages(),
+      listLabels(),
+      listSavedViews("inbox"),
+      getQueuesSummary(),
+    ]);
+    const [leadItems, stageItems, labelItems, viewItems, summaryData] = results;
+    const errors: string[] = [];
+
+    if (leadItems.status === "fulfilled") {
+      setLeads(leadItems.value);
       setSelectedLeadId((current) => {
-        if (current && leadItems.some((lead) => lead.id === current)) return current;
-        return leadItems[0]?.id || null;
+        if (current && leadItems.value.some((lead) => lead.id === current)) return current;
+        return leadItems.value[0]?.id || null;
       });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
+    } else {
+      errors.push(`leads: ${leadItems.reason instanceof Error ? leadItems.reason.message : String(leadItems.reason)}`);
     }
+
+    if (stageItems.status === "fulfilled") {
+      setStages(stageItems.value);
+    } else {
+      errors.push(`stages: ${stageItems.reason instanceof Error ? stageItems.reason.message : String(stageItems.reason)}`);
+    }
+
+    if (labelItems.status === "fulfilled") {
+      setLabels(labelItems.value);
+    } else {
+      errors.push(`labels: ${labelItems.reason instanceof Error ? labelItems.reason.message : String(labelItems.reason)}`);
+    }
+
+    if (viewItems.status === "fulfilled") {
+      setSavedViews(viewItems.value);
+    } else {
+      errors.push(`views: ${viewItems.reason instanceof Error ? viewItems.reason.message : String(viewItems.reason)}`);
+    }
+
+    if (summaryData.status === "fulfilled") {
+      setSummary(summaryData.value);
+    } else {
+      errors.push(`summary: ${summaryData.reason instanceof Error ? summaryData.reason.message : String(summaryData.reason)}`);
+    }
+
+    setError(errors.length ? errors.join(" | ") : null);
+    setLoading(false);
   }, []);
 
   const refreshMessages = useCallback(async (conversationId: string) => {

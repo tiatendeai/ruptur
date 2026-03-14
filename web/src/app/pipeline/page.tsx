@@ -19,16 +19,23 @@ export default function PipelinePage() {
 
   async function refresh() {
     setLoading(true);
-    setError(null);
-    try {
-      const [stageItems, leadItems] = await Promise.all([listStages(), listLeads()]);
-      setStages(stageItems);
-      setLeads(leadItems);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
+    const [stageItems, leadItems] = await Promise.allSettled([listStages(), listLeads()]);
+    const errors: string[] = [];
+
+    if (stageItems.status === "fulfilled") {
+      setStages(stageItems.value);
+    } else {
+      errors.push(`stages: ${stageItems.reason instanceof Error ? stageItems.reason.message : String(stageItems.reason)}`);
     }
+
+    if (leadItems.status === "fulfilled") {
+      setLeads(leadItems.value);
+    } else {
+      errors.push(`leads: ${leadItems.reason instanceof Error ? leadItems.reason.message : String(leadItems.reason)}`);
+    }
+
+    setError(errors.length ? errors.join(" | ") : null);
+    setLoading(false);
   }
 
   useEffect(() => {
