@@ -530,6 +530,44 @@
         return new THREE.Vector3(0, 0, 0);
       }
 
+      function getBrainProfilePoints(zOffset = 0) {
+        return [
+          new THREE.Vector3(-214, -12, zOffset - 18),
+          new THREE.Vector3(-200, 58, zOffset - 24),
+          new THREE.Vector3(-164, 118, zOffset - 28),
+          new THREE.Vector3(-106, 162, zOffset - 24),
+          new THREE.Vector3(-24, 186, zOffset - 18),
+          new THREE.Vector3(72, 174, zOffset - 10),
+          new THREE.Vector3(154, 134, zOffset),
+          new THREE.Vector3(214, 58, zOffset + 16),
+          new THREE.Vector3(224, -18, zOffset + 20),
+          new THREE.Vector3(196, -82, zOffset + 10),
+          new THREE.Vector3(126, -118, zOffset - 6),
+          new THREE.Vector3(62, -136, zOffset - 24),
+          new THREE.Vector3(22, -154, zOffset - 72),
+          new THREE.Vector3(-28, -162, zOffset - 104),
+          new THREE.Vector3(-88, -148, zOffset - 94),
+          new THREE.Vector3(-146, -120, zOffset - 66),
+          new THREE.Vector3(-188, -74, zOffset - 34),
+          new THREE.Vector3(-214, -12, zOffset - 18)
+        ];
+      }
+
+      function getCerebellumProfilePoints(zOffset = 0) {
+        return [
+          new THREE.Vector3(-58, -134, zOffset - 34),
+          new THREE.Vector3(-26, -114, zOffset - 28),
+          new THREE.Vector3(22, -110, zOffset - 22),
+          new THREE.Vector3(62, -126, zOffset - 18),
+          new THREE.Vector3(86, -156, zOffset - 12),
+          new THREE.Vector3(74, -184, zOffset - 8),
+          new THREE.Vector3(34, -198, zOffset - 18),
+          new THREE.Vector3(-18, -194, zOffset - 26),
+          new THREE.Vector3(-54, -170, zOffset - 32),
+          new THREE.Vector3(-58, -134, zOffset - 34)
+        ];
+      }
+
       function buildBrainShell() {
         shellGroup.clear();
 
@@ -584,6 +622,75 @@
         groove.rotation.y = Math.PI / 2;
         groove.position.set(0, 8, -24);
         shellGroup.add(groove);
+
+        const outlineMaterial = new THREE.LineBasicMaterial({
+          color: 0xd8e6ff,
+          transparent: true,
+          opacity: 0.26
+        });
+        const warmOutlineMaterial = new THREE.LineBasicMaterial({
+          color: 0xffb17d,
+          transparent: true,
+          opacity: 0.18
+        });
+
+        const lateralOffsets = [-54, -24, 0, 24, 54];
+        lateralOffsets.forEach((offset, index) => {
+          const profile = new THREE.CatmullRomCurve3(getBrainProfilePoints(offset), true);
+          const line = new THREE.Line(
+            new THREE.BufferGeometry().setFromPoints(profile.getPoints(96)),
+            index === 2 ? warmOutlineMaterial.clone() : outlineMaterial.clone()
+          );
+          shellGroup.add(line);
+        });
+
+        [-20, 0, 20].forEach((offset) => {
+          const cerebellumProfile = new THREE.CatmullRomCurve3(getCerebellumProfilePoints(offset), true);
+          const line = new THREE.Line(
+            new THREE.BufferGeometry().setFromPoints(cerebellumProfile.getPoints(72)),
+            new THREE.LineBasicMaterial({
+              color: 0xffd166,
+              transparent: true,
+              opacity: 0.2
+            })
+          );
+          shellGroup.add(line);
+        });
+
+        const crownBands = [
+          [-182, 48, -42], [-134, 118, -34], [-48, 160, -22], [52, 152, -10], [140, 108, 8], [198, 32, 20],
+          [-166, 22, 0], [-110, 76, 8], [-24, 112, 18], [74, 106, 24], [154, 74, 30], [204, 8, 28],
+          [-146, -10, 34], [-84, 26, 42], [4, 58, 52], [96, 52, 56], [168, 20, 50], [204, -28, 40]
+        ];
+        for (let band = 0; band < 3; band += 1) {
+          const slice = crownBands.slice(band * 6, band * 6 + 6).map(([x, y, z]) => new THREE.Vector3(x, y, z));
+          const curve = new THREE.CatmullRomCurve3(slice, false);
+          const line = new THREE.Line(
+            new THREE.BufferGeometry().setFromPoints(curve.getPoints(72)),
+            new THREE.LineBasicMaterial({
+              color: 0x9edfff,
+              transparent: true,
+              opacity: 0.14
+            })
+          );
+          shellGroup.add(line);
+        }
+
+        const stemCurve = new THREE.CatmullRomCurve3([
+          new THREE.Vector3(8, -166, -62),
+          new THREE.Vector3(10, -196, -58),
+          new THREE.Vector3(6, -228, -46),
+          new THREE.Vector3(0, -258, -26)
+        ]);
+        const stem = new THREE.Line(
+          new THREE.BufferGeometry().setFromPoints(stemCurve.getPoints(48)),
+          new THREE.LineBasicMaterial({
+            color: 0xcdd8e8,
+            transparent: true,
+            opacity: 0.24
+          })
+        );
+        shellGroup.add(stem);
       }
 
       function buildNeuralField() {
@@ -621,6 +728,27 @@
           neuralFieldGroup.add(dots);
           shellDots.push(dots);
           shellConnectionPoints.push(...reduced.map((point) => ({ point, color })));
+        });
+
+        [-54, -24, 0, 24, 54].forEach((offset, index) => {
+          const profilePoints = new THREE.CatmullRomCurve3(getBrainProfilePoints(offset), true).getPoints(96);
+          profilePoints.forEach((point, pointIndex) => {
+            if (pointIndex % 2 === 0) {
+              shellConnectionPoints.push({
+                point,
+                color: index === 2 ? 0xffb17d : 0xcfe6ff
+              });
+            }
+          });
+        });
+
+        [-20, 0, 20].forEach((offset) => {
+          const cerebellumPoints = new THREE.CatmullRomCurve3(getCerebellumProfilePoints(offset), true).getPoints(64);
+          cerebellumPoints.forEach((point, pointIndex) => {
+            if (pointIndex % 2 === 0) {
+              shellConnectionPoints.push({ point, color: 0xffd166 });
+            }
+          });
         });
 
         for (let i = 0; i < shellConnectionPoints.length; i += 1) {
