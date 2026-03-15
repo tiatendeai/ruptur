@@ -347,3 +347,122 @@ CREATE TABLE IF NOT EXISTS workflow_runs (
 );
 
 CREATE INDEX IF NOT EXISTS workflow_runs_due_idx ON workflow_runs (status, next_due_at);
+
+-- CFO (MVP): base financeira para skill de abstracao do Jarvis-CFO
+CREATE TABLE IF NOT EXISTS cfo_clients (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name text NOT NULL UNIQUE,
+  segment text,
+  active boolean NOT NULL DEFAULT true,
+  notes text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS cfo_projects (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name text NOT NULL UNIQUE,
+  project_type text NOT NULL DEFAULT 'internal', -- internal|client|product
+  status text NOT NULL DEFAULT 'active', -- active|paused|closed
+  client_id uuid REFERENCES cfo_clients(id) ON DELETE SET NULL,
+  notes text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS cfo_projects_status_idx ON cfo_projects (status, updated_at DESC);
+CREATE INDEX IF NOT EXISTS cfo_projects_client_idx ON cfo_projects (client_id, updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS cfo_domains (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  hostname text NOT NULL UNIQUE,
+  registrar text,
+  annual_cost_cents int NOT NULL DEFAULT 0,
+  renews_on date,
+  status text NOT NULL DEFAULT 'active', -- active|inactive
+  project_id uuid REFERENCES cfo_projects(id) ON DELETE SET NULL,
+  notes text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS cfo_domains_renews_idx ON cfo_domains (renews_on, status);
+CREATE INDEX IF NOT EXISTS cfo_domains_project_idx ON cfo_domains (project_id, updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS cfo_payables (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  description text NOT NULL,
+  amount_cents int NOT NULL CHECK (amount_cents >= 0),
+  due_date date NOT NULL,
+  status text NOT NULL DEFAULT 'open', -- open|paid|canceled
+  category text NOT NULL DEFAULT 'operacional',
+  project_id uuid REFERENCES cfo_projects(id) ON DELETE SET NULL,
+  client_id uuid REFERENCES cfo_clients(id) ON DELETE SET NULL,
+  paid_at timestamptz,
+  notes text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS cfo_payables_due_idx ON cfo_payables (status, due_date);
+CREATE INDEX IF NOT EXISTS cfo_payables_project_idx ON cfo_payables (project_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS cfo_payables_client_idx ON cfo_payables (client_id, updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS cfo_receivables (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  description text NOT NULL,
+  amount_cents int NOT NULL CHECK (amount_cents >= 0),
+  due_date date NOT NULL,
+  status text NOT NULL DEFAULT 'open', -- open|received|lost
+  category text NOT NULL DEFAULT 'receita',
+  project_id uuid REFERENCES cfo_projects(id) ON DELETE SET NULL,
+  client_id uuid REFERENCES cfo_clients(id) ON DELETE SET NULL,
+  received_at timestamptz,
+  notes text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS cfo_receivables_due_idx ON cfo_receivables (status, due_date);
+CREATE INDEX IF NOT EXISTS cfo_receivables_project_idx ON cfo_receivables (project_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS cfo_receivables_client_idx ON cfo_receivables (client_id, updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS cfo_weekly_close_runs (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  reference_date date NOT NULL,
+  checklist jsonb NOT NULL,
+  summary jsonb,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS cfo_weekly_close_ref_idx ON cfo_weekly_close_runs (reference_date DESC, created_at DESC);
+
+-- Jarvis Ops (skill eggs): missões executivas e notícias de entrega
+CREATE TABLE IF NOT EXISTS jarvis_missions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  title text NOT NULL,
+  demand text NOT NULL,
+  status text NOT NULL DEFAULT 'planned', -- planned|in_progress|blocked|done|canceled
+  priority text NOT NULL DEFAULT 'p2', -- p0|p1|p2|p3
+  owner text,
+  team text,
+  source text NOT NULL DEFAULT 'diego',
+  acceptance_criteria text,
+  due_date date,
+  metadata jsonb,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS jarvis_missions_status_idx ON jarvis_missions (status, priority, updated_at DESC);
+CREATE INDEX IF NOT EXISTS jarvis_missions_due_idx ON jarvis_missions (due_date, status);
+
+CREATE TABLE IF NOT EXISTS jarvis_mission_updates (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  mission_id uuid NOT NULL REFERENCES jarvis_missions(id) ON DELETE CASCADE,
+  kind text NOT NULL DEFAULT 'note', -- note|delivery|risk|blocker
+  message text NOT NULL,
+  created_by text NOT NULL DEFAULT 'jarvis',
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS jarvis_mission_updates_mission_idx ON jarvis_mission_updates (mission_id, created_at DESC);

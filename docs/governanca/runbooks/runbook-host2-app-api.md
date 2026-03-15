@@ -32,12 +32,43 @@ ssh ubuntu@167.234.228.71 "curl -sS https://api.ruptur.cloud/health"
 ssh ubuntu@167.234.228.71 "curl -sS -I https://app.ruptur.cloud | head -n 5"
 ```
 
+## Verificar dependencias do backend no container
+
+```bash
+ssh ubuntu@167.234.228.71 \
+  "docker exec host2-ruptur-backend-1 python -c 'import fastapi, openai, psycopg; print(fastapi.__version__, openai.__version__, psycopg.__version__)'"
+```
+
 ## Verificar CRM operacional
 
 ```bash
 ssh ubuntu@167.234.228.71 "curl -sS https://api.ruptur.cloud/crm/labels"
 ssh ubuntu@167.234.228.71 "curl -sS 'https://api.ruptur.cloud/crm/views?scope=inbox'"
 ssh ubuntu@167.234.228.71 "curl -sS 'https://api.ruptur.cloud/crm/leads?limit=5'"
+```
+
+## Verificar Jarvis (ops e cfo)
+
+```bash
+ssh ubuntu@167.234.228.71 "curl -sS -X POST https://api.ruptur.cloud/jarvis/ask -H 'content-type: application/json' -d '{\"profile\":\"ops\",\"principal_name\":\"Diego\",\"message\":\"status rapido\"}'"
+
+ssh ubuntu@167.234.228.71 "curl -sS -X POST https://api.ruptur.cloud/jarvis/ask/cfo -H 'content-type: application/json' -d '{\"principal_name\":\"Diego\",\"focus\":\"caixa\",\"message\":\"3 acoes de hoje\"}'"
+
+ssh ubuntu@167.234.228.71 "curl -sS -X POST https://api.ruptur.cloud/jarvis/cfo/weekly-close -H 'content-type: application/json' -d '{\"principal_name\":\"Diego\",\"include_ai_summary\":true}'"
+```
+
+## Verificar CFO (dados e contexto)
+
+```bash
+ssh ubuntu@167.234.228.71 "curl -sS https://api.ruptur.cloud/cfo/overview"
+ssh ubuntu@167.234.228.71 "curl -sS https://api.ruptur.cloud/cfo/clients"
+ssh ubuntu@167.234.228.71 "curl -sS https://api.ruptur.cloud/cfo/projects"
+```
+
+Se `RUPTUR_JARVIS_ADMIN_TOKEN` estiver configurado no backend, incluir:
+
+```bash
+-H 'x-jarvis-token: SEU_TOKEN'
 ```
 
 ## Diagnóstico rápido

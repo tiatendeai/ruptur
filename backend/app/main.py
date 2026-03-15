@@ -16,6 +16,8 @@ from app.api.uazapi_instance import router as uazapi_instance_router
 from app.api.growth import router as growth_router
 from app.api.billing import router as billing_router
 from app.api.baileys_instance import router as baileys_instance_router
+from app.api.jarvis import router as jarvis_router
+from app.api.cfo import router as cfo_router
 
 
 def create_app() -> FastAPI:
@@ -52,6 +54,8 @@ def create_app() -> FastAPI:
     app.include_router(sendflow_router)
     app.include_router(growth_router)
     app.include_router(billing_router)
+    app.include_router(jarvis_router)
+    app.include_router(cfo_router)
     return app
 
 

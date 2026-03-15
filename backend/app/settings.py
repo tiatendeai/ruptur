@@ -45,5 +45,7 @@ class Settings(BaseSettings):
     asaas_base_url: str = Field(default="https://api.asaas.com", alias="RUPTUR_ASAAS_BASE_URL")
     asaas_token: str | None = Field(default=None, alias="RUPTUR_ASAAS_TOKEN")
 
+    jarvis_admin_token: str | None = Field(default=None, alias="RUPTUR_JARVIS_ADMIN_TOKEN")
+
 
 settings = Settings()

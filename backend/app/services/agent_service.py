@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+
 from openai import OpenAI
+
 from app.settings import settings
+from app.services.jarvis_profiles import JarvisProfile, build_system_prompt
 
 logger = logging.getLogger(__name__)
+
 
 class AgentService:
     def __init__(self):
@@ -16,67 +19,126 @@ class AgentService:
         else:
             logger.warning("OPENAI_API_KEY not found in settings. Agent will work in mirror mode.")
 
-    def get_response(self, lead_name: str, last_message: str, history: list[dict[str, str]] = [], persona: str = "iazinha") -> str:
-        """
-        Gera uma resposta da IA baseada na persona solicitada.
-        """
+    def _offline_response(self, *, profile: JarvisProfile, user_message: str) -> str:
+        if profile == "cfo":
+            mode = "vCFO"
+        elif profile == "vcvo":
+            mode = "vCVO"
+        elif profile == "eggs":
+            mode = "Eggs"
+        else:
+            mode = "Ops"
+        return (
+            f"*Jarvis ({mode} Offline):*\n"
+            f'Recebi sua mensagem: "{user_message}". '
+            "Configure a API Key para ativar minha inteligência plena."
+        )
+
+    @staticmethod
+    def _sanitize_history(history: list[dict[str, str]] | None) -> list[dict[str, str]]:
+        if not history:
+            return []
+        cleaned: list[dict[str, str]] = []
+        for item in history[-8:]:
+            role = item.get("role")
+            content = item.get("content")
+            if role in {"user", "assistant"} and isinstance(content, str) and content.strip():
+                cleaned.append({"role": role, "content": content.strip()})
+        return cleaned
+
+    def get_response(
+        self,
+        *,
+        profile: JarvisProfile,
+        principal_name: str | None,
+        user_message: str,
+        history: list[dict[str, str]] | None = None,
+        context_blocks: list[str] | None = None,
+    ) -> str:
         if not self.client:
-            return f"*{persona.capitalize()}:* Offline. Configure a API Key."
-
-        # Configurações de Persona
-        configs = {
-            "jarvis": {
-                "name": "JARVIS RUPTUR",
-                "tone": "Inspired by Iron Man's Jarvis—calm, intelligent, professional, and dry.",
-                "signature": "*Jarvis:*",
-                "mission": "Provide direct, concise answers to customer requests."
-            },
-            "iazinha": {
-                "name": "IAzinha Ruptur",
-                "tone": "Friendly, helpful, young, and efficient assistant. A 'daughter' or abstraction of Jarvis.",
-                "signature": "*IAzinha:*",
-                "mission": "Be the official AI assistant of the platform, with a more approachable tone than Jarvis."
-            }
-        }
-
-        conf = configs.get(persona, configs["iazinha"])
+            return self._offline_response(profile=profile, user_message=user_message)
 
         try:
-            system_prompt = (
-                f"## IDENTITY\n"
-                f"You are {conf['name']}, a highly efficient digital assistant.\n"
-                f"NEVER mention being an AI or a language model. Tone: {conf['tone']}\n\n"
-                f"## MISSION\n"
-                f"- {conf['mission']}\n"
-                f"- NO FILLERS: Do not end responses with polite questions like 'How can I help you today?' or 'Is there anything else?'.\n"
-                f"- ENDING: Stop immediately after delivering the requested information. The system will providing navigation buttons.\n\n"
-                f"## RULES\n"
-                f"- ALWAYS sign at the beginning as {conf['signature']}.\n"
-                f"- Language: natural Brazilian Portuguese (PT-BR) mobile-optimized paragraphs."
-            )
+            system_prompt = build_system_prompt(profile=profile, principal_name=principal_name)
+            blocks = [b.strip() for b in (context_blocks or []) if isinstance(b, str) and b.strip()]
+            if blocks:
+                system_prompt = f"{system_prompt}\n## EXTRA CONTEXT\n\n" + "\n\n".join(f"- {b}" for b in blocks)
 
             messages = [{"role": "system", "content": system_prompt}]
-            
-            # Adicionar histórico se houver
-            for h in history[-5:]:
+            for h in self._sanitize_history(history):
                 messages.append(h)
-
-            messages.append({"role": "user", "content": last_message})
+            messages.append({"role": "user", "content": user_message})
 
             response = self.client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=messages,
                 temperature=0.7,
-                max_tokens=600
+                max_tokens=500,
             )
-
             return response.choices[0].message.content or ""
-        except Exception as e:
-            logger.error(f"Error calling OpenAI: {e}")
-            return f"{conf['signature']} Tive um pequeno curto-circuito. Tente novamente."
+        except Exception as exc:
+            logger.error("Error calling OpenAI: %s", exc)
+            return "*Jarvis:* Tive um pequeno curto-circuito ao processar sua resposta. Tente novamente em alguns instantes."
 
-    # Mantém compatibilidade com chamadas antigas
-    def get_jarvis_response(self, lead_name: str, last_message: str, history: list[dict[str, str]] = []) -> str:
-        return self.get_response(lead_name, last_message, history, persona="jarvis")
+    def get_jarvis_response(self, lead_name: str, last_message: str, history: list[dict[str, str]] | None = None) -> str:
+        return self.get_response(
+            profile="ops",
+            principal_name=lead_name,
+            user_message=last_message,
+            history=history,
+        )
+
+    def get_jarvis_cfo_response(
+        self,
+        *,
+        principal_name: str,
+        user_message: str,
+        focus: str | None = None,
+        history: list[dict[str, str]] | None = None,
+        context_blocks: list[str] | None = None,
+    ) -> str:
+        extra = list(context_blocks or [])
+        if focus and focus.strip():
+            extra.append(f"Foco atual da analise CFO: {focus.strip()}.")
+        return self.get_response(
+            profile="cfo",
+            principal_name=principal_name,
+            user_message=user_message,
+            history=history,
+            context_blocks=extra,
+        )
+
+    def get_jarvis_eggs_response(
+        self,
+        *,
+        principal_name: str,
+        user_message: str,
+        history: list[dict[str, str]] | None = None,
+        context_blocks: list[str] | None = None,
+    ) -> str:
+        return self.get_response(
+            profile="eggs",
+            principal_name=principal_name,
+            user_message=user_message,
+            history=history,
+            context_blocks=context_blocks,
+        )
+
+    def get_jarvis_vcvo_response(
+        self,
+        *,
+        principal_name: str,
+        user_message: str,
+        history: list[dict[str, str]] | None = None,
+        context_blocks: list[str] | None = None,
+    ) -> str:
+        return self.get_response(
+            profile="vcvo",
+            principal_name=principal_name,
+            user_message=user_message,
+            history=history,
+            context_blocks=context_blocks,
+        )
+
 
 agent_service = AgentService()

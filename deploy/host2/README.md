@@ -44,6 +44,7 @@ RUPTUR_PORT=8000
 RUPTUR_DATABASE_URL=postgresql://ruptur:ruptur@ruptur-db:5432/ruptur
 RUPTUR_UAZAPI_BASE_URL=http://baileys:3000
 RUPTUR_UAZAPI_TOKEN=local-baileys
+RUPTUR_JARVIS_ADMIN_TOKEN=troque-este-token
 ```
 
 3) Rode:
@@ -78,4 +79,40 @@ curl -sS https://api.ruptur.cloud/health
 curl -sS -X POST https://baileys.ruptur.cloud/send/text \
   -H 'content-type: application/json' \
   -d '{"to":"5511999999999","text":"teste baileys"}'
+```
+
+### Validacao de dependencias do backend (na VPS)
+
+Depois do `docker compose up -d --build`, valide que o container do backend possui os pacotes criticos:
+
+```bash
+ssh ubuntu@167.234.228.71 \
+  "docker exec host2-ruptur-backend-1 python -c 'import fastapi, openai, psycopg; print(fastapi.__version__, openai.__version__, psycopg.__version__)'"
+```
+
+### Validacao de endpoints Jarvis
+
+```bash
+curl -sS -X POST https://api.ruptur.cloud/jarvis/ask \
+  -H 'x-jarvis-token: TROQUE_AQUI' \
+  -H 'content-type: application/json' \
+  -d '{"profile":"ops","principal_name":"Diego","message":"status do dia"}'
+
+curl -sS -X POST https://api.ruptur.cloud/jarvis/ask/cfo \
+  -H 'x-jarvis-token: TROQUE_AQUI' \
+  -H 'content-type: application/json' \
+  -d '{"principal_name":"Diego","focus":"caixa","message":"priorize 3 acoes para proteger caixa"}'
+
+curl -sS -X POST https://api.ruptur.cloud/jarvis/cfo/weekly-close \
+  -H 'x-jarvis-token: TROQUE_AQUI' \
+  -H 'content-type: application/json' \
+  -d '{"principal_name":"Diego","include_ai_summary":true}'
+```
+
+### Validacao de endpoints CFO (dados)
+
+```bash
+curl -sS https://api.ruptur.cloud/cfo/overview
+curl -sS https://api.ruptur.cloud/cfo/clients
+curl -sS https://api.ruptur.cloud/cfo/projects
 ```
