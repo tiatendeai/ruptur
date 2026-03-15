@@ -75,13 +75,15 @@ class BaileysClient:
             logger.error(f"Error sending voice via Baileys: {e}")
             return {"ok": False, "error": str(e)}
 
-    def send_presence(self, jid: str, presence: str) -> dict[str, Any]:
+    def send_presence(self, jid: str, presence: str, delay: int = 0) -> dict[str, Any]:
         """Envia atualização de presença (composing, recording, paused)."""
         url = f"{self.base_url}/send/presence"
         payload = {
             # O gateway Baileys usa o formato /send/presence com campo "number".
             "number": jid,
-            "presence": presence
+            "presence": presence,
+            # Evita timeout do client (default do gateway é 30s).
+            "delay": max(0, min(int(delay), 300000)),
         }
         try:
             with httpx.Client(timeout=10) as client:
