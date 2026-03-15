@@ -380,7 +380,7 @@
       const tooltip = document.getElementById("tooltip");
       const scene = new THREE.Scene();
       const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 4000);
-      camera.position.set(0, 0, 650);
+      camera.position.set(220, 18, 640);
 
       const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -392,6 +392,7 @@
       controls.dampingFactor = 0.06;
       controls.minDistance = 260;
       controls.maxDistance = 1200;
+      controls.target.set(20, -10, 10);
       controls.autoRotate = true;
       controls.autoRotateSpeed = 0.28;
 
@@ -535,7 +536,7 @@
         const hemiMaterial = new THREE.MeshPhysicalMaterial({
           color: 0x0c1a28,
           transparent: true,
-          opacity: 0.1,
+          opacity: 0.05,
           roughness: 0.34,
           metalness: 0.08,
           transmission: 0.18,
@@ -566,7 +567,7 @@
             new THREE.LineBasicMaterial({
               color: index === 2 ? 0xff7b54 : 0x79d8ff,
               transparent: true,
-              opacity: index === 2 ? 0.16 : 0.14
+              opacity: index === 2 ? 0.24 : 0.22
             })
           );
           if (index === 0) wire.position.copy(leftHemi.position);
@@ -591,6 +592,7 @@
         fieldNodes.length = 0;
 
         const shellDots = [];
+        const shellConnectionPoints = [];
         const surfaceGeometries = [
           { geometry: new THREE.SphereGeometry(188, 32, 24), position: new THREE.Vector3(-105, 16, -26), scale: new THREE.Vector3(1.05, 1.02, 0.92), color: 0x79d8ff },
           { geometry: new THREE.SphereGeometry(188, 32, 24), position: new THREE.Vector3(105, 16, -26), scale: new THREE.Vector3(1.05, 1.02, 0.92), color: 0xff7b54 },
@@ -601,20 +603,43 @@
           geometry.scale(scale.x, scale.y, scale.z);
           const points = geometry.attributes.position.array;
           const surface = [];
+          const reduced = [];
           for (let i = 0; i < points.length; i += 3) {
             surface.push(points[i] + position.x, points[i + 1] + position.y, points[i + 2] + position.z);
+            if ((i / 3) % 9 === 0) {
+              reduced.push(new THREE.Vector3(points[i] + position.x, points[i + 1] + position.y, points[i + 2] + position.z));
+            }
           }
           const dotGeometry = new THREE.BufferGeometry();
           dotGeometry.setAttribute("position", new THREE.Float32BufferAttribute(surface, 3));
           const dots = new THREE.Points(dotGeometry, new THREE.PointsMaterial({
             color,
-            size: 1.8,
+            size: 2.4,
             transparent: true,
-            opacity: 0.18
+            opacity: 0.28
           }));
           neuralFieldGroup.add(dots);
           shellDots.push(dots);
+          shellConnectionPoints.push(...reduced.map((point) => ({ point, color })));
         });
+
+        for (let i = 0; i < shellConnectionPoints.length; i += 1) {
+          for (let j = i + 1; j < Math.min(shellConnectionPoints.length, i + 18); j += 1) {
+            const a = shellConnectionPoints[i];
+            const b = shellConnectionPoints[j];
+            const distance = a.point.distanceTo(b.point);
+            if (distance > 40) continue;
+            const geometry = new THREE.BufferGeometry().setFromPoints([a.point, b.point]);
+            const material = new THREE.LineBasicMaterial({
+              color: a.color,
+              transparent: true,
+              opacity: THREE.MathUtils.mapLinear(distance, 0, 40, 0.16, 0.05)
+            });
+            const line = new THREE.Line(geometry, material);
+            neuralFieldGroup.add(line);
+            fieldLines.push(line);
+          }
+        }
 
         const anchors = [
           { color: 0x79d8ff, center: new THREE.Vector3(-90, 92, -60), spread: 58, count: 54 },
@@ -654,10 +679,10 @@
           return [c.r, c.g, c.b];
         }), 3));
         const microPoints = new THREE.Points(microGeometry, new THREE.PointsMaterial({
-          size: 2.4,
+          size: 1.45,
           vertexColors: true,
           transparent: true,
-          opacity: 0.72
+          opacity: 0.16
         }));
         neuralFieldGroup.add(microPoints);
         fieldNodes.push({ points: microPoints, data: microNodes });
@@ -672,7 +697,7 @@
             const material = new THREE.LineBasicMaterial({
               color: a.color,
               transparent: true,
-              opacity: THREE.MathUtils.mapLinear(distance, 0, 44, 0.18, 0.03)
+              opacity: THREE.MathUtils.mapLinear(distance, 0, 44, 0.08, 0.015)
             });
             const line = new THREE.Line(geometry, material);
             neuralFieldGroup.add(line);
@@ -696,7 +721,7 @@
             const material = new THREE.LineBasicMaterial({
               color,
               transparent: true,
-              opacity: node.mass > 1.6 ? 0.24 : 0.12
+              opacity: node.mass > 1.6 ? 0.14 : 0.08
             });
             const line = new THREE.Line(geometry, material);
             neuralFieldGroup.add(line);
@@ -995,8 +1020,8 @@
       });
 
       document.getElementById("reset-camera").addEventListener("click", () => {
-        camera.position.set(0, 0, 650);
-        controls.target.set(0, 0, 0);
+        camera.position.set(220, 18, 640);
+        controls.target.set(20, -10, 10);
         controls.update();
       });
 
