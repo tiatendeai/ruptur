@@ -57,6 +57,10 @@ ssh ubuntu@167.234.228.71 "curl -sS -X POST https://api.ruptur.cloud/jarvis/ask/
 ssh ubuntu@167.234.228.71 "curl -sS -X POST https://api.ruptur.cloud/jarvis/cfo/weekly-close -H 'content-type: application/json' -d '{\"principal_name\":\"Diego\",\"include_ai_summary\":true}'"
 ```
 
+Para matriz completa de endpoints vCFO/vCVO/Eggs e guardas operacionais:
+
+- [runbook-jarvis-vc-level.md](/Users/diego/Downloads/ruptur/docs/governanca/runbooks/runbook-jarvis-vc-level.md)
+
 ## Verificar CFO (dados e contexto)
 
 ```bash

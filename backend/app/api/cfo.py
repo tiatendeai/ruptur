@@ -15,6 +15,7 @@ from app.services.jarvis_skill_runtime import get_skill
 from app.services import jarvis_cfo_skill as _jarvis_cfo_skill  # noqa: F401
 
 
+# Protected by the same optional token used by Jarvis routes.
 router = APIRouter(prefix="/cfo", tags=["cfo"], dependencies=[Depends(require_jarvis_token)])
 
 

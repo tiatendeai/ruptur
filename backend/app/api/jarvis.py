@@ -17,6 +17,8 @@ from app.services import jarvis_cfo_skill as _jarvis_cfo_skill  # noqa: F401
 from app.services import jarvis_eggs_skill as _jarvis_eggs_skill  # noqa: F401
 
 
+# Single control plane for Diego. Token guard is optional via env and can be
+# enabled in production without changing client contracts.
 router = APIRouter(prefix="/jarvis", tags=["jarvis"], dependencies=[Depends(require_jarvis_token)])
 
 
@@ -85,6 +87,7 @@ def _load_eggs_context() -> SkillContext:
 
 
 def _load_vcvo_context() -> SkillContext:
+    # vCVO decisions depend on both financial and execution context.
     cfo_ctx = _load_cfo_context()
     eggs_ctx = _load_eggs_context()
     blocks = [*cfo_ctx.context_blocks, *eggs_ctx.context_blocks]
