@@ -86,7 +86,8 @@ class BaileysClient:
             "delay": max(0, min(int(delay), 300000)),
         }
         try:
-            with httpx.Client(timeout=10) as client:
+            # Presenca pode levar ~10s no gateway mesmo com delay=0.
+            with httpx.Client(timeout=25) as client:
                 resp = client.post(url, json=payload, headers=self._headers())
                 resp.raise_for_status()
                 return resp.json()
