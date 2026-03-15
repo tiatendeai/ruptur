@@ -177,6 +177,84 @@ function pickPreferredBaileysInstance(items: RupturBaileysInstance[]) {
   );
 }
 
+type UnifiedConnectionStatus = "connected" | "connecting" | "disconnected" | "unknown";
+
+type UnifiedInstance = {
+  id: string;
+  hasUazapi: boolean;
+  hasBaileys: boolean;
+  number?: string;
+  profileName?: string;
+  systemName?: string;
+  adminField01?: string;
+  adminField02?: string;
+  uazapiStatus?: string;
+  baileysStatus?: string;
+  hasQr?: boolean;
+  connectedSince?: string;
+  lastUpdatedAt?: string;
+  overallStatus: UnifiedConnectionStatus;
+  tooltip: string;
+};
+
+function isBaileysConnected(status?: string) {
+  return ["open", "connected", "online", "ready"].includes((status || "").toLowerCase().trim());
+}
+
+function normalizeConnectionStatus(status?: string, hasQr = false): UnifiedConnectionStatus {
+  const normalized = (status || "").toLowerCase().trim();
+  if (isUazapiConnected(status) || isBaileysConnected(status)) return "connected";
+  if (hasQr || normalized.includes("connecting") || normalized.includes("pair")) return "connecting";
+  if (
+    ["disconnected", "close", "closed", "offline", "loggedout", "not_connected", "not ready", "not_ready"].some((token) =>
+      normalized.includes(token),
+    )
+  ) {
+    return "disconnected";
+  }
+  return "unknown";
+}
+
+function statusLabel(status: UnifiedConnectionStatus) {
+  if (status === "connected") return "conectado";
+  if (status === "connecting") return "conectando";
+  if (status === "disconnected") return "desconectado";
+  return "desconhecido";
+}
+
+function pickKnownDate(raw?: Record<string, unknown>) {
+  if (!raw) return undefined;
+  const keys = [
+    "connectedAt",
+    "connected_at",
+    "connectedSince",
+    "connected_since",
+    "connectionAt",
+    "connection_at",
+    "lastConnectionAt",
+    "last_connection_at",
+    "lastSeenAt",
+    "last_seen_at",
+    "updatedAt",
+    "updated_at",
+  ];
+  for (const key of keys) {
+    const value = raw[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return undefined;
+}
+
+function formatDateTime(value?: string) {
+  if (!value) return "desconhecido";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(date);
+}
+
 type ProviderTab = "visualizacao" | "criacao" | "edicao" | "propriedades" | "configuracao";
 
 export default function ConnectionsClient() {
@@ -216,8 +294,11 @@ export default function ConnectionsClient() {
   const [proxyEnabled, setProxyEnabled] = useState(false);
   const [proxyUrl, setProxyUrl] = useState("");
   const [propertiesJson, setPropertiesJson] = useState("{}");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [providerFilter, setProviderFilter] = useState<"all" | "uazapi" | "baileys" | "both">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | UnifiedConnectionStatus>("all");
 
-  const loadConnectionsData = useCallback(async (activeProvider: "uazapi" | "baileys") => {
+  const loadConnectionsData = useCallback(async () => {
     const [instanceResponse, healthResponse, baileysResponse] = await Promise.allSettled([
       listUazapiInstances(),
       listChannelHealth(),
@@ -225,8 +306,8 @@ export default function ConnectionsClient() {
     ]);
 
     const errors: string[] = [];
-    let nextUazapiItems = instances;
-    let nextBaileysItems = baileysInstances;
+    let nextUazapiItems: UazapiInstance[] = [];
+    let nextBaileysItems: RupturBaileysInstance[] = [];
 
     if (instanceResponse.status === "fulfilled") {
       nextUazapiItems = extractUazapiInstances(instanceResponse.value);
@@ -249,26 +330,30 @@ export default function ConnectionsClient() {
     }
 
     setError(errors.length ? errors.join(" | ") : null);
+    // Preserve user context after refresh: keep current selection if it still exists in any provider.
     setSelectedInstanceId((current) => {
-      if (activeProvider === "uazapi") {
-        const currentStillExists = nextUazapiItems.some((item) => item.name === current);
-        return currentStillExists ? current : pickPreferredUazapiInstance(nextUazapiItems)?.name || null;
+      const ids = new Set<string>();
+      for (const item of nextUazapiItems) {
+        if (item.name) ids.add(item.name);
       }
-      const currentStillExists = nextBaileysItems.some((item) => item.instance === current);
-      return currentStillExists ? current : pickPreferredBaileysInstance(nextBaileysItems)?.instance || null;
+      for (const item of nextBaileysItems) {
+        if (item.instance) ids.add(item.instance);
+      }
+      if (current && ids.has(current)) return current;
+      return pickPreferredUazapiInstance(nextUazapiItems)?.name || pickPreferredBaileysInstance(nextBaileysItems)?.instance || null;
     });
-  }, [baileysInstances, instances]);
+  }, []);
 
   async function refresh() {
     setFailedQrUrl(null);
-    await loadConnectionsData(provider);
+    await loadConnectionsData();
   }
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       if (cancelled) return;
-      await loadConnectionsData(provider);
+      await loadConnectionsData();
     })().catch((e) => {
       if (cancelled) return;
       setError(e instanceof Error ? e.message : String(e));
@@ -276,7 +361,7 @@ export default function ConnectionsClient() {
     return () => {
       cancelled = true;
     };
-  }, [loadConnectionsData, provider]);
+  }, [loadConnectionsData]);
 
   useEffect(() => {
     if (provider !== "baileys" || !selectedInstanceId) return;
@@ -308,24 +393,154 @@ export default function ConnectionsClient() {
     setFailedQrUrl(null);
     setOpMessage(null);
     setActiveTab("visualizacao");
-    setSelectedInstanceId(
-      next === "uazapi"
+    setSelectedInstanceId((current) => {
+      if (current) {
+        const availableOnTarget =
+          next === "uazapi"
+            ? instances.some((item) => item.name === current)
+            : baileysInstances.some((item) => item.instance === current);
+        if (availableOnTarget) return current;
+      }
+      return next === "uazapi"
         ? pickPreferredUazapiInstance(instances)?.name || null
-        : pickPreferredBaileysInstance(baileysInstances)?.instance || null,
-    );
+        : pickPreferredBaileysInstance(baileysInstances)?.instance || null;
+    });
     if (next !== "baileys") setBaileysStatus(null);
     if (next !== "uazapi") setUazapiStatus(null);
   }
 
-  const summary = useMemo(() => {
-    const connected = instances.filter((item) => isUazapiConnected(item.status)).length;
-    const baileysConnected = baileysInstances.filter((item) => ["open", "connected", "online"].includes((item.connection || "").toLowerCase())).length;
-    return {
-      total: provider === "uazapi" ? instances.length : baileysInstances.length,
-      connected: provider === "uazapi" ? connected : baileysConnected,
-      monitored: health.length,
+  const unifiedInstances = useMemo(() => {
+    // Canonical list for UI: merge UAZAPI + Baileys (+ health-only rows) by instance id.
+    type WorkingInstance = Omit<UnifiedInstance, "overallStatus" | "tooltip">;
+    const map = new Map<string, WorkingInstance>();
+    const ensure = (id: string) => {
+      const key = id.trim();
+      const existing = map.get(key);
+      if (existing) return existing;
+      const created: WorkingInstance = {
+        id: key,
+        hasUazapi: false,
+        hasBaileys: false,
+      };
+      map.set(key, created);
+      return created;
     };
-  }, [instances, health, provider, baileysInstances]);
+    const applyLastUpdated = (item: WorkingInstance, value?: string) => {
+      if (!value || !value.trim()) return;
+      if (!item.lastUpdatedAt) {
+        item.lastUpdatedAt = value;
+        return;
+      }
+      const prev = new Date(item.lastUpdatedAt).getTime();
+      const next = new Date(value).getTime();
+      if (!Number.isNaN(next) && (Number.isNaN(prev) || next >= prev)) item.lastUpdatedAt = value;
+    };
+
+    for (const instance of instances) {
+      const id = (instance.name || instance.id || "").trim();
+      if (!id) continue;
+      const item = ensure(id);
+      item.hasUazapi = true;
+      item.uazapiStatus = instance.status || item.uazapiStatus;
+      item.number = instance.number || item.number;
+      item.profileName = instance.profileName || item.profileName;
+      item.systemName = instance.systemName || item.systemName;
+      item.adminField01 = instance.adminField01 || item.adminField01;
+      item.adminField02 = instance.adminField02 || item.adminField02;
+      item.hasQr = item.hasQr || Boolean(instance.qrcode || instance.paircode);
+      item.connectedSince = item.connectedSince || pickKnownDate(instance.raw);
+      applyLastUpdated(item, pickKnownDate(instance.raw));
+    }
+
+    for (const instance of baileysInstances) {
+      const id = (instance.instance || "").trim();
+      if (!id) continue;
+      const item = ensure(id);
+      item.hasBaileys = true;
+      item.baileysStatus = instance.connection || item.baileysStatus;
+      item.hasQr = item.hasQr || Boolean(instance.hasQr);
+    }
+
+    for (const item of health) {
+      const id = (item.instance_id || "").trim();
+      if (!id) continue;
+      const row = ensure(id);
+      const providerKey = (item.provider || "").toLowerCase();
+      if (providerKey === "uazapi") {
+        row.hasUazapi = true;
+        row.uazapiStatus = row.uazapiStatus || item.status;
+      }
+      if (providerKey === "baileys") {
+        row.hasBaileys = true;
+        row.baileysStatus = row.baileysStatus || item.status;
+      }
+      if (!row.connectedSince && normalizeConnectionStatus(item.status) === "connected") {
+        row.connectedSince = item.updated_at;
+      }
+      applyLastUpdated(row, item.updated_at);
+    }
+
+    const output: UnifiedInstance[] = [];
+    for (const item of map.values()) {
+      // Consolidate provider statuses into one normalized status to simplify filtering/sorting.
+      const uazapiNormalized = normalizeConnectionStatus(item.uazapiStatus, item.hasQr);
+      const baileysNormalized = normalizeConnectionStatus(item.baileysStatus, item.hasQr);
+      const overallStatus: UnifiedConnectionStatus =
+        uazapiNormalized === "connected" || baileysNormalized === "connected"
+          ? "connected"
+          : uazapiNormalized === "connecting" || baileysNormalized === "connecting"
+            ? "connecting"
+            : uazapiNormalized === "disconnected" || baileysNormalized === "disconnected"
+              ? "disconnected"
+              : "unknown";
+      const tooltip = [
+        `Instancia: ${item.id}`,
+        `Provedores: ${item.hasUazapi ? "UAZAPI" : ""}${item.hasUazapi && item.hasBaileys ? " + " : ""}${item.hasBaileys ? "Baileys" : ""}`,
+        `Status geral: ${statusLabel(overallStatus)}`,
+        `Status UAZAPI: ${item.uazapiStatus || "sem_dados"}`,
+        `Status Baileys: ${item.baileysStatus || "sem_dados"}`,
+        `Numero: ${item.number || "sem_numero"}`,
+        `Conectado desde: ${formatDateTime(item.connectedSince)}`,
+        `Ultima atualizacao: ${formatDateTime(item.lastUpdatedAt)}`,
+      ].join("\n");
+      output.push({ ...item, overallStatus, tooltip });
+    }
+
+    return output.sort((a, b) => {
+      const statusRank: Record<UnifiedConnectionStatus, number> = {
+        connected: 0,
+        connecting: 1,
+        disconnected: 2,
+        unknown: 3,
+      };
+      const byStatus = statusRank[a.overallStatus] - statusRank[b.overallStatus];
+      if (byStatus !== 0) return byStatus;
+      return a.id.localeCompare(b.id);
+    });
+  }, [instances, baileysInstances, health]);
+
+  const filteredInstances = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return unifiedInstances.filter((item) => {
+      if (providerFilter === "uazapi" && !item.hasUazapi) return false;
+      if (providerFilter === "baileys" && !item.hasBaileys) return false;
+      if (providerFilter === "both" && !(item.hasUazapi && item.hasBaileys)) return false;
+      if (statusFilter !== "all" && item.overallStatus !== statusFilter) return false;
+      if (!query) return true;
+      return [item.id, item.number, item.profileName, item.systemName, item.adminField01, item.adminField02]
+        .filter((value): value is string => Boolean(value))
+        .some((value) => value.toLowerCase().includes(query));
+    });
+  }, [providerFilter, searchQuery, statusFilter, unifiedInstances]);
+
+  const summary = useMemo(() => {
+    const connected = unifiedInstances.filter((item) => item.overallStatus === "connected").length;
+    return {
+      total: unifiedInstances.length,
+      connected,
+      monitored: new Set(health.map((item) => `${item.provider}:${item.instance_id}`)).size,
+    };
+  }, [health, unifiedInstances]);
 
   const selectedUazapiInstance = useMemo(
     () => instances.find((instance) => (instance.name || null) === selectedInstanceId) || null,
@@ -335,7 +550,23 @@ export default function ConnectionsClient() {
     () => baileysInstances.find((instance) => (instance.instance || null) === selectedInstanceId) || null,
     [baileysInstances, selectedInstanceId],
   );
+  const selectedUnifiedInstance = useMemo(
+    () => unifiedInstances.find((instance) => instance.id === selectedInstanceId) || null,
+    [selectedInstanceId, unifiedInstances],
+  );
   const selectedUazapiDetails = uazapiStatus || selectedUazapiInstance;
+
+  useEffect(() => {
+    // Keep operational tabs usable by forcing the active provider to one that exists for the selected instance.
+    if (!selectedUnifiedInstance) return;
+    if (provider === "uazapi" && !selectedUnifiedInstance.hasUazapi && selectedUnifiedInstance.hasBaileys) {
+      setProvider("baileys");
+      return;
+    }
+    if (provider === "baileys" && !selectedUnifiedInstance.hasBaileys && selectedUnifiedInstance.hasUazapi) {
+      setProvider("uazapi");
+    }
+  }, [provider, selectedUnifiedInstance]);
 
   useEffect(() => {
     if (provider !== "uazapi") return;
@@ -681,36 +912,46 @@ export default function ConnectionsClient() {
 
       <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
         <div className="rounded-[28px] border border-white/10 bg-white/5 p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="space-y-3">
             <div>
               <h2 className="text-lg font-semibold">Instancias</h2>
-              <p className="text-sm text-zinc-400">Troque entre UAZAPI e Baileys e inspecione o estado real das conexoes.</p>
+              <p className="text-sm text-zinc-400">Lista unificada com pesquisa, filtros, status e dados conhecidos de UAZAPI/Baileys.</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => switchProvider("uazapi")}
-                className={[
-                  "rounded-full border px-4 py-2 text-sm transition",
-                  provider === "uazapi" ? "border-sky-300/30 bg-sky-500/10 text-sky-100" : "border-white/10 text-zinc-300 hover:bg-white/5",
-                ].join(" ")}
+              <input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Pesquisar instancia, numero ou perfil"
+                className="min-w-[16rem] flex-1 rounded-full border border-white/10 bg-black/20 px-4 py-2 text-sm text-zinc-200 outline-none"
+              />
+              <select
+                value={providerFilter}
+                onChange={(e) => setProviderFilter(e.target.value as "all" | "uazapi" | "baileys" | "both")}
+                className="rounded-full border border-white/10 bg-black/20 px-4 py-2 text-sm text-zinc-200 outline-none"
+                title="Filtrar por provedor"
               >
-                UAZAPI
-              </button>
-              <button
-                type="button"
-                onClick={() => switchProvider("baileys")}
-                className={[
-                  "rounded-full border px-4 py-2 text-sm transition",
-                  provider === "baileys" ? "border-amber-300/30 bg-amber-500/10 text-amber-100" : "border-white/10 text-zinc-300 hover:bg-white/5",
-                ].join(" ")}
+                <option value="all">todos</option>
+                <option value="uazapi">uazapi</option>
+                <option value="baileys">baileys</option>
+                <option value="both">nas duas</option>
+              </select>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as "all" | UnifiedConnectionStatus)}
+                className="rounded-full border border-white/10 bg-black/20 px-4 py-2 text-sm text-zinc-200 outline-none"
+                title="Filtrar por status"
               >
-                Baileys
-              </button>
+                <option value="all">todos status</option>
+                <option value="connected">conectado</option>
+                <option value="connecting">conectando</option>
+                <option value="disconnected">desconectado</option>
+                <option value="unknown">desconhecido</option>
+              </select>
               <button
                 type="button"
                 onClick={refresh}
                 className="rounded-full border border-white/10 px-4 py-2 text-sm text-zinc-200 hover:bg-white/5"
+                title="Atualizar lista e status das instancias"
               >
                 Atualizar
               </button>
@@ -718,64 +959,81 @@ export default function ConnectionsClient() {
           </div>
 
           <div className="mt-5 grid gap-3">
-            {(provider === "uazapi" ? instances.length : baileysInstances.length) ? (
-              provider === "uazapi"
-                ? instances.map((instance, index) => (
+            {filteredInstances.length ? (
+              filteredInstances.map((instance) => (
                 <article
-                  key={`${instance.name || "inst"}-${index}`}
+                  key={instance.id}
                   className={[
                     "rounded-[24px] border bg-black/20 p-4 transition",
-                    selectedInstanceId === (instance.name || null) ? "border-sky-300/30" : "border-white/10",
+                    selectedInstanceId === instance.id
+                      ? "border-sky-300/30"
+                      : instance.overallStatus === "connected"
+                        ? "border-emerald-300/20"
+                        : instance.overallStatus === "connecting"
+                          ? "border-amber-300/20"
+                          : instance.overallStatus === "disconnected"
+                            ? "border-red-300/20"
+                            : "border-white/10",
                   ].join(" ")}
                 >
                   <button
                     type="button"
                     onClick={() => {
                       setFailedQrUrl(null);
-                      setSelectedInstanceId(instance.name || null);
+                      setOpMessage(null);
+                      setActiveTab("visualizacao");
+                      setSelectedInstanceId(instance.id);
+                      if (provider === "uazapi" && !instance.hasUazapi && instance.hasBaileys) setProvider("baileys");
+                      if (provider === "baileys" && !instance.hasBaileys && instance.hasUazapi) setProvider("uazapi");
                     }}
                     className="w-full text-left"
-                  >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="text-lg font-medium">{instance.name || `Instancia ${index + 1}`}</div>
-                      <div className="mt-1 text-xs uppercase tracking-[0.25em] text-zinc-500">
-                        {instance.status || "status_indefinido"}
-                      </div>
-                      {instance.profileName ? <div className="mt-2 text-sm text-zinc-400">{instance.profileName}</div> : null}
-                    </div>
-                    <div className="rounded-full border border-white/10 px-3 py-1 text-xs text-zinc-300">
-                      {instance.number || "sem_numero"}
-                    </div>
-                  </div>
-                  </button>
-                </article>
-              ))
-                : baileysInstances.map((instance, index) => (
-                <article
-                  key={`${instance.instance || "baileys"}-${index}`}
-                  className={[
-                    "rounded-[24px] border bg-black/20 p-4 transition",
-                    selectedInstanceId === (instance.instance || null) ? "border-amber-300/30" : "border-white/10",
-                  ].join(" ")}
-                >
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFailedQrUrl(null);
-                      setSelectedInstanceId(instance.instance || null);
-                    }}
-                    className="w-full text-left"
+                    title={instance.tooltip}
                   >
                     <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="text-lg font-medium">{instance.instance || `Instancia ${index + 1}`}</div>
-                        <div className="mt-1 text-xs uppercase tracking-[0.25em] text-zinc-500">
-                          {instance.connection || "status_indefinido"}
+                      <div className="space-y-2">
+                        <div className="text-lg font-medium">{instance.id}</div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {instance.hasUazapi ? (
+                            <span className="rounded-full border border-sky-300/30 bg-sky-500/10 px-2.5 py-1 text-[10px] uppercase tracking-[0.2em] text-sky-100" title="Instancia existente na UAZAPI">
+                              UAZAPI
+                            </span>
+                          ) : null}
+                          {instance.hasBaileys ? (
+                            <span className="rounded-full border border-amber-300/30 bg-amber-500/10 px-2.5 py-1 text-[10px] uppercase tracking-[0.2em] text-amber-100" title="Instancia existente no Baileys">
+                              BAILEYS
+                            </span>
+                          ) : null}
+                          <span
+                            className={[
+                              "rounded-full border px-2.5 py-1 text-[10px] uppercase tracking-[0.2em]",
+                              instance.overallStatus === "connected"
+                                ? "border-emerald-300/30 bg-emerald-500/10 text-emerald-100"
+                                : instance.overallStatus === "connecting"
+                                  ? "border-amber-300/30 bg-amber-500/10 text-amber-100"
+                                  : instance.overallStatus === "disconnected"
+                                    ? "border-red-300/30 bg-red-500/10 text-red-100"
+                                    : "border-white/20 bg-white/5 text-zinc-300",
+                            ].join(" ")}
+                          >
+                            {statusLabel(instance.overallStatus)}
+                          </span>
                         </div>
+                        <div className="text-xs text-zinc-400">
+                          UAZAPI: {instance.uazapiStatus || "sem_dados"} | Baileys: {instance.baileysStatus || "sem_dados"}
+                        </div>
+                        <div className="text-xs text-zinc-500">
+                          Conectado desde: {formatDateTime(instance.connectedSince)} | Ultima atualizacao: {formatDateTime(instance.lastUpdatedAt)}
+                        </div>
+                        {instance.profileName || instance.systemName ? (
+                          <div className="text-xs text-zinc-400">
+                            {instance.profileName ? `Perfil: ${instance.profileName}` : ""}
+                            {instance.profileName && instance.systemName ? " | " : ""}
+                            {instance.systemName ? `Sistema: ${instance.systemName}` : ""}
+                          </div>
+                        ) : null}
                       </div>
                       <div className="rounded-full border border-white/10 px-3 py-1 text-xs text-zinc-300">
-                        {instance.hasQr ? "tem_qr" : "sem_qr"}
+                        {instance.number || "sem_numero"}
                       </div>
                     </div>
                   </button>
@@ -783,7 +1041,7 @@ export default function ConnectionsClient() {
               ))
             ) : (
               <div className="rounded-2xl border border-dashed border-white/15 bg-black/20 p-6 text-sm text-zinc-400">
-                Nenhuma instancia visivel agora. Isso pode indicar token ausente, integracao sem retorno ou nenhuma conta conectada.
+                Nenhuma instancia encontrada para os filtros atuais.
               </div>
             )}
           </div>
@@ -794,9 +1052,41 @@ export default function ConnectionsClient() {
           <p className="mt-1 text-sm text-zinc-400">Gestao completa das contas por API, em abas.</p>
           <div className="mt-5 rounded-[22px] border border-white/10 bg-black/20 p-4">
             <div className="text-xs uppercase tracking-[0.25em] text-zinc-500">provider ativo</div>
-            <div className="mt-2 text-lg font-medium">{provider === "uazapi" ? "UAZAPI" : "Baileys"}</div>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => switchProvider("uazapi")}
+                disabled={Boolean(selectedInstanceId && !selectedUnifiedInstance?.hasUazapi)}
+                className={[
+                  "rounded-full border px-3 py-1.5 text-xs uppercase tracking-[0.2em] transition disabled:cursor-not-allowed disabled:opacity-40",
+                  provider === "uazapi" ? "border-sky-300/40 bg-sky-500/10 text-sky-100" : "border-white/10 text-zinc-300 hover:bg-white/5",
+                ].join(" ")}
+                title="Usar operacoes da UAZAPI para esta instancia"
+              >
+                UAZAPI
+              </button>
+              <button
+                type="button"
+                onClick={() => switchProvider("baileys")}
+                disabled={Boolean(selectedInstanceId && !selectedUnifiedInstance?.hasBaileys)}
+                className={[
+                  "rounded-full border px-3 py-1.5 text-xs uppercase tracking-[0.2em] transition disabled:cursor-not-allowed disabled:opacity-40",
+                  provider === "baileys" ? "border-amber-300/40 bg-amber-500/10 text-amber-100" : "border-white/10 text-zinc-300 hover:bg-white/5",
+                ].join(" ")}
+                title="Usar operacoes do Baileys para esta instancia"
+              >
+                BAILEYS
+              </button>
+            </div>
             <div className="mt-4 text-xs uppercase tracking-[0.25em] text-zinc-500">instancia selecionada</div>
             <div className="mt-2 text-sm text-zinc-200">{selectedInstanceId || "nenhuma"}</div>
+            {selectedUnifiedInstance ? (
+              <div className="mt-2 space-y-1 text-xs text-zinc-400">
+                <div>Numero: {selectedUnifiedInstance.number || "sem_numero"}</div>
+                <div>Status geral: {statusLabel(selectedUnifiedInstance.overallStatus)}</div>
+                <div>Conectado desde: {formatDateTime(selectedUnifiedInstance.connectedSince)}</div>
+              </div>
+            ) : null}
             <div className="mt-4 flex flex-wrap gap-2">
               {(["visualizacao", "criacao", "edicao", "propriedades", "configuracao"] as ProviderTab[]).map((tab) => (
                 <button
