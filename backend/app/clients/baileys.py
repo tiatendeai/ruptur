@@ -74,3 +74,38 @@ class BaileysClient:
         except Exception as e:
             logger.error(f"Error sending voice via Baileys: {e}")
             return {"ok": False, "error": str(e)}
+
+    def send_presence(self, jid: str, presence: str) -> dict[str, Any]:
+        """Envia atualização de presença (composing, recording, paused)."""
+        url = f"{self.base_url}/presence"
+        payload = {
+            "jid": jid,
+            "presence": presence
+        }
+        try:
+            with httpx.Client(timeout=10) as client:
+                resp = client.post(url, json=payload, headers=self._headers())
+                resp.raise_for_status()
+                return resp.json()
+        except Exception as e:
+            logger.error(f"Error updating presence via Baileys: {e}")
+            return {"ok": False, "error": str(e)}
+
+    def send_menu(self, jid: str, text: str, choices: list[str], footer: str = "") -> dict[str, Any]:
+        """Envia botões interativos (Interactive Message)."""
+        url = f"{self.base_url}/send/menu"
+        payload = {
+            "number": jid,
+            "text": text,
+            "type": "button",
+            "choices": choices,
+            "footerText": footer
+        }
+        try:
+            with httpx.Client(timeout=30) as client:
+                resp = client.post(url, json=payload, headers=self._headers())
+                resp.raise_for_status()
+                return resp.json()
+        except Exception as e:
+            logger.error(f"Error sending menu via Baileys: {e}")
+            return {"ok": False, "error": str(e)}

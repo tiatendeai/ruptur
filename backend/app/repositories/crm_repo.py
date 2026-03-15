@@ -440,6 +440,18 @@ def store_out_message(conn: Connection, *, conversation_id: str, text: str, raw:
     return external_id
 
 
+def get_conversation_metadata(conn: Connection, *, conversation_id: str) -> dict[str, Any]:
+    row = conn.execute("SELECT metadata FROM conversations WHERE id = %s", (conversation_id,)).fetchone()
+    return row[0] if row and row[0] else {}
+
+
+def update_conversation_metadata(conn: Connection, *, conversation_id: str, metadata: dict[str, Any]) -> None:
+    conn.execute(
+        "UPDATE conversations SET metadata = %s, updated_at = now() WHERE id = %s",
+        (Jsonb(metadata), conversation_id),
+    )
+
+
 def upsert_pipeline_stages(conn: Connection, items: Iterable[StageRow]) -> None:
     for s in items:
         conn.execute(

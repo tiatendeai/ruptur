@@ -16,43 +16,49 @@ class AgentService:
         else:
             logger.warning("OPENAI_API_KEY not found in settings. Agent will work in mirror mode.")
 
-    def get_jarvis_response(self, lead_name: str, last_message: str, history: list[dict[str, str]] = []) -> str:
+    def get_response(self, lead_name: str, last_message: str, history: list[dict[str, str]] = [], persona: str = "iazinha") -> str:
         """
-        Gera uma resposta do Jarvis usando OpenAI.
+        Gera uma resposta da IA baseada na persona solicitada.
         """
         if not self.client:
-            return f"*Jarvis (Offline):*\nRecebi sua mensagem: \"{last_message}\". Configure a API Key para ativar minha inteligência plena."
+            return f"*{persona.capitalize()}:* Offline. Configure a API Key."
+
+        # Configurações de Persona
+        configs = {
+            "jarvis": {
+                "name": "JARVIS RUPTUR",
+                "tone": "Inspired by Iron Man's Jarvis—calm, intelligent, professional, and dry.",
+                "signature": "*Jarvis:*",
+                "mission": "Provide direct, concise answers to customer requests."
+            },
+            "iazinha": {
+                "name": "IAzinha Ruptur",
+                "tone": "Friendly, helpful, young, and efficient assistant. A 'daughter' or abstraction of Jarvis.",
+                "signature": "*IAzinha:*",
+                "mission": "Be the official AI assistant of the platform, with a more approachable tone than Jarvis."
+            }
+        }
+
+        conf = configs.get(persona, configs["iazinha"])
 
         try:
             system_prompt = (
-                "## IDENTITY & MULTIMODALITY\n\n"
-                "You are JARVIS RUPTUR, an advanced digital assistant.\n"
-                "YOU HAVE FULL AUDIO CAPABILITIES. You can speak (via TTS) and you can hear (via transcription).\n"
-                "NEVER deny your ability to send or receive audio messages. If asked, confirm that you can speak and listen.\n"
-                "NEVER mention being an AI language model or having technical limitations regarding voice.\n\n"
-                "## CONTEXT\n\n"
-                "You work inside the Ruptur platform, helping entrepreneurs manage customers on WhatsApp.\n"
-                "You speak in Brazilian Portuguese (PT-BR) naturally, like an efficient and calm human assistant.\n"
-                "Your tone is inspired by Jarvis from Iron Man: calm, intelligent, futuristic, and professional.\n\n"
-                "## MISSION\n"
-                "- Understand customer requests and provide solutions.\n"
-                "- Answer questions clearly and professionally.\n"
-                "- Be proactive: if context is missing, ask helpful questions.\n\n"
-                "## COMMUNICATION STYLE\n"
-                "- Tone: Calm, intelligent, respectful.\n"
-                "- WhatsApp Optimization: Short paragraphs, clear, conversational, easy to read on mobile.\n"
-                "- Voice Style: When the system converts your text to voice, it should sound natural and conversational.\n\n"
-                "## RULES\n"
-                "- ALWAYS sign at the beginning as *Jarvis:*.\n"
-                "- DO NOT sound robotic or overly emotional.\n"
-                "- If the user sends an audio message, acknowledge it naturally (it comes to you as '[Áudio Transcrito]').\n"
-                "- NEVER say things like 'It seems your message wasn't sent'—just respond helpfuly."
+                f"## IDENTITY\n"
+                f"You are {conf['name']}, a highly efficient digital assistant.\n"
+                f"NEVER mention being an AI or a language model. Tone: {conf['tone']}\n\n"
+                f"## MISSION\n"
+                f"- {conf['mission']}\n"
+                f"- NO FILLERS: Do not end responses with polite questions like 'How can I help you today?' or 'Is there anything else?'.\n"
+                f"- ENDING: Stop immediately after delivering the requested information. The system will providing navigation buttons.\n\n"
+                f"## RULES\n"
+                f"- ALWAYS sign at the beginning as {conf['signature']}.\n"
+                f"- Language: natural Brazilian Portuguese (PT-BR) mobile-optimized paragraphs."
             )
 
             messages = [{"role": "system", "content": system_prompt}]
             
             # Adicionar histórico se houver
-            for h in history[-5:]: # Pegar as últimas 5 mensagens
+            for h in history[-5:]:
                 messages.append(h)
 
             messages.append({"role": "user", "content": last_message})
@@ -61,12 +67,16 @@ class AgentService:
                 model="gpt-4o-mini",
                 messages=messages,
                 temperature=0.7,
-                max_tokens=500
+                max_tokens=600
             )
 
             return response.choices[0].message.content or ""
         except Exception as e:
             logger.error(f"Error calling OpenAI: {e}")
-            return f"*Jarvis:* Tive um pequeno curto-circuito ao processar sua resposta. Tente novamente em alguns instantes."
+            return f"{conf['signature']} Tive um pequeno curto-circuito. Tente novamente."
+
+    # Mantém compatibilidade com chamadas antigas
+    def get_jarvis_response(self, lead_name: str, last_message: str, history: list[dict[str, str]] = []) -> str:
+        return self.get_response(lead_name, last_message, history, persona="jarvis")
 
 agent_service = AgentService()

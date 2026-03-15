@@ -52,11 +52,19 @@ async def process_ai_response(payload: dict[str, Any], lead_id: str, conversatio
                 return
             
             lead_name, lead_phone, lead_source, paused, manual_override = lead
-            if paused or manual_override:
-                print(
-                    f"[DEBUG] AI response suppressed for lead={lead_id} paused={paused} manual_override={manual_override}"
-                )
-                return
+            
+            # UX: Inicia 'digitando...' imediatamente no WhatsApp (via Baileys)
+            is_baileys = "instance" in payload or "jid" in payload.get("data", {})
+            target_jid = None
+            if is_baileys and settings.baileys_base_url:
+                try:
+                    chatid = payload.get("data", {}).get("chatid")
+                    target_jid = chatid if chatid and "@" in chatid else f"{lead_phone}@s.whatsapp.net"
+                    client = BaileysClient(base_url=settings.baileys_base_url, instance_id=settings.baileys_instance_id)
+                    client.send_presence(jid=target_jid, presence="composing")
+                except:
+                    pass
+
             print(f"[DEBUG] Processing for {lead_name} ({lead_phone})")
             
             # Puxar histórico recente (excluindo a mensagem atual que já foi passada)
@@ -71,31 +79,96 @@ async def process_ai_response(payload: dict[str, Any], lead_id: str, conversatio
             print(f"[DEBUG] Reconstructed history (context): {json.dumps(history, ensure_ascii=False)}")
             print(f"[DEBUG] Current message (trigger): '{last_msg}'")
             
-            # Gerar resposta do Jarvis
-            response_text = agent_service.get_jarvis_response(
-                lead_name=lead_name or lead_phone or "Cliente",
-                last_message=last_msg,
-                history=history
-            )
-            print(f"[DEBUG] Lead: {lead_name}, Msg: '{last_msg}', History Length: {len(history)}")
-            print(f"[DEBUG] Jarvis generated response: {response_text[:50]}...")
+            # Gerenciamento de Persona e Estado (Sessão)
+            metadata = crm_repo.get_conversation_metadata(conn, conversation_id=conversation_id)
+            active_persona = metadata.get("active_persona", "iazinha")
+            last_activity = metadata.get("last_activity")
+            
+            # Lógica de Timeout (30 minutos)
+            from datetime import datetime
+            now_iso = datetime.now().isoformat()
+            if last_activity and active_persona == "jarvis":
+                try:
+                    last_dt = datetime.fromisoformat(last_activity)
+                    diff = (datetime.now() - last_dt).total_seconds()
+                    if diff > 1800: # 30 min
+                        active_persona = "iazinha"
+                        print(f"[DEBUG] Session timeout (Jarvis -> IAzinha) after {diff}s")
+                except:
+                    pass
+            
+            # Atualiza última atividade
+            metadata["last_activity"] = now_iso
+            
+            # Lógica de Troca de Persona / Password Challenge
+            msg_body = last_msg or ""
+            msg_lower = msg_body.lower().strip()
+            
+            # 1. Solicitação de Ativação do Jarvis
+            if active_persona == "iazinha" and ("jarvis" in msg_lower or "senhor jarvis" in msg_lower):
+                # Se já mandou a senha na mesma frase (ex: "Jarvis 7")
+                if "7" in msg_lower:
+                    active_persona = "jarvis"
+                    metadata["active_persona"] = "jarvis"
+                    crm_repo.update_conversation_metadata(conn, conversation_id=conversation_id, metadata=metadata)
+                    response_text = "*Jarvis:* Protocolo de segurança validado. Em que posso ajudá-lo hoje, senhor?"
+                else:
+                    # Desafio de Senha
+                    response_text = "*IAzinha:* Identidade de nível superior detectada. Aguardando chave de ativação para prosseguir com o Protocolo Jarvis."
+                    print(f"[DEBUG] Password challenge sent for Jarvis activation.")
+                    # Pula o restante e manda o desafio
+                    external_id = crm_repo.store_out_message(conn, conversation_id=conversation_id, text=response_text, raw={"system_challenge": True})
+                    conn.commit()
+                    if is_baileys and settings.baileys_base_url:
+                        client.send_menu(jid=target_jid, text=response_text, choices=["Digitar Senha", "Cancelar"], footer="Segurança Jarvis 🦾")
+                    else:
+                        clean_number = neutralize_br_number(lead_phone)
+                        client = UazapiClient(base_url=settings.uazapi_base_url, token=settings.uazapi_token)
+                        client.send_text(number=clean_number, text=response_text)
+                    return
+
+            # 2. Recebimento da Senha isolada
+            elif active_persona == "iazinha" and msg_lower == "7":
+                active_persona = "jarvis"
+                metadata["active_persona"] = "jarvis"
+                crm_repo.update_conversation_metadata(conn, conversation_id=conversation_id, metadata=metadata)
+                response_text = "*Jarvis:* Acesso concedido. Protocolo de ativação concluído. Como posso ajudar?"
+            
+            # 3. Resposta Normal (ou Jarvis já ativo)
+            else:
+                response_text = agent_service.get_response(
+                    lead_name=lead_name or lead_phone or "Cliente",
+                    last_message=msg_body,
+                    history=history,
+                    persona=active_persona
+                )
+                
+                # Se estiver no modo Jarvis e encerrar, reseta persona nos metadados
+                if active_persona == "jarvis" and ("encerrar" in msg_lower or "tchau" in msg_lower or "obrigado" in msg_lower):
+                    active_persona = "iazinha"
+                    metadata["active_persona"] = "iazinha"
+                
+                # Salva o estado atualizado (persona e timestamp)
+                metadata["active_persona"] = active_persona
+                crm_repo.update_conversation_metadata(conn, conversation_id=conversation_id, metadata=metadata)
+
+            # Define a voz baseada na assinatura da resposta
+            voice = "onyx" if "*Jarvis:*" in response_text else "nova"
+            print(f"[DEBUG] Session Persona: {active_persona} | Voice: {voice}")
 
             # Decidir se envia áudio
-            # Se a última mensagem do usuário foi áudio (marcada pelo gateway) ou se ele pediu explicitamente
             wants_audio = "[Áudio Transcrito]" in last_msg or any(x in last_msg.lower() for x in ["áudio", "audio", "auio", "voz", "mande um áudio", "manda áudio", "manda audio"])
             audio_data = None
             if wants_audio:
-                print(f"[DEBUG] User seems to want audio. Generating TTS with OpenAI...")
-                # Remover o prefixo *Jarvis:* do texto lido para o áudio
-                audio_text = response_text.replace("*Jarvis:* ", "").replace("*Jarvis:*", "").strip()
+                # UX: Muda para 'gravando áudio...'
+                if is_baileys and settings.baileys_base_url:
+                    try:
+                        client.send_presence(jid=target_jid, presence="recording")
+                    except:
+                        pass
                 
-                # Tentar OpenAI Primeiro (já validado e estável)
-                voice = "onyx" if "1980" in settings.baileys_instance_id else "nova"
+                audio_text = response_text.split(":", 1)[-1].strip() # Remove a assinatura do áudio
                 audio_data = media_service.text_to_speech_openai(audio_text, voice=voice)
-                
-                if not audio_data:
-                    print(f"[DEBUG] OpenAI TTS failed. Trying ElevenLabs as fallback...")
-                    audio_data = media_service.text_to_speech_elevenlabs(audio_text)
             
             # Salvar no banco
             external_id = crm_repo.store_out_message(
@@ -112,16 +185,31 @@ async def process_ai_response(payload: dict[str, Any], lead_id: str, conversatio
             is_baileys = "instance" in payload or "jid" in payload.get("data", {})
             
             if is_baileys and settings.baileys_base_url:
-                client = BaileysClient(base_url=settings.baileys_base_url, instance_id=settings.baileys_instance_id)
-                # Priorizar o chatid original para evitar "mensagens fantasma" no mobile
-                target_jid = chatid if chatid and "@" in chatid else f"{lead_phone}@s.whatsapp.net"
-                
                 if audio_data:
                     print(f"[DEBUG] Sending PTT via Baileys to {target_jid} (base64, {len(audio_data)} bytes)")
                     res = client.send_voice_jid(jid=target_jid, audio_data=audio_data)
+                    # Envia botões logo após o áudio para manter a conversa fluida
+                    client.send_menu(
+                        jid=target_jid,
+                        text="O que deseja fazer agora?",
+                        choices=["Encerrar conversa", "Fazer nova pergunta"],
+                        footer="Jarvis 🦾"
+                    )
                 else:
-                    print(f"[DEBUG] Sending via Baileys to {target_jid}")
-                    res = client.send_text_jid(jid=target_jid, text=response_text)
+                    print(f"[DEBUG] Sending via Baileys (Interactive Menu) to {target_jid}")
+                    # Envia a resposta de texto diretamente no corpo do menu de botões (mais eficiente)
+                    res = client.send_menu(
+                        jid=target_jid,
+                        text=response_text,
+                        choices=["Encerrar conversa", "Fazer nova pergunta"],
+                        footer="Jarvis 🦾"
+                    )
+                
+                # UX: Finaliza o status visual
+                try:
+                    client.send_presence(jid=target_jid, presence="paused")
+                except:
+                    pass
                 print(f"[DEBUG] Baileys response: {res}")
             elif settings.uazapi_base_url and settings.uazapi_token:
                 clean_number = neutralize_br_number(lead_phone)
@@ -168,17 +256,17 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks) ->
                 
                 print(f"[WEBHOOK] Checking AI Trigger: chatid={chatid} from_me={from_me}")
                 
-                # Regra de Grupos: 
+                # Regra Universal de Bloqueio de Grupos: 
+                # O agente responde apenas em DMs.
                 is_group = "@g.us" in chatid
-                allowed_groups = [jid.strip() for jid in settings.allowed_groups_jids.split(",") if jid.strip()]
-                
-                should_respond = not is_group or chatid in allowed_groups
-                print(f"[WEBHOOK] is_group={is_group} allowed={chatid in allowed_groups} should_respond={should_respond}")
+                should_respond = not is_group
+                print(f"[WEBHOOK] is_group={is_group} -> should_respond={should_respond}")
                 
                 # Resiliência para from_me (pode vir como string em alguns adaptadores)
                 is_from_me = str(from_me).lower() == "true"
                 
                 if is_from_me is False and should_respond and result.message_id:
+                   # A regra agora é universal: responde em ambos os números (DMs apenas)
                    print(f"[WEBHOOK] AI Response queued for lead {result.lead_id} (Message: {result.message_id})")
                    background_tasks.add_task(
                        process_ai_response, 
