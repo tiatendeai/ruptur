@@ -61,11 +61,28 @@ class UazapiAdminClient:
             return [v for v in data if isinstance(v, dict)]
         raise UazapiError("uazapi_unexpected_response", body=str(data)[:2000], url=str(resp.request.url))
 
-    def init_instance(self, *, name: str, system_name: str | None = None) -> dict[str, Any]:
+    def init_instance(
+        self,
+        *,
+        name: str,
+        system_name: str | None = None,
+        admin_field01: str | None = None,
+        admin_field02: str | None = None,
+        fingerprint_profile: str | None = None,
+        browser: str | None = None,
+    ) -> dict[str, Any]:
         url = f"{self.base_url.rstrip('/')}/instance/init"
         payload: dict[str, Any] = {"name": name}
         if system_name:
             payload["systemName"] = system_name
+        if admin_field01 is not None:
+            payload["adminField01"] = admin_field01
+        if admin_field02 is not None:
+            payload["adminField02"] = admin_field02
+        if fingerprint_profile is not None:
+            payload["fingerprintProfile"] = fingerprint_profile
+        if browser is not None:
+            payload["browser"] = browser
         try:
             with httpx.Client(timeout=30) as client:
                 resp = client.post(url, json=payload, headers=self._headers())
@@ -88,6 +105,34 @@ class UazapiAdminClient:
         except Exception:
             return {"raw": resp.text}
         return data if isinstance(data, dict) else {"raw": data}
+
+    def raw_request(self, *, method: str, path: str, payload: dict[str, Any] | None = None) -> dict[str, Any] | list[Any]:
+        url = f"{self.base_url.rstrip('/')}{path}"
+        try:
+            with httpx.Client(timeout=30) as client:
+                resp = client.request(method.upper(), url, json=payload, headers=self._headers())
+        except httpx.TimeoutException as exc:
+            raise UazapiError("uazapi_timeout", url=url) from exc
+        except httpx.RequestError as exc:
+            raise UazapiError("uazapi_request_error", url=url) from exc
+
+        if resp.is_error:
+            body = (resp.text or "")[:2000]
+            raise UazapiError(
+                "uazapi_http_error",
+                status_code=resp.status_code,
+                body=body,
+                url=str(resp.request.url),
+            )
+
+        try:
+            data = resp.json()
+        except Exception:
+            return {"raw": resp.text}
+
+        if isinstance(data, (dict, list)):
+            return data
+        return {"raw": data}
 
 
 @dataclass(frozen=True)
@@ -250,3 +295,30 @@ class UazapiClient:
         except Exception:
             return {"raw": resp.text}
         return data if isinstance(data, dict) else {"raw": data}
+
+    def raw_request(self, *, method: str, path: str, payload: dict[str, Any] | None = None) -> dict[str, Any] | list[Any]:
+        url = f"{self.base_url.rstrip('/')}{path}"
+        try:
+            with httpx.Client(timeout=30) as client:
+                resp = client.request(method.upper(), url, json=payload, headers=self._headers())
+        except httpx.TimeoutException as exc:
+            raise UazapiError("uazapi_timeout", url=url) from exc
+        except httpx.RequestError as exc:
+            raise UazapiError("uazapi_request_error", url=url) from exc
+
+        if resp.is_error:
+            body = (resp.text or "")[:2000]
+            raise UazapiError(
+                "uazapi_http_error",
+                status_code=resp.status_code,
+                body=body,
+                url=str(resp.request.url),
+            )
+
+        try:
+            data = resp.json()
+        except Exception:
+            return {"raw": resp.text}
+        if isinstance(data, (dict, list)):
+            return data
+        return {"raw": data}

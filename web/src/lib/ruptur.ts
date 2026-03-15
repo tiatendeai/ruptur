@@ -260,6 +260,52 @@ export async function connectUazapiInstance(instance?: string, phone?: string) {
   return (data.uazapi?.instance || data.uazapi || {}) as RupturUazapiStatus;
 }
 
+export async function createUazapiInstance(input: {
+  name: string;
+  systemName?: string;
+  adminField01?: string;
+  adminField02?: string;
+  fingerprintProfile?: string;
+  browser?: string;
+}) {
+  const data = await apiFetch("/integrations/uazapi/instances", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  return data as { ok?: boolean; uazapi?: unknown } & Record<string, unknown>;
+}
+
+export async function runUazapiInstanceOperation(
+  operation:
+    | "disconnect"
+    | "update_instance_name"
+    | "update_admin_fields"
+    | "update_delay_settings"
+    | "update_chatbot_settings"
+    | "update_fields_map"
+    | "get_proxy"
+    | "set_proxy"
+    | "delete_proxy"
+    | "get_privacy"
+    | "set_privacy"
+    | "set_presence"
+    | "delete_instance",
+  input?: {
+    instance?: string;
+    payload?: Record<string, unknown>;
+  },
+) {
+  const sp = new URLSearchParams();
+  if (input?.instance) sp.set("instance", input.instance);
+  const data = await apiFetch(`/integrations/uazapi/ops/${operation}${sp.toString() ? `?${sp.toString()}` : ""}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ payload: input?.payload || {} }),
+  });
+  return (data.uazapi || {}) as Record<string, unknown>;
+}
+
 export async function listBaileysInstances() {
   const data = await apiFetch("/integrations/baileys/instances");
   return (data.items || []) as RupturBaileysInstance[];

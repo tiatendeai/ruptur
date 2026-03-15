@@ -40,6 +40,14 @@ class ConnectRequest(BaseModel):
 class InitInstanceRequest(BaseModel):
     name: str = Field(min_length=1, description="Nome da instância (único)")
     systemName: str | None = Field(default=None, description="Nome do sistema (opcional)")
+    adminField01: str | None = Field(default=None, description="Campo administrativo 1 (opcional)")
+    adminField02: str | None = Field(default=None, description="Campo administrativo 2 (opcional)")
+    fingerprintProfile: str | None = Field(default=None, description="Perfil de fingerprint (opcional)")
+    browser: str | None = Field(default=None, description="Navegador para emulação (opcional)")
+
+
+class InstanceOperationRequest(BaseModel):
+    payload: dict[str, Any] = Field(default_factory=dict, description="Payload bruto da operação")
 
 
 def _list_single_instance() -> dict[str, Any]:
@@ -102,7 +110,67 @@ def init_instance(
     Cria instância e retorna token (via admintoken).
     """
     try:
-        data = admin_client(settings, admin_token=x_uazapi_admintoken).init_instance(name=req.name, system_name=req.systemName)
+        data = admin_client(settings, admin_token=x_uazapi_admintoken).init_instance(
+            name=req.name,
+            system_name=req.systemName,
+            admin_field01=req.adminField01,
+            admin_field02=req.adminField02,
+            fingerprint_profile=req.fingerprintProfile,
+            browser=req.browser,
+        )
+        return {"ok": True, "uazapi": redact(data)}
+    except UazapiError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "error": str(exc),
+                "upstream_status": exc.status_code,
+                "upstream_body": exc.body,
+                "upstream_url": exc.url,
+            },
+        )
+
+
+_UAZAPI_INSTANCE_OPS: dict[str, tuple[str, str, str]] = {
+    "disconnect": ("POST", "/instance/disconnect", "token"),
+    "update_instance_name": ("POST", "/instance/updateInstanceName", "token"),
+    "update_admin_fields": ("POST", "/instance/updateAdminFields", "admintoken"),
+    "update_delay_settings": ("POST", "/instance/updateDelaySettings", "token"),
+    "update_chatbot_settings": ("POST", "/instance/updatechatbotsettings", "token"),
+    "update_fields_map": ("POST", "/instance/updateFieldsMap", "token"),
+    "get_proxy": ("GET", "/instance/proxy", "token"),
+    "set_proxy": ("POST", "/instance/proxy", "token"),
+    "delete_proxy": ("DELETE", "/instance/proxy", "token"),
+    "get_privacy": ("GET", "/instance/privacy", "token"),
+    "set_privacy": ("POST", "/instance/privacy", "token"),
+    "set_presence": ("POST", "/instance/presence", "token"),
+    "delete_instance": ("DELETE", "/instance", "token"),
+}
+
+
+@router.post("/ops/{operation}")
+def run_instance_operation(
+    operation: str,
+    req: InstanceOperationRequest | None = None,
+    instance: str | None = Query(default=None, description="Opcional: id ou name da instância"),
+    x_uazapi_token: str | None = Header(default=None, alias="x-uazapi-token"),
+    x_uazapi_admintoken: str | None = Header(default=None, alias="x-uazapi-admintoken"),
+) -> dict[str, Any]:
+    op_key = operation.strip().lower()
+    if op_key not in _UAZAPI_INSTANCE_OPS:
+        raise HTTPException(status_code=404, detail="uazapi_operation_not_found")
+
+    method, path, auth_mode = _UAZAPI_INSTANCE_OPS[op_key]
+    payload = req.payload if req else {}
+
+    try:
+        send_payload = payload if method in {"POST", "PUT", "PATCH"} else None
+        if auth_mode == "admintoken":
+            data = admin_client(settings, admin_token=x_uazapi_admintoken).raw_request(method=method, path=path, payload=send_payload)
+            return {"ok": True, "uazapi": redact(data)}
+
+        token = resolve_token(settings, token=x_uazapi_token, instance=instance, admin_token=x_uazapi_admintoken)
+        data = client(settings, token=token).raw_request(method=method, path=path, payload=send_payload)
         return {"ok": True, "uazapi": redact(data)}
     except UazapiError as exc:
         raise HTTPException(
