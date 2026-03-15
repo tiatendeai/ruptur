@@ -77,9 +77,10 @@ class BaileysClient:
 
     def send_presence(self, jid: str, presence: str) -> dict[str, Any]:
         """Envia atualização de presença (composing, recording, paused)."""
-        url = f"{self.base_url}/presence"
+        url = f"{self.base_url}/send/presence"
         payload = {
-            "jid": jid,
+            # O gateway Baileys usa o formato /send/presence com campo "number".
+            "number": jid,
             "presence": presence
         }
         try:
