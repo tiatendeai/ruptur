@@ -483,6 +483,9 @@
       const shellGroup = new THREE.Group();
       scene.add(shellGroup);
 
+      const neuralFieldGroup = new THREE.Group();
+      scene.add(neuralFieldGroup);
+
       const stars = new THREE.Points(
         new THREE.BufferGeometry().setAttribute(
           "position",
@@ -504,8 +507,27 @@
       const nodeMeshes = [];
       const nodeMap = new Map();
       const linkMeshes = [];
+      const fieldLines = [];
+      const fieldNodes = [];
       let hoveredSphere = null;
       let selectedSphere = null;
+
+      function brainVolumeContains(x, y, z) {
+        const left = ((x + 105) ** 2) / (192 ** 2) + ((y - 16) ** 2) / (182 ** 2) + ((z + 26) ** 2) / (168 ** 2) <= 1;
+        const right = ((x - 105) ** 2) / (192 ** 2) + ((y - 16) ** 2) / (182 ** 2) + ((z + 26) ** 2) / (168 ** 2) <= 1;
+        const cerebellum = (x ** 2) / (112 ** 2) + ((y + 150) ** 2) / (70 ** 2) + ((z + 86) ** 2) / (78 ** 2) <= 1;
+        return left || right || cerebellum;
+      }
+
+      function sampleBrainPoint() {
+        for (let i = 0; i < 1200; i += 1) {
+          const x = THREE.MathUtils.randFloatSpread(420);
+          const y = THREE.MathUtils.randFloatSpread(360) - 12;
+          const z = THREE.MathUtils.randFloatSpread(300) - 24;
+          if (brainVolumeContains(x, y, z)) return new THREE.Vector3(x, y, z);
+        }
+        return new THREE.Vector3(0, 0, 0);
+      }
 
       function buildBrainShell() {
         shellGroup.clear();
@@ -561,6 +583,128 @@
         groove.rotation.y = Math.PI / 2;
         groove.position.set(0, 8, -24);
         shellGroup.add(groove);
+      }
+
+      function buildNeuralField() {
+        neuralFieldGroup.clear();
+        fieldLines.length = 0;
+        fieldNodes.length = 0;
+
+        const shellDots = [];
+        const surfaceGeometries = [
+          { geometry: new THREE.SphereGeometry(188, 32, 24), position: new THREE.Vector3(-105, 16, -26), scale: new THREE.Vector3(1.05, 1.02, 0.92), color: 0x79d8ff },
+          { geometry: new THREE.SphereGeometry(188, 32, 24), position: new THREE.Vector3(105, 16, -26), scale: new THREE.Vector3(1.05, 1.02, 0.92), color: 0xff7b54 },
+          { geometry: new THREE.SphereGeometry(92, 22, 18), position: new THREE.Vector3(0, -150, -86), scale: new THREE.Vector3(1.08, 0.72, 0.84), color: 0xffd166 }
+        ];
+
+        surfaceGeometries.forEach(({ geometry, position, scale, color }) => {
+          geometry.scale(scale.x, scale.y, scale.z);
+          const points = geometry.attributes.position.array;
+          const surface = [];
+          for (let i = 0; i < points.length; i += 3) {
+            surface.push(points[i] + position.x, points[i + 1] + position.y, points[i + 2] + position.z);
+          }
+          const dotGeometry = new THREE.BufferGeometry();
+          dotGeometry.setAttribute("position", new THREE.Float32BufferAttribute(surface, 3));
+          const dots = new THREE.Points(dotGeometry, new THREE.PointsMaterial({
+            color,
+            size: 1.8,
+            transparent: true,
+            opacity: 0.18
+          }));
+          neuralFieldGroup.add(dots);
+          shellDots.push(dots);
+        });
+
+        const anchors = [
+          { color: 0x79d8ff, center: new THREE.Vector3(-90, 92, -60), spread: 58, count: 54 },
+          { color: 0xff7b54, center: new THREE.Vector3(102, 86, -24), spread: 62, count: 58 },
+          { color: 0xffd166, center: new THREE.Vector3(-132, -84, 54), spread: 48, count: 42 },
+          { color: 0xf472d0, center: new THREE.Vector3(118, -116, 68), spread: 50, count: 44 },
+          { color: 0x9cff6b, center: new THREE.Vector3(0, 18, 0), spread: 86, count: 70 }
+        ];
+
+        const microNodes = [];
+        anchors.forEach(({ color, center, spread, count }) => {
+          for (let i = 0; i < count; i += 1) {
+            const point = center.clone().add(new THREE.Vector3(
+              THREE.MathUtils.randFloatSpread(spread),
+              THREE.MathUtils.randFloatSpread(spread * 0.9),
+              THREE.MathUtils.randFloatSpread(spread * 0.8)
+            ));
+            if (!brainVolumeContains(point.x, point.y, point.z)) continue;
+            microNodes.push({ point, color, pulse: Math.random() * Math.PI * 2 });
+          }
+        });
+
+        while (microNodes.length < 360) {
+          const point = sampleBrainPoint();
+          const nearest = dataset.reduce((best, node) => {
+            const nodePoint = new THREE.Vector3(...node.base);
+            const distance = point.distanceTo(nodePoint);
+            return !best || distance < best.distance ? { color: palette[node.layer] || 0xffffff, distance } : best;
+          }, null);
+          microNodes.push({ point, color: nearest?.color || 0x79d8ff, pulse: Math.random() * Math.PI * 2 });
+        }
+
+        const microGeometry = new THREE.BufferGeometry();
+        microGeometry.setAttribute("position", new THREE.Float32BufferAttribute(microNodes.flatMap(({ point }) => [point.x, point.y, point.z]), 3));
+        microGeometry.setAttribute("color", new THREE.Float32BufferAttribute(microNodes.flatMap(({ color }) => {
+          const c = new THREE.Color(color);
+          return [c.r, c.g, c.b];
+        }), 3));
+        const microPoints = new THREE.Points(microGeometry, new THREE.PointsMaterial({
+          size: 2.4,
+          vertexColors: true,
+          transparent: true,
+          opacity: 0.72
+        }));
+        neuralFieldGroup.add(microPoints);
+        fieldNodes.push({ points: microPoints, data: microNodes });
+
+        for (let i = 0; i < microNodes.length; i += 1) {
+          for (let j = i + 1; j < Math.min(microNodes.length, i + 12); j += 1) {
+            const a = microNodes[i];
+            const b = microNodes[j];
+            const distance = a.point.distanceTo(b.point);
+            if (distance > 44) continue;
+            const geometry = new THREE.BufferGeometry().setFromPoints([a.point, b.point]);
+            const material = new THREE.LineBasicMaterial({
+              color: a.color,
+              transparent: true,
+              opacity: THREE.MathUtils.mapLinear(distance, 0, 44, 0.18, 0.03)
+            });
+            const line = new THREE.Line(geometry, material);
+            neuralFieldGroup.add(line);
+            fieldLines.push(line);
+          }
+        }
+
+        dataset.forEach((node) => {
+          const anchor = new THREE.Vector3(...node.base);
+          const color = palette[node.layer] || 0xffffff;
+          const near = microNodes
+            .map((entry) => ({ ...entry, distance: entry.point.distanceTo(anchor) }))
+            .sort((a, b) => a.distance - b.distance)
+            .slice(0, 5);
+
+          near.forEach((entry, index) => {
+            const mid = anchor.clone().lerp(entry.point, 0.45);
+            mid.y += 10 + index * 2;
+            const curve = new THREE.QuadraticBezierCurve3(anchor, mid, entry.point);
+            const geometry = new THREE.BufferGeometry().setFromPoints(curve.getPoints(16));
+            const material = new THREE.LineBasicMaterial({
+              color,
+              transparent: true,
+              opacity: node.mass > 1.6 ? 0.24 : 0.12
+            });
+            const line = new THREE.Line(geometry, material);
+            neuralFieldGroup.add(line);
+            fieldLines.push(line);
+          });
+        });
+
+        neuralFieldGroup.userData.shellDots = shellDots;
       }
 
       function createAtomCore(radius, color) {
@@ -730,6 +874,7 @@
             base[2] + Math.cos(index * 1.1) * 4
           ];
         });
+        buildNeuralField();
         buildNodes();
       }
 
@@ -758,6 +903,7 @@
           vps_oracle: [210, -185, 250]
         };
         dataset.forEach((node) => { node.base = map[node.id] || [0, 0, 0]; });
+        buildNeuralField();
         buildNodes();
       }
 
@@ -939,6 +1085,16 @@
         });
 
         shellGroup.rotation.y = t * 0.02;
+        neuralFieldGroup.rotation.y = t * 0.018;
+        neuralFieldGroup.rotation.x = Math.sin(t * 0.15) * 0.03;
+        neuralFieldGroup.children.forEach((child, index) => {
+          if (child.material?.opacity === undefined) return;
+          if (!child.material.userData) child.material.userData = {};
+          if (child.material.userData.baseOpacity === undefined) {
+            child.material.userData.baseOpacity = child.material.opacity;
+          }
+          child.material.opacity = child.material.userData.baseOpacity * (0.92 + Math.sin(t * 0.8 + index * 0.07) * 0.08);
+        });
         controls.update();
         renderer.render(scene, camera);
         requestAnimationFrame(animate);
