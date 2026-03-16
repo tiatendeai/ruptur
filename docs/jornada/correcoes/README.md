@@ -27,3 +27,4 @@ Registros mais recentes:
 - `2026-03-16-rup-2026-019-baileys-create-attrs-and-no-ghost-status.md`
 - `2026-03-16-rup-2026-020-provider-strategy-uazapi-primary-baileys-contingency.md`
 - `2026-03-16-rup-2026-021-mychat-control-deck-alignment.md`
+- `2026-03-16-rup-2026-022-connections-instance-lifecycle-modal-and-opaque-ids.md`

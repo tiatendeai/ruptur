@@ -368,19 +368,43 @@ function formatDateTime(value?: string) {
   }).format(date);
 }
 
-type ProviderTab = "visualizacao" | "criacao" | "edicao" | "propriedades" | "configuracao";
+function randomToken(length = 8) {
+  const alphabet = "abcdefghjkmnpqrstuvwxyz23456789";
+  let out = "";
+  for (let index = 0; index < length; index += 1) {
+    out += alphabet[Math.floor(Math.random() * alphabet.length)] || "x";
+  }
+  return out;
+}
+
+function makeOpaqueInstanceId(prefix: "uaz" | "bai") {
+  const stamp = Date.now().toString(36).slice(-4);
+  return `${prefix}-${stamp}${randomToken(6)}`;
+}
+
+type ProviderTab = "visualizacao" | "edicao" | "propriedades" | "configuracao";
+
+function tabLabel(tab: ProviderTab) {
+  if (tab === "visualizacao") return "visao";
+  if (tab === "edicao") return "ajustes";
+  if (tab === "configuracao") return "operacao";
+  return "payload";
+}
 
 export default function ConnectionsClient() {
   const [instances, setInstances] = useState<UazapiInstance[]>([]);
   const [baileysInstances, setBaileysInstances] = useState<RupturBaileysInstance[]>([]);
   const [health, setHealth] = useState<RupturChannelHealth[]>([]);
   const [provider, setProvider] = useState<"uazapi" | "baileys">("uazapi");
+  const [createProvider, setCreateProvider] = useState<"uazapi" | "baileys">("uazapi");
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
   const [baileysStatus, setBaileysStatus] = useState<RupturBaileysStatus | null>(null);
   const [uazapiStatus, setUazapiStatus] = useState<UazapiInstance | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [failedQrUrl, setFailedQrUrl] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<ProviderTab>("visualizacao");
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showCreateAdvanced, setShowCreateAdvanced] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [opMessage, setOpMessage] = useState<string | null>(null);
   const [pairPhone, setPairPhone] = useState("");
@@ -539,6 +563,15 @@ export default function ConnectionsClient() {
     });
     if (next !== "baileys") setBaileysStatus(null);
     if (next !== "uazapi") setUazapiStatus(null);
+  }
+
+  function openCreateModal(nextProvider: "uazapi" | "baileys" = provider) {
+    setCreateProvider(nextProvider);
+    setShowCreateAdvanced(false);
+    setShowCreateModal(true);
+    setOpMessage(null);
+    setError(null);
+    setFailedQrUrl(null);
   }
 
   const unifiedInstances = useMemo(() => {
@@ -748,7 +781,7 @@ export default function ConnectionsClient() {
 
   useEffect(() => {
     // Keep operational tabs usable by forcing the active provider to one that exists for the selected instance.
-    if (!selectedUnifiedInstance || activeTab === "criacao") return;
+    if (!selectedUnifiedInstance) return;
     if (provider === "uazapi" && !selectedUnifiedInstance.hasUazapi && selectedUnifiedInstance.hasBaileys) {
       setProvider("baileys");
       return;
@@ -772,6 +805,16 @@ export default function ConnectionsClient() {
     if (provider !== "baileys") return;
     setPropertiesJson(JSON.stringify(selectedBaileysInstance || baileysStatus || {}, null, 2));
   }, [provider, selectedBaileysInstance, baileysStatus]);
+
+  useEffect(() => {
+    if (!showCreateModal) return;
+    if (createProvider === "uazapi" && !createName.trim()) {
+      setCreateName(makeOpaqueInstanceId("uaz"));
+    }
+    if (createProvider === "baileys" && !createBaileysInstanceId.trim()) {
+      setCreateBaileysInstanceId(makeOpaqueInstanceId("bai"));
+    }
+  }, [showCreateModal, createProvider, createName, createBaileysInstanceId]);
 
   async function runBusy<T>(label: string, action: () => Promise<T>) {
     setBusy(label);
@@ -890,7 +933,10 @@ export default function ConnectionsClient() {
       setCreateFingerprintProfile("");
       setCreateBrowser("");
       setSelectedInstanceId(name);
+      setProvider("uazapi");
       setActiveTab("visualizacao");
+      setShowCreateAdvanced(false);
+      setShowCreateModal(false);
       await refresh();
     });
   }
@@ -928,7 +974,10 @@ export default function ConnectionsClient() {
       setCreateBaileysSyncFullHistory(true);
       setCreateBaileysMarkOnlineOnConnect(false);
       setSelectedInstanceId(instance);
+      setProvider("baileys");
       setActiveTab("visualizacao");
+      setShowCreateAdvanced(false);
+      setShowCreateModal(false);
       await refresh();
     });
   }
@@ -1232,20 +1281,7 @@ export default function ConnectionsClient() {
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setActiveTab("criacao");
-                  setOpMessage(null);
-                  setError(null);
-                  setFailedQrUrl(null);
-                  if (provider === "baileys" && selectedUnifiedInstance && !selectedUnifiedInstance.hasBaileys) {
-                    setSelectedInstanceId(null);
-                    setBaileysStatus(null);
-                  }
-                  if (provider === "uazapi" && selectedUnifiedInstance && !selectedUnifiedInstance.hasUazapi) {
-                    setSelectedInstanceId(null);
-                    setUazapiStatus(null);
-                  }
-                }}
+                onClick={() => openCreateModal(provider)}
                 className="rounded-full border border-sky-300/30 bg-sky-500/10 px-4 py-2 text-sm text-sky-100 hover:bg-sky-500/20"
                 title="Criar uma nova instancia no provedor ativo"
               >
@@ -1285,9 +1321,14 @@ export default function ConnectionsClient() {
                     className="w-full text-left"
                     title={instance.tooltip}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="space-y-2">
-                        <div className="text-lg font-medium">{instance.displayId || instance.id}</div>
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0 space-y-2">
+                        <div className="text-xl font-semibold tracking-[-0.04em] text-white">
+                          {instance.number || instance.baileysDisplayNumber || "sem_numero"}
+                        </div>
+                        <div className="truncate font-mono text-[11px] uppercase tracking-[0.18em] text-zinc-500">
+                          {instance.displayId || instance.id}
+                        </div>
                         <div className="flex flex-wrap items-center gap-2">
                           {instance.hasUazapi ? (
                             <span className="rounded-full border border-sky-300/30 bg-sky-500/10 px-2.5 py-1 text-[10px] uppercase tracking-[0.2em] text-sky-100" title="Instancia existente na UAZAPI">
@@ -1324,22 +1365,21 @@ export default function ConnectionsClient() {
                             {statusLabel(instance.overallStatus)}
                           </span>
                         </div>
+                        <div className="text-sm text-zinc-300">
+                          {instance.profileName || "sem perfil"}
+                        </div>
                         <div className="text-xs text-zinc-400">
                           UAZAPI: {instance.uazapiStatus || "sem_dados"} | Baileys: {instance.baileysStatus || "sem_dados"}
                         </div>
-                        <div className="text-xs text-zinc-500">
-                          Conectado desde: {formatDateTime(instance.connectedSince)} | Ultima atualizacao: {formatDateTime(instance.lastUpdatedAt)}
-                        </div>
                         {instance.profileName || instance.systemName ? (
-                          <div className="text-xs text-zinc-400">
-                            {instance.profileName ? `Perfil: ${instance.profileName}` : ""}
-                            {instance.profileName && instance.systemName ? " | " : ""}
-                            {instance.systemName ? `Sistema: ${instance.systemName}` : ""}
+                          <div className="text-xs text-zinc-500">
+                            {instance.systemName ? `Sistema: ${instance.systemName}` : "Sistema: sem_dados"}
                           </div>
                         ) : null}
                       </div>
-                      <div className="rounded-full border border-white/10 px-3 py-1 text-xs text-zinc-300">
-                        {instance.number || "sem_numero"}
+                      <div className="shrink-0 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-right text-[11px] text-zinc-300">
+                        <div>desde {formatDateTime(instance.connectedSince)}</div>
+                        <div className="mt-1 text-zinc-500">att {formatDateTime(instance.lastUpdatedAt)}</div>
                       </div>
                     </div>
                   </button>
@@ -1355,7 +1395,7 @@ export default function ConnectionsClient() {
 
         <div className="rounded-[28px] border border-white/10 bg-white/5 p-5">
           <h2 className="text-lg font-semibold">Painel operacional</h2>
-          <p className="mt-1 text-sm text-zinc-400">Gestao completa das contas por API, em abas, com UAZAPI como trilha principal do MVP e Baileys como contingencia.</p>
+          <p className="mt-1 text-sm text-zinc-400">Acoes diretas para lifecycle, conexao e ajuste fino da instancia selecionada.</p>
           <div className="mt-5 rounded-[22px] border border-white/10 bg-black/20 p-4">
             <div className="text-xs uppercase tracking-[0.25em] text-zinc-500">provider ativo</div>
             <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -1385,46 +1425,66 @@ export default function ConnectionsClient() {
             <div className="mt-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-zinc-300">
               {provider === "uazapi" ? "Papel ativo: canal primario do MVP." : "Papel ativo: contingencia estrategica e camada de aprendizado."}
             </div>
-            <div className="mt-4 text-xs uppercase tracking-[0.25em] text-zinc-500">instancia selecionada</div>
-            <div className="mt-2 text-sm text-zinc-200">{selectedInstanceId || "nenhuma"}</div>
+            <div className="mt-5 text-xs uppercase tracking-[0.25em] text-zinc-500">instancia selecionada</div>
+            <div className="mt-2 text-lg font-semibold tracking-[-0.03em] text-white">
+              {selectedUnifiedInstance?.number || selectedInstanceId || "nenhuma"}
+            </div>
+            <div className="mt-1 font-mono text-[11px] uppercase tracking-[0.18em] text-zinc-500">
+              {selectedInstanceId || "sem_instancia"}
+            </div>
             {selectedUnifiedInstance ? (
-              <div className="mt-2 space-y-1 text-xs text-zinc-400">
-                <div>Papel no MVP: {selectedUnifiedInstance.hasUazapi ? "uazapi primario" : "baileys contingencia"}</div>
-                <div>Numero: {selectedUnifiedInstance.number || "sem_numero"}</div>
-                <div>Status geral: {statusLabel(selectedUnifiedInstance.overallStatus)}</div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-sm text-zinc-300">
+                  <div className="text-[10px] uppercase tracking-[0.22em] text-zinc-500">papel no mvp</div>
+                  <div className="mt-2">{selectedUnifiedInstance.hasUazapi ? "uazapi primario" : "baileys contingencia"}</div>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-sm text-zinc-300">
+                  <div className="text-[10px] uppercase tracking-[0.22em] text-zinc-500">status geral</div>
+                  <div className="mt-2">{statusLabel(selectedUnifiedInstance.overallStatus)}</div>
+                </div>
                 {selectedUnifiedInstance.hasBaileys ? (
-                  <>
-                    <div>Numero WhatsApp: {selectedUnifiedInstance.baileysTransportNumber || "sem_dados"}</div>
-                    <div>Modo identidade: {identityModeLabel(selectedUnifiedInstance.baileysIdentityMode)}</div>
-                  </>
+                  <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-sm text-zinc-300 sm:col-span-2">
+                    <div className="text-[10px] uppercase tracking-[0.22em] text-zinc-500">identidade whatsapp</div>
+                    <div className="mt-2">Numero WhatsApp: {selectedUnifiedInstance.baileysTransportNumber || "sem_dados"}</div>
+                    <div className="mt-1">Modo identidade: {identityModeLabel(selectedUnifiedInstance.baileysIdentityMode)}</div>
+                  </div>
                 ) : null}
-                <div>Conectado desde: {formatDateTime(selectedUnifiedInstance.connectedSince)}</div>
               </div>
             ) : null}
             {selectedInstanceId ? (
-              <div className="mt-4 flex flex-wrap gap-2">
+              <div className="mt-5 flex flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={() => void (provider === "uazapi" ? handleUazapiConnectQr() : handleBaileysConnectQr())}
                   disabled={busy !== null || (provider === "baileys" && !canManageSelectedBaileys)}
-                  className="rounded-full border border-white/10 px-3 py-1.5 text-xs uppercase tracking-[0.2em] text-zinc-200 hover:bg-white/5 disabled:opacity-50"
+                  className="rounded-full border border-sky-300/30 bg-sky-500/10 px-4 py-2 text-sm text-sky-100 hover:bg-sky-500/20 disabled:opacity-50"
                   title="Gerar ou renovar QR da instancia selecionada"
                 >
-                  Gerar/Atualizar QR
+                  Abrir QR
                 </button>
+                {provider === "baileys" ? (
+                  <button
+                    type="button"
+                    onClick={() => void handleBaileysReset()}
+                    disabled={busy !== null || !canManageSelectedBaileys}
+                    className="rounded-full border border-amber-300/30 px-4 py-2 text-sm text-amber-100 hover:bg-amber-500/10 disabled:opacity-50"
+                  >
+                    Resetar sessao
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   onClick={() => void (provider === "uazapi" ? handleDeleteUazapi() : handleDeleteBaileys())}
                   disabled={busy !== null || (provider === "baileys" && !canManageSelectedBaileys)}
-                  className="rounded-full border border-red-300/30 px-3 py-1.5 text-xs uppercase tracking-[0.2em] text-red-100 hover:bg-red-500/10 disabled:opacity-50"
+                  className="rounded-full border border-red-300/30 px-4 py-2 text-sm text-red-100 hover:bg-red-500/10 disabled:opacity-50"
                   title="Excluir a instancia selecionada com limpeza do que o provedor suportar"
                 >
                   Excluir instancia
                 </button>
               </div>
             ) : null}
-            <div className="mt-4 flex flex-wrap gap-2">
-              {(["visualizacao", "criacao", "edicao", "propriedades", "configuracao"] as ProviderTab[]).map((tab) => (
+            <div className="mt-5 flex flex-wrap gap-2">
+              {(["visualizacao", "edicao", "configuracao", "propriedades"] as ProviderTab[]).map((tab) => (
                 <button
                   key={tab}
                   type="button"
@@ -1434,20 +1494,9 @@ export default function ConnectionsClient() {
                     activeTab === tab ? "border-sky-300/40 bg-sky-500/10 text-sky-100" : "border-white/10 text-zinc-300 hover:bg-white/5",
                   ].join(" ")}
                 >
-                  {tab}
+                  {tabLabel(tab)}
                 </button>
               ))}
-            </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => void (provider === "uazapi" ? handleUazapiConnectQr() : handleBaileysConnectQr())}
-                disabled={!selectedInstanceId || busy !== null || (provider === "baileys" && !canManageSelectedBaileys)}
-                className="rounded-full border border-white/10 px-3 py-1.5 text-xs uppercase tracking-[0.2em] text-zinc-200 hover:bg-white/5 disabled:opacity-50"
-                title="Gerar ou renovar QR da instancia selecionada"
-              >
-                Gerar/Atualizar QR
-              </button>
             </div>
 
             {opMessage ? <div className="mt-4 rounded-xl border border-emerald-300/20 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">{opMessage}</div> : null}
@@ -1594,50 +1643,6 @@ export default function ConnectionsClient() {
               </div>
             ) : null}
 
-            {activeTab === "criacao" ? (
-              <div className="mt-4 space-y-3">
-                {provider === "uazapi" ? (
-                  <>
-                    <div className="rounded-xl border border-emerald-300/20 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-100">
-                      Fluxo principal do MVP. Aqui vale expor a criacao rica do provider porque a UAZAPI e o canal primario de operacao.
-                    </div>
-                    <input value={createName} onChange={(e) => setCreateName(e.target.value)} placeholder="Nome da instancia" className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-zinc-200 outline-none" />
-                    <input value={createSystemName} onChange={(e) => setCreateSystemName(e.target.value)} placeholder="SystemName (opcional)" className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-zinc-200 outline-none" />
-                    <input value={createAdminField01} onChange={(e) => setCreateAdminField01(e.target.value)} placeholder="AdminField01 (opcional)" className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-zinc-200 outline-none" />
-                    <input value={createAdminField02} onChange={(e) => setCreateAdminField02(e.target.value)} placeholder="AdminField02 (opcional)" className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-zinc-200 outline-none" />
-                    <input value={createFingerprintProfile} onChange={(e) => setCreateFingerprintProfile(e.target.value)} placeholder="fingerprintProfile (opcional)" className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-zinc-200 outline-none" />
-                    <input value={createBrowser} onChange={(e) => setCreateBrowser(e.target.value)} placeholder="browser (opcional)" className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-zinc-200 outline-none" />
-                    <button type="button" onClick={() => void handleCreateUazapi()} disabled={busy !== null} className="rounded-full border border-white/10 px-4 py-2 text-sm text-zinc-200 hover:bg-white/5 disabled:opacity-50">
-                      Criar instancia UAZAPI
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <div className="rounded-xl border border-amber-300/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
-                      Fluxo de contingencia do MVP. Mantenha o minimo operacional necessario para QR, recuperacao, reset e observabilidade do self-host.
-                    </div>
-                    <input value={createBaileysInstanceId} onChange={(e) => setCreateBaileysInstanceId(e.target.value)} placeholder="ID da instancia Baileys" className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-zinc-200 outline-none" />
-                    <input value={createBaileysProfileName} onChange={(e) => setCreateBaileysProfileName(e.target.value)} placeholder="Perfil (opcional)" className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-zinc-200 outline-none" />
-                    <input value={createBaileysSystemName} onChange={(e) => setCreateBaileysSystemName(e.target.value)} placeholder="SystemName (opcional)" className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-zinc-200 outline-none" />
-                    <input value={createBaileysAdminField01} onChange={(e) => setCreateBaileysAdminField01(e.target.value)} placeholder="AdminField01 (opcional)" className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-zinc-200 outline-none" />
-                    <input value={createBaileysAdminField02} onChange={(e) => setCreateBaileysAdminField02(e.target.value)} placeholder="AdminField02 (opcional)" className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-zinc-200 outline-none" />
-                    <input value={createBaileysBrowser} onChange={(e) => setCreateBaileysBrowser(e.target.value)} placeholder="browser (opcional, ex.: Mac OS|Desktop|14.4.1)" className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-zinc-200 outline-none" />
-                    <label className="flex items-center gap-2 text-sm text-zinc-200">
-                      <input type="checkbox" checked={createBaileysSyncFullHistory} onChange={(e) => setCreateBaileysSyncFullHistory(e.target.checked)} />
-                      SyncFullHistory
-                    </label>
-                    <label className="flex items-center gap-2 text-sm text-zinc-200">
-                      <input type="checkbox" checked={createBaileysMarkOnlineOnConnect} onChange={(e) => setCreateBaileysMarkOnlineOnConnect(e.target.checked)} />
-                      MarkOnlineOnConnect
-                    </label>
-                    <button type="button" onClick={() => void handleCreateBaileys()} disabled={busy !== null} className="rounded-full border border-white/10 px-4 py-2 text-sm text-zinc-200 hover:bg-white/5 disabled:opacity-50">
-                      Criar instancia Baileys
-                    </button>
-                  </>
-                )}
-              </div>
-            ) : null}
-
             {activeTab === "edicao" ? (
               <div className="mt-4 space-y-3">
                 {provider === "uazapi" ? (
@@ -1654,7 +1659,7 @@ export default function ConnectionsClient() {
                   </>
                 ) : (
                   <div className="rounded-xl border border-dashed border-white/15 bg-black/20 p-4 text-sm text-zinc-400">
-                    A edicao de metadados Baileys ainda nao foi aberta no painel. Hoje a configuracao funcional acontece na criacao e no reset da sessao.
+                    Metadados Baileys seguem enxutos no MVP. O fluxo principal fica em criar, conectar, resetar e excluir sem aumentar complexidade desnecessaria.
                   </div>
                 )}
               </div>
@@ -1770,6 +1775,165 @@ export default function ConnectionsClient() {
           </div>
         </div>
       </section>
+
+      {showCreateModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#120d0b]/80 px-4 py-8 backdrop-blur">
+          <div className="w-full max-w-2xl rounded-[32px] border border-white/10 bg-[#17120f] shadow-[0_32px_120px_rgba(0,0,0,0.45)]">
+            <div className="flex items-start justify-between gap-4 border-b border-white/10 px-6 py-5">
+              <div>
+                <div className="text-[11px] uppercase tracking-[0.32em] text-[#d2ab93]">Nova instancia</div>
+                <div className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-white">criar e colocar em modo de conexao</div>
+                <p className="mt-2 text-sm text-[#d8c2b4]">
+                  Primeiro criamos a instancia no provider certo. Em seguida, o sistema ja deixa o QR ou o pareamento pronto para operar.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCreateModal(false)}
+                className="rounded-full border border-white/10 px-4 py-2 text-sm text-zinc-200 hover:bg-white/5"
+              >
+                Fechar
+              </button>
+            </div>
+
+            <div className="px-6 py-5">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCreateProvider("uazapi")}
+                  className={[
+                    "rounded-full border px-4 py-2 text-xs uppercase tracking-[0.2em] transition",
+                    createProvider === "uazapi" ? "border-sky-300/40 bg-sky-500/10 text-sky-100" : "border-white/10 text-zinc-300 hover:bg-white/5",
+                  ].join(" ")}
+                >
+                  UAZAPI
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCreateProvider("baileys")}
+                  className={[
+                    "rounded-full border px-4 py-2 text-xs uppercase tracking-[0.2em] transition",
+                    createProvider === "baileys" ? "border-amber-300/40 bg-amber-500/10 text-amber-100" : "border-white/10 text-zinc-300 hover:bg-white/5",
+                  ].join(" ")}
+                >
+                  BAILEYS
+                </button>
+              </div>
+
+              <div className="mt-4 grid gap-3 md:grid-cols-[1.2fr_0.8fr]">
+                <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-zinc-200">
+                  <div className="text-[10px] uppercase tracking-[0.22em] text-zinc-500">papel do provider</div>
+                  <div className="mt-2">
+                    {createProvider === "uazapi"
+                      ? "UAZAPI segue como canal principal do MVP. A criacao ja prepara a operacao normal."
+                      : "Baileys fica em contingencia. Aqui o foco e criar rapido, abrir QR e recuperar sessao quando necessario."}
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-zinc-200">
+                  <div className="text-[10px] uppercase tracking-[0.22em] text-zinc-500">id interno</div>
+                  <div className="mt-2 break-all font-mono text-xs text-zinc-100">
+                    {createProvider === "uazapi" ? createName || "gerando..." : createBaileysInstanceId || "gerando..."}
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        createProvider === "uazapi"
+                          ? setCreateName(makeOpaqueInstanceId("uaz"))
+                          : setCreateBaileysInstanceId(makeOpaqueInstanceId("bai"))
+                      }
+                      className="rounded-full border border-white/10 px-3 py-1.5 text-xs text-zinc-200 hover:bg-white/5"
+                    >
+                      Regenerar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowCreateAdvanced((current) => !current)}
+                      className="rounded-full border border-white/10 px-3 py-1.5 text-xs text-zinc-200 hover:bg-white/5"
+                    >
+                      {showCreateAdvanced ? "Ocultar avancado" : "Editar avancado"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-zinc-300">
+                {createProvider === "uazapi" ? (
+                  <div>
+                    O numero do WhatsApp entra depois do QR. Antes disso, a Ruptur trabalha so com o identificador interno e com os metadados operacionais minimos.
+                  </div>
+                ) : (
+                  <div>
+                    O gateway Baileys usa ID interno opaco por padrao. O numero real e a identidade do WhatsApp so aparecem depois do pareamento e da leitura de `me.id`.
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-5 space-y-3">
+                {createProvider === "uazapi" ? (
+                  <>
+                    <input value={createSystemName} onChange={(e) => setCreateSystemName(e.target.value)} placeholder="SystemName ou dono operacional (opcional)" className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-zinc-200 outline-none" />
+                    {showCreateAdvanced ? (
+                      <div className="space-y-3 rounded-[24px] border border-white/10 bg-black/20 p-4">
+                        <input value={createName} onChange={(e) => setCreateName(e.target.value)} placeholder="ID interno da instancia" className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-zinc-200 outline-none" />
+                        <input value={createBrowser} onChange={(e) => setCreateBrowser(e.target.value)} placeholder="browser (opcional)" className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-zinc-200 outline-none" />
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <input value={createAdminField01} onChange={(e) => setCreateAdminField01(e.target.value)} placeholder="AdminField01 (opcional)" className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-zinc-200 outline-none" />
+                          <input value={createAdminField02} onChange={(e) => setCreateAdminField02(e.target.value)} placeholder="AdminField02 (opcional)" className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-zinc-200 outline-none" />
+                        </div>
+                        <input value={createFingerprintProfile} onChange={(e) => setCreateFingerprintProfile(e.target.value)} placeholder="fingerprintProfile (opcional)" className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-zinc-200 outline-none" />
+                      </div>
+                    ) : null}
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" onClick={() => void handleCreateUazapi()} disabled={busy !== null} className="rounded-full border border-sky-300/30 bg-sky-500/10 px-5 py-2.5 text-sm text-sky-100 hover:bg-sky-500/20 disabled:opacity-50">
+                        Criar e abrir conexao
+                      </button>
+                      <button type="button" onClick={() => setShowCreateModal(false)} className="rounded-full border border-white/10 px-5 py-2.5 text-sm text-zinc-200 hover:bg-white/5">
+                        Cancelar
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <input value={createBaileysProfileName} onChange={(e) => setCreateBaileysProfileName(e.target.value)} placeholder="Perfil operacional (opcional)" className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-zinc-200 outline-none" />
+                      <input value={createBaileysSystemName} onChange={(e) => setCreateBaileysSystemName(e.target.value)} placeholder="SystemName ou dono operacional (opcional)" className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-zinc-200 outline-none" />
+                    </div>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <label className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-zinc-200">
+                        <input type="checkbox" checked={createBaileysSyncFullHistory} onChange={(e) => setCreateBaileysSyncFullHistory(e.target.checked)} />
+                        SyncFullHistory
+                      </label>
+                      <label className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-zinc-200">
+                        <input type="checkbox" checked={createBaileysMarkOnlineOnConnect} onChange={(e) => setCreateBaileysMarkOnlineOnConnect(e.target.checked)} />
+                        MarkOnlineOnConnect
+                      </label>
+                    </div>
+                    {showCreateAdvanced ? (
+                      <div className="space-y-3 rounded-[24px] border border-white/10 bg-black/20 p-4">
+                        <input value={createBaileysInstanceId} onChange={(e) => setCreateBaileysInstanceId(e.target.value)} placeholder="ID interno da instancia Baileys" className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-zinc-200 outline-none" />
+                        <input value={createBaileysBrowser} onChange={(e) => setCreateBaileysBrowser(e.target.value)} placeholder="browser (opcional, ex.: Mac OS|Desktop|14.4.1)" className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-zinc-200 outline-none" />
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <input value={createBaileysAdminField01} onChange={(e) => setCreateBaileysAdminField01(e.target.value)} placeholder="AdminField01 (opcional)" className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-zinc-200 outline-none" />
+                          <input value={createBaileysAdminField02} onChange={(e) => setCreateBaileysAdminField02(e.target.value)} placeholder="AdminField02 (opcional)" className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-zinc-200 outline-none" />
+                        </div>
+                      </div>
+                    ) : null}
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" onClick={() => void handleCreateBaileys()} disabled={busy !== null} className="rounded-full border border-amber-300/30 bg-amber-500/10 px-5 py-2.5 text-sm text-amber-100 hover:bg-amber-500/20 disabled:opacity-50">
+                        Criar e abrir conexao
+                      </button>
+                      <button type="button" onClick={() => setShowCreateModal(false)} className="rounded-full border border-white/10 px-5 py-2.5 text-sm text-zinc-200 hover:bg-white/5">
+                        Cancelar
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
