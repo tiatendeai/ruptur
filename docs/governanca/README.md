@@ -1,59 +1,84 @@
-# Governança de TI e Ativos — Ruptur
+# Governanca Operacional — Assistente WhatsApp MVP
 
-Este diretório consolida **governança operacional** (processos, padrões, controles) para que a solução seja:
+Este diretorio consolida a documentacao viva para o MVP do assistente por sessao no WhatsApp, com:
 
-- replicável (mesmo resultado em ambientes diferentes)
-- auditável (quem fez o quê, quando e por quê)
-- resiliente (fallback, contingência e recuperação)
-- escalável (múltiplas instâncias/chips/tenants sem caos)
+- UAZAPI como provedor principal
+- Baileys como contingencia
+- sessao explicita por conversa
+- contexto compartilhado entre agentes
+- operacao orientada a custo, fallback, rastreabilidade e governanca
 
-## Princípios (regras do projeto)
+## Objetivos
 
-1. **Usar o que já existe**: se o provedor entrega nativamente (ex.: multi-instância na uazapi), **não duplicar** na nossa stack.
-2. **Orquestrar, não competir**: uazapi é o provedor primário; Baileys é contingência/expansão.
-3. **Tudo como portfólio de ativos**: serviços, instâncias, tokens, domínios e hosts são ativos com dono, finalidade e risco.
-4. **Mudanças com registro**: decisões arquiteturais em ADR; mudanças operacionais em POP/SOP; incidentes com postmortem.
-5. **Segredos fora do Git**: tokens/keys nunca entram no repositório; usar `.env`/secrets manager e referenciar por nome.
+- transformar o escopo definido nesta rodada em artefatos executaveis
+- reduzir ambiguidade entre produto, aplicacao, infra e operacao
+- padronizar setup, integracao, sustentacao e fallback
+- preparar a base para publicacao em backlog, GitHub Projects e producao
 
-## Metodologias e padrões usados (referência prática)
+## Estrutura
 
-- **ITIL 4**: gestão de incidentes, mudanças, ativos/configuração (CMDB-lite).
-- **COBIT**: governança e controles (quem aprova, quem executa, rastreabilidade).
-- **SRE**: SLO/SLI, alertas, runbooks e postmortems sem culpabilização.
-- **GitOps/Infra-as-Code**: configuração versionada no Git, revisão via PR, deploy reproduzível.
-- **ADR (Architecture Decision Records)**: decisões arquiteturais versionadas.
-- **Runbook / SOP (POP)**: procedimentos repetíveis (operação e suporte).
+- `api/`: contrato OpenAPI do modulo de sessao/comandos seguindo o estilo do spec UAZAPI
+- `adr/`: decisao arquitetural do MVP
+- `ativos/`: inventario minimo do servico, provedores, canais e riscos
+- `blueprints/`: desenho operacional e arquitetural do produto
+- `manuais/`: guias de integracao, setup e sustentacao
+- `playbooks/`: guias de operacao coordenada multi-time
+- `pops/`: procedimentos operacionais padrao
+- `portfolio/`: matriz de capacidades, catalogo de modelos e agentes do time
+- `processos/`: politicas de sessao, mudanca e operacao
+- `runbooks/`: diagnostico e mitigacao de incidentes
+- `whitepapers/`: material executivo/comercial e documento tecnico
 
-## Conteúdo
+## Documentos de referencia adicionados
 
-- `portfolio/`:
-  - `portfolio-ativos.md`: mapa de ativos (uazapi, baileys, ruptur, infra) e como se relacionam
-  - `capabilities-matrix.md`: capacidade por provedor e regra de roteamento (uazapi → baileys)
-  - `agent-kits.md`: kits de agentes/workflows (ex.: Antigravity Kit) e como usar sem conflitar com governança
-  - `mcp-e-integracoes.md`: mapa das integrações externas e do que vale ligar por MCP/API
-- `processos/`:
-  - `mudancas.md`: fluxo mínimo de mudança (PR, revisão, deploy, rollback)
-  - `incidentes.md`: fluxo mínimo de incidentes (triagem, mitigação, postmortem)
-  - `segredos.md`: regras para armazenar/rotacionar segredos
-  - `orquestracao-a2a.md`: modelo oficial para coordenação ponta a ponta entre agentes e trilhas
-- `pops/` (procedimentos operacionais padrão):
-  - `pop-uazapi-nova-instancia.md`: criar/conectar instância uazapi (fluxo nativo)
-  - `pop-failover-uazapi-para-baileys.md`: contingência quando uazapi falhar
-  - `pop-preview-local.md`: como subir preview local do backend e web
-  - `pop-rotacao-segredos.md`: como tratar e rotacionar segredos expostos
-- `runbooks/`:
-  - `runbook-envio-mensagens.md`: checklist para envio e diagnósticos (texto/mídia/botão)
-  - `runbook-webhook-instancia-preview.md`: diagnóstico rápido de webhook, instância e ambiente local
-- `templates/`:
-  - `ADR-template.md`, `POP-template.md`, `RUNBOOK-template.md`, `POSTMORTEM-template.md`
-- `ativos/`:
-  - `registry.yaml`: inventário (CMDB-lite) de hosts, domínios, provedores e instâncias
+- roadmap de midias, seguranca e pentest em `processos/roadmap-midias-seguranca-pentest-assistente-whatsapp.md`
+- premissa geral de lucro do ecossistema em `processos/premissa-geral-ecossistema-lucro.md`
+- regra de identidade WhatsApp BR, `wa_id` e nono digito em `processos/identidade-whatsapp-br-wa-id.md`
+- processo obrigatorio de correcoes documentadas/comentadas em `processos/mudancas.md`
+- processo de equipe completa de resolucao (bugs/dev/infra) em `processos/equipe-resolucao-bugs-dev-infra.md`
+- template de registro de correcao em `processos/template-registro-correcao.md`
 
-## Como usar
+## Registros operacionais recentes
 
-1. Para decisões de arquitetura: abra um ADR em `docs/governanca/templates/ADR-template.md`.
-2. Para rotinas operacionais: crie/atualize um POP em `docs/governanca/pops/`.
-3. Para incidentes: use `POSTMORTEM-template.md`.
-4. Mantenha o inventário em `docs/governanca/ativos/registry.yaml` atualizado.
-5. Para trabalho com múltiplos agentes: siga `docs/governanca/processos/orquestracao-a2a.md`.
-6. Para integrações externas de gestão/ops: valide antes em `docs/governanca/portfolio/mcp-e-integracoes.md`.
+- incidente SSH da VPS documentado em `runbooks/runbook-incidente-ssh-vps-2026-03-14.md`
+- snapshot local de alias/chaves em `ativos/ssh-vps-snapshot-2026-03-14.md`
+- revisao assistente WhatsApp em `runbooks/runbook-revisao-assistente-whatsapp-2026-03-15.md`
+- correcoes RUP-2026-007/008/009/010/011/012/013/014/015/016/017/018 em `docs/jornada/correcoes/`
+
+## Principios
+
+1. O assistente nao responde sem comando explicito.
+2. Self-chat pode iniciar sessao diretamente; chat externo exige desafio de senha.
+3. UAZAPI e o provedor primario; Baileys entra por contingencia.
+4. O contexto e da sessao, nao do agente.
+5. Troca de skill nao remove agente; remocao de agente e evento distinto.
+6. Tudo que impacta producao deve ter telemetria minima, fallback e trilha auditavel.
+7. O catalogo de modelos deve ser modular e hot-swappable.
+
+## Agentes do time envolvidos
+
+Pacote operacional recomendado para esta frente:
+
+- `orchestrator`
+- `project-planner`
+- `debugger`
+- `backend-specialist`
+- `frontend-specialist`
+- `database-architect`
+- `documentation-writer`
+- `security-auditor`
+- `devops-engineer`
+- `test-engineer`
+- `qa-automation-engineer`
+- `code-archaeologist`
+
+Referencia de coordenacao:
+
+- `/.agent/agents/orchestrator.md`
+- `/.agent/agents/backend-specialist.md`
+- `/.agent/agents/documentation-writer.md`
+- `/.agent/agents/security-auditor.md`
+
+## Status
+
+Os artefatos deste diretorio consolidam o MVP alvo. Publicacao em remote, GitHub Projects e producao dependem da etapa operacional e de credenciais/ambiente disponiveis no turno.
