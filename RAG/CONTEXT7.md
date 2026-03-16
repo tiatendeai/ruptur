@@ -12,6 +12,15 @@ Leia este arquivo primeiro. Se a tarefa tocar OpenAI ou Baileys, consulte tambem
 
 ## Verdade operacional atual
 
+- Estrategia por fase aprovada:
+  - no MVP, `UAZAPI` e o transporte primario
+  - no MVP, `Baileys` e contingencia estrategica e trilha de aprendizado
+  - no alvo futuro, `Baileys` pode assumir o papel de primario quando auth, sessao, observabilidade e lifecycle estiverem maduros
+  - consequencia arquitetural: o contrato interno da Ruptur nao pode ser o contrato de nenhum provider
+- Modelo de ownership aprovado:
+  - `Ruptur`: CRM, identidade canonica, assistente, roteamento, observabilidade e failover
+  - `UAZAPI`: transporte primario do MVP e recursos nativos de plataforma quando explicitamente usados
+  - `Baileys`: transporte de contingencia e ativo estrategico self-hosted
 - Numeros do assistente em foco:
   - `5531981139540` -> instancia Baileys `inst-553181139540`
   - `5531989131980` -> instancia Baileys `inst-553189131980`
@@ -24,6 +33,11 @@ Leia este arquivo primeiro. Se a tarefa tocar OpenAI ou Baileys, consulte tambem
 - Nao existe conceito de negocio de instancia `default`.
 - Qualquer uso de `default` no contexto Baileys deve ser tratado como legado tecnico e removido de novos fluxos.
 - O backend do assistente esta respondendo; o gargalo residual isolado hoje e transporte/sessao Signal quando aparecem erros como `Bad MAC` e `No matching sessions found for message`.
+- O painel e a API interna podem expor UAZAPI e Baileys lado a lado para operacao, mas isso nao significa paridade de papel no MVP.
+- `MyChat` faz parte do mesmo `Control Deck`; nao deve usar shell, copy ou semantica visual de produto paralelo ao resto do ecossistema.
+- Em UI interna:
+  - simplificar para `numero + contexto + status + ownership`
+  - deixar a estrategia `UAZAPI primaria / Baileys contingencia` visivel para operacao, sem despejar a micelania tecnica do transporte no fluxo do operador
 
 ## Jornada e gatilhos do assistente
 
@@ -65,6 +79,11 @@ Leia este arquivo primeiro. Se a tarefa tocar OpenAI ou Baileys, consulte tambem
 
 ## Baileys: regras de engenharia
 
+- No MVP, Baileys nao deve ser modelado como produto equivalente a UAZAPI.
+- No MVP, prioridade do Baileys:
+  - QR, auth, reset, delete, status, identidade efetiva, getMessage e retry
+  - observabilidade suficiente para contingencia
+  - reduzir superficie de customizacao desnecessaria
 - Envie sempre com `x-instance-id` de uma instancia real.
 - Nao introduza fallback para `default`.
 - Nao reescreva um JID explicito retornado pelo WhatsApp apenas para inserir ou remover o nono digito.
@@ -90,6 +109,10 @@ Leia este arquivo primeiro. Se a tarefa tocar OpenAI ou Baileys, consulte tambem
   - no painel, `criar instancia` deve deixar a conta imediatamente em modo de conexao
   - exclusao Baileys deve apagar auth, cache persistido de retry e runtime em memoria
   - a UI interna pode mostrar detalhes tecnicos; a UX do usuario final nao deve herdar essa complexidade
+- Regras de produto:
+  - `UAZAPI` deve aparecer como canal primario do MVP
+  - `Baileys` deve aparecer como contingencia estrategica
+  - a eventual virada de primario no futuro deve ser tratada como troca de configuracao e readiness, nao como reescrita do dominio
 
 ## OpenAI: uso atual no codigo
 
@@ -131,6 +154,13 @@ Leia este arquivo primeiro. Se a tarefa tocar OpenAI ou Baileys, consulte tambem
 - Nao assumir que recomendacoes de modelos da OpenAI permanecem estaticas; verificar antes.
 - Nao confundir correcao de codigo com reparo operacional de sessao.
 - Mapear sempre `numero de negocio -> instancia -> estado do assistente`.
+- Nunca deixar chatbot/AI nativo de provider competir com o assistente da Ruptur na mesma instancia sem policy explicita.
+- Se uma instancia estiver em modo `assistente Ruptur`, recursos nativos de chatbot/triggers/AI do provider devem estar desativados ou claramente isolados.
+- Sempre separar:
+  - `connection_id` ou identidade interna da Ruptur
+  - `provider_instance_id`
+  - `display_number`
+  - `transport_identity`
 - Se existir divergencia entre documento antigo e este arquivo, este arquivo vence.
 
 ## Pendencias conhecidas

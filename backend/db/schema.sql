@@ -192,7 +192,7 @@ CREATE TABLE IF NOT EXISTS campaigns (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name text NOT NULL,
   kind text NOT NULL, -- one_to_one|group
-  provider_preference text NOT NULL DEFAULT 'auto', -- auto|uazapi|baileys
+  provider_preference text NOT NULL DEFAULT 'uazapi', -- uazapi|baileys (auto legado deve resolver para uazapi no MVP)
   payload jsonb NOT NULL, -- template + params (texto, mídia, interativos)
   created_at timestamptz NOT NULL DEFAULT now()
 );

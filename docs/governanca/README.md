@@ -14,6 +14,7 @@ Este diretorio consolida a documentacao viva para o MVP do assistente por sessao
 - reduzir ambiguidade entre produto, aplicacao, infra e operacao
 - padronizar setup, integracao, sustentacao e fallback
 - preparar a base para publicacao em backlog, GitHub Projects e producao
+- garantir que o MVP nao acople a Ruptur ao contrato de um provider externo
 
 ## Estrutura
 
@@ -34,6 +35,7 @@ Este diretorio consolida a documentacao viva para o MVP do assistente por sessao
 - roadmap de midias, seguranca e pentest em `processos/roadmap-midias-seguranca-pentest-assistente-whatsapp.md`
 - premissa geral de lucro do ecossistema em `processos/premissa-geral-ecossistema-lucro.md`
 - regra de identidade WhatsApp BR, `wa_id` e nono digito em `processos/identidade-whatsapp-br-wa-id.md`
+- estrategia de providers do MVP em `processos/provider-strategy-uazapi-primary-baileys-contingency.md`
 - processo obrigatorio de correcoes documentadas/comentadas em `processos/mudancas.md`
 - processo de equipe completa de resolucao (bugs/dev/infra) em `processos/equipe-resolucao-bugs-dev-infra.md`
 - template de registro de correcao em `processos/template-registro-correcao.md`
@@ -54,6 +56,9 @@ Este diretorio consolida a documentacao viva para o MVP do assistente por sessao
 5. Troca de skill nao remove agente; remocao de agente e evento distinto.
 6. Tudo que impacta producao deve ter telemetria minima, fallback e trilha auditavel.
 7. O catalogo de modelos deve ser modular e hot-swappable.
+8. O contrato interno da Ruptur deve permanecer acima dos providers.
+9. Se o assistente da Ruptur for o dono da conversa, chatbot/AI nativo do provider nao deve competir no mesmo fluxo.
+10. Baileys deve ser endurecido desde o MVP, mas sem ser modelado como canal principal antes da hora.
 
 ## Agentes do time envolvidos
 

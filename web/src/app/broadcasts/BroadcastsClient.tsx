@@ -21,7 +21,7 @@ export default function BroadcastsClient() {
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [kind, setKind] = useState<"one_to_one" | "group">("one_to_one");
-  const [provider, setProvider] = useState<"auto" | "uazapi" | "baileys">("auto");
+  const [provider, setProvider] = useState<"uazapi" | "baileys">("uazapi");
   const [message, setMessage] = useState("");
 
   async function refresh() {
@@ -65,7 +65,7 @@ export default function BroadcastsClient() {
       setName("");
       setMessage("");
       setKind("one_to_one");
-      setProvider("auto");
+      setProvider("uazapi");
       await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -145,16 +145,18 @@ export default function BroadcastsClient() {
 
             <label className="space-y-2 text-sm md:col-span-2">
               <span className="text-zinc-300">Provedor</span>
-              <div className="grid gap-2 md:grid-cols-3">
+              <div className="rounded-2xl border border-emerald-300/20 bg-emerald-500/10 px-4 py-3 text-xs text-emerald-100">
+                No MVP, campanhas novas devem nascer em UAZAPI. Baileys entra apenas quando a contingencia for deliberada.
+              </div>
+              <div className="grid gap-2 md:grid-cols-2">
                 {[
-                  { key: "auto", label: "Auto" },
                   { key: "uazapi", label: "UAZAPI" },
                   { key: "baileys", label: "Baileys" },
                 ].map((item) => (
                   <button
                     key={item.key}
                     type="button"
-                    onClick={() => setProvider(item.key as "auto" | "uazapi" | "baileys")}
+                    onClick={() => setProvider(item.key as "uazapi" | "baileys")}
                     className={[
                       "rounded-2xl border px-4 py-3 text-left text-sm transition",
                       provider === item.key

@@ -117,8 +117,19 @@ class Campaign(BaseModel):
 class CreateCampaignRequest(BaseModel):
     name: str = Field(min_length=1)
     kind: str = Field(min_length=1, description="one_to_one|group")
-    provider_preference: str = Field(default="auto", description="auto|uazapi|baileys")
+    provider_preference: str = Field(default="uazapi", description="uazapi|baileys|auto(auto=>uazapi no MVP)")
     payload: dict[str, Any] = Field(default_factory=dict)
+
+
+def _normalize_provider_preference(value: str | None) -> str:
+    normalized = (value or "uazapi").strip().lower()
+    if normalized in {"", "auto"}:
+        # MVP rule: auto resolves to the primary provider instead of keeping
+        # ambiguous routing semantics in persisted campaign intent.
+        return "uazapi"
+    if normalized not in {"uazapi", "baileys"}:
+        raise HTTPException(status_code=400, detail="provider_preference_invalid")
+    return normalized
 
 
 @router.get("/campaigns")
@@ -139,7 +150,7 @@ def create_campaign(req: CreateCampaignRequest) -> dict[str, Any]:
                 conn,
                 name=req.name,
                 kind=req.kind,
-                provider_preference=req.provider_preference,
+                provider_preference=_normalize_provider_preference(req.provider_preference),
                 payload=req.payload,
             )
             conn.commit()

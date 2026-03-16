@@ -318,6 +318,9 @@ function MessageBubbleBody({ message }: { message: RupturMessage }) {
 }
 
 const DEFAULT_QUEUE_FILTER = "all";
+const BRAND_ACTIVE = "border-[#9d4e31]/25 bg-[#4a2316] text-[#fff1e8]";
+const BRAND_BUTTON = "border-[#9d4e31]/25 bg-[#8f492e] text-[#fff1e8] hover:bg-[#7f4129]";
+const BRAND_GHOST = "border-[#9d4e31]/20 bg-[#1b1412] text-[#f0d9ca] hover:bg-[#241915]";
 
 const QUEUE_FILTERS = [
   { key: "all", label: "Tudo", description: "fila completa" },
@@ -403,6 +406,7 @@ export default function InboxClient() {
   const messageBlocks = useMemo(() => buildMessageBlocks(visibleMessages), [visibleMessages]);
   const selectedPhone = normalizePhone(selectedContact?.phone);
   const waLink = selectedPhone ? `https://wa.me/${selectedPhone}` : null;
+  const needsReplyCount = counts.byQueue.get("awaiting_us") || 0;
   const quickReplies = useMemo(
     () => [
       "Oi, vi sua mensagem e vou seguir por aqui.",
@@ -677,24 +681,31 @@ export default function InboxClient() {
 
   return (
     <div className="space-y-3 text-zinc-100">
-      <section className="overflow-hidden rounded-[28px] border border-white/10 bg-[#0b141a] shadow-[0_28px_80px_rgba(0,0,0,0.28)]">
-        <div className="border-b border-white/10 bg-[linear-gradient(180deg,#111b21_0%,#0f171d_100%)] px-4 py-4 sm:px-5">
+      <section className="overflow-hidden rounded-[28px] border border-black/10 bg-[#17120f] shadow-[0_28px_80px_rgba(40,22,15,0.28)]">
+        <div className="border-b border-white/10 bg-[linear-gradient(180deg,#201713_0%,#17120f_100%)] px-4 py-4 sm:px-5">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div>
-              <div className="text-[11px] uppercase tracking-[0.34em] text-[#7ba998]">MyChat</div>
-              <div className="mt-2 text-2xl font-semibold tracking-[-0.05em] text-[#e9edef]">Inbox operacional</div>
-              <div className="mt-2 text-sm text-[#8696a0]">conversa, fila e contexto no mesmo fluxo.</div>
+              <div className="text-[11px] uppercase tracking-[0.34em] text-[#d2ab93]">MyChat</div>
+              <div className="mt-2 text-2xl font-semibold tracking-[-0.05em] text-[#fff7f1]">conversa em operacao</div>
+              <div className="mt-2 max-w-2xl text-sm text-[#d8c2b4]">
+                atendimento, contexto e decisao no mesmo fluxo, sem virar um produto paralelo ao restante do ecossistema.
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2 text-[11px] uppercase tracking-[0.22em] text-[#e8d4c7]">
+                <span className="rounded-full border border-white/10 bg-[#241915] px-3 py-1.5">uazapi primaria no mvp</span>
+                <span className="rounded-full border border-white/10 bg-[#241915] px-3 py-1.5">contingencia pronta</span>
+                <span className="rounded-full border border-white/10 bg-[#241915] px-3 py-1.5">um contato por linha</span>
+              </div>
             </div>
 
             <div className="grid gap-2 sm:grid-cols-3">
               {[
-                { label: "conversas", value: counts.total },
-                { label: "ativas", value: counts.withConversation },
-                { label: "na fila", value: filteredContacts.length },
+                { label: "contatos", value: counts.total },
+                { label: "com conversa", value: counts.withConversation },
+                { label: "pedindo resposta", value: needsReplyCount },
               ].map((item) => (
-                <div key={item.label} className="rounded-[18px] border border-white/10 bg-[#111b21] px-4 py-3">
-                  <div className="text-[10px] uppercase tracking-[0.24em] text-[#7d8a91]">{item.label}</div>
-                  <div className="mt-2 text-2xl font-semibold tracking-[-0.05em] text-[#e9edef]">{item.value}</div>
+                <div key={item.label} className="rounded-[18px] border border-white/10 bg-[#241915] px-4 py-3">
+                  <div className="text-[10px] uppercase tracking-[0.24em] text-[#c6a896]">{item.label}</div>
+                  <div className="mt-2 text-2xl font-semibold tracking-[-0.05em] text-[#fff7f1]">{item.value}</div>
                 </div>
               ))}
             </div>
@@ -711,12 +722,10 @@ export default function InboxClient() {
                   onClick={() => setQueueFilter(filter.key)}
                   className={[
                     "rounded-full border px-3 py-2 text-xs transition",
-                    active
-                      ? "border-[#25d366]/30 bg-[#103529] text-[#d7ffe7]"
-                      : "border-white/10 bg-[#111b21] text-[#aebac1] hover:bg-[#17232a]",
+                    active ? BRAND_ACTIVE : "border-white/10 bg-[#241915] text-[#d8c2b4] hover:bg-[#2b1d18]",
                   ].join(" ")}
                 >
-                  {filter.label} <span className="ml-1 text-[#7d8a91]">{total}</span>
+                  {filter.label} <span className="ml-1 text-[#b78d79]">{total}</span>
                 </button>
               );
             })}
@@ -725,7 +734,7 @@ export default function InboxClient() {
                 key={view.id}
                 type="button"
                 onClick={() => applySavedView(view)}
-                className="rounded-full border border-white/10 bg-[#111b21] px-3 py-2 text-xs text-[#aebac1] transition hover:bg-[#17232a]"
+                className="rounded-full border border-white/10 bg-[#241915] px-3 py-2 text-xs text-[#d8c2b4] transition hover:bg-[#2b1d18]"
               >
                 {view.name}
               </button>
@@ -733,7 +742,7 @@ export default function InboxClient() {
             <button
               type="button"
               onClick={() => void onCreateSavedView()}
-              className="rounded-full border border-white/10 bg-[#1f2c34] px-3 py-2 text-xs text-[#d9e6eb] transition hover:bg-[#24333c]"
+              className={`rounded-full border px-3 py-2 text-xs transition ${BRAND_GHOST}`}
             >
               salvar view
             </button>
@@ -756,9 +765,7 @@ export default function InboxClient() {
               onClick={() => setMobilePane(item.key as "list" | "chat" | "context")}
               className={[
                 "flex-1 rounded-[18px] border px-3 py-3 text-sm font-medium transition",
-                mobilePane === item.key
-                  ? "border-[#25d366]/30 bg-[#103529] text-[#d7ffe7]"
-                  : "border-white/10 bg-[#111b21] text-[#aebac1]",
+                mobilePane === item.key ? BRAND_ACTIVE : "border-white/10 bg-[#111b21] text-[#d8c2b4]",
               ].join(" ")}
             >
               {item.label}
@@ -774,11 +781,11 @@ export default function InboxClient() {
         >
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="text-lg font-semibold tracking-[-0.03em] text-[#e9edef]">Conversas</h2>
-              <p className="text-sm text-[#8696a0]">um contato por linha, sem duplicidade.</p>
+              <h2 className="text-lg font-semibold tracking-[-0.03em] text-[#e9edef]">Fila consolidada</h2>
+              <p className="text-sm text-[#8696a0]">um contato por linha, com identidade consolidada.</p>
             </div>
             <button
-              className="rounded-full border border-white/10 bg-[#1f2c34] px-4 py-2 text-sm text-[#d9e6eb] transition hover:bg-[#24333c]"
+              className={`rounded-full border px-4 py-2 text-sm transition ${BRAND_GHOST}`}
               onClick={() => void refreshLeads()}
               type="button"
             >
@@ -788,7 +795,7 @@ export default function InboxClient() {
 
           <div className="mt-4 space-y-3">
             <input
-              className="w-full rounded-[18px] border border-white/10 bg-[#0b141a] px-4 py-3 text-sm text-[#e9edef] outline-none placeholder:text-[#6a7c85] focus:border-[#25d366]/30"
+              className="w-full rounded-[18px] border border-white/10 bg-[#0b141a] px-4 py-3 text-sm text-[#e9edef] outline-none placeholder:text-[#6a7c85] focus:border-[#9d4e31]/30"
               placeholder="Buscar por nome, telefone ou mensagem"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -815,7 +822,7 @@ export default function InboxClient() {
                         className={[
                           "w-full rounded-[20px] border px-4 py-3 text-left transition",
                           selectedLeadId === lead.id
-                            ? "border-[#25d366]/30 bg-[#1f2c34] shadow-[0_10px_30px_rgba(0,0,0,0.18)]"
+                            ? "border-[#9d4e31]/25 bg-[#1f1714] shadow-[0_10px_30px_rgba(0,0,0,0.18)]"
                             : "border-white/10 bg-[#0b141a] hover:border-white/15 hover:bg-[#101a20]",
                         ].join(" ")}
                       >
@@ -834,7 +841,7 @@ export default function InboxClient() {
                           </div>
                           <div className="flex flex-col items-end gap-1">
                             {pinnedContacts[contact.key] ? (
-                              <span className="rounded-full bg-[#103529] px-2.5 py-1 text-[10px] uppercase tracking-[0.2em] text-[#d7ffe7]">
+                              <span className="rounded-full bg-[#4a2316] px-2.5 py-1 text-[10px] uppercase tracking-[0.2em] text-[#fff1e8]">
                                 pin
                               </span>
                             ) : null}
@@ -857,7 +864,7 @@ export default function InboxClient() {
                           <div className="min-w-0">
                             <div className="line-clamp-2 text-xs text-[#aebac1]">{contact.lastMessageBody || "Sem ultima mensagem"}</div>
                             {notesByContact[contact.key] ? (
-                              <div className="mt-2 line-clamp-1 rounded-full bg-[#1f2c34] px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-[#7ba998]">
+                              <div className="mt-2 line-clamp-1 rounded-full bg-[#1f1714] px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-[#e8c1aa]">
                                 nota interna ativa
                               </div>
                             ) : null}
@@ -896,7 +903,7 @@ export default function InboxClient() {
                 className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-sm font-semibold uppercase tracking-[0.18em]"
               />
               <div>
-                <div className="text-[11px] uppercase tracking-[0.3em] text-[#7ba998]">conversa ativa</div>
+                <div className="text-[11px] uppercase tracking-[0.3em] text-[#d2ab93]">atendimento em linha</div>
                 <div className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-[#e9edef]">
                   {selectedContact?.name || selectedContact?.phone || "Selecione uma conversa"}
                 </div>
@@ -923,14 +930,14 @@ export default function InboxClient() {
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                className="rounded-full border border-white/10 bg-[#1f2c34] px-4 py-2 text-sm text-[#d9e6eb] transition hover:bg-[#24333c] xl:hidden"
+                className={`rounded-full border px-4 py-2 text-sm transition xl:hidden ${BRAND_GHOST}`}
                 onClick={() => setMobilePane("list")}
               >
                 Voltar
               </button>
               <button
                 type="button"
-                className="rounded-full border border-white/10 bg-[#1f2c34] px-4 py-2 text-sm text-[#d9e6eb] transition hover:bg-[#24333c] disabled:opacity-50"
+                className={`rounded-full border px-4 py-2 text-sm transition disabled:opacity-50 ${BRAND_GHOST}`}
                 onClick={() => selectedContact?.conversationIds.length && void refreshMessages(selectedContact.conversationIds)}
                 disabled={!selectedContact?.conversationIds.length}
               >
@@ -938,7 +945,7 @@ export default function InboxClient() {
               </button>
               <button
                 type="button"
-                className="rounded-full border border-white/10 bg-[#1f2c34] px-4 py-2 text-sm text-[#d9e6eb] transition hover:bg-[#24333c] disabled:opacity-50"
+                className={`rounded-full border px-4 py-2 text-sm transition disabled:opacity-50 ${BRAND_GHOST}`}
                 onClick={() => void copySelectedPhone()}
                 disabled={!selectedPhone}
               >
@@ -947,7 +954,7 @@ export default function InboxClient() {
               {selectedContact ? (
                 <button
                   type="button"
-                  className="rounded-full border border-white/10 bg-[#1f2c34] px-4 py-2 text-sm text-[#d9e6eb] transition hover:bg-[#24333c]"
+                  className={`rounded-full border px-4 py-2 text-sm transition ${BRAND_GHOST}`}
                   onClick={() => togglePinned(selectedContact.key)}
                 >
                   {pinnedContacts[selectedContact.key] ? "Desafixar" : "Fixar"}
@@ -965,7 +972,7 @@ export default function InboxClient() {
               ) : null}
               <button
                 type="button"
-                className="rounded-full border border-white/10 bg-[#1f2c34] px-4 py-2 text-sm text-[#d9e6eb] transition hover:bg-[#24333c] xl:hidden"
+                className={`rounded-full border px-4 py-2 text-sm transition xl:hidden ${BRAND_GHOST}`}
                 onClick={() => setMobilePane("context")}
               >
                 Contato
@@ -976,7 +983,7 @@ export default function InboxClient() {
           <div className="relative">
             <div className="mt-4 flex flex-wrap items-center gap-2">
               <input
-                className="min-w-[220px] flex-1 rounded-[16px] border border-white/10 bg-[#111b21] px-4 py-2.5 text-sm text-[#e9edef] outline-none placeholder:text-[#6a7c85] focus:border-[#25d366]/30"
+                className="min-w-[220px] flex-1 rounded-[16px] border border-white/10 bg-[#111b21] px-4 py-2.5 text-sm text-[#e9edef] outline-none placeholder:text-[#6a7c85] focus:border-[#9d4e31]/30"
                 placeholder="Buscar dentro da conversa"
                 value={messageQuery}
                 onChange={(e) => setMessageQuery(e.target.value)}
@@ -987,7 +994,7 @@ export default function InboxClient() {
                   type="button"
                   onClick={() => setText((current) => (current ? `${current}\n${reply}` : reply))}
                   className={[
-                    "rounded-full border border-white/10 bg-[#111b21] px-3 py-2 text-xs text-[#aebac1] transition hover:bg-[#17232a]",
+                    "rounded-full border border-white/10 bg-[#111b21] px-3 py-2 text-xs text-[#d8c2b4] transition hover:bg-[#17232a]",
                     index > 1 ? "hidden lg:inline-flex" : "",
                   ].join(" ")}
                 >
@@ -1073,7 +1080,7 @@ export default function InboxClient() {
               <button
                 type="button"
                 onClick={scrollMessagesToBottom}
-                className="absolute bottom-4 right-3 rounded-full border border-white/10 bg-[#1f2c34] px-3 py-2 text-xs font-medium text-[#d9e6eb] shadow-[0_12px_24px_rgba(0,0,0,0.22)] transition hover:bg-[#24333c]"
+                className={`absolute bottom-4 right-3 rounded-full border px-3 py-2 text-xs font-medium shadow-[0_12px_24px_rgba(0,0,0,0.22)] transition ${BRAND_GHOST}`}
               >
                 Ir para o fim
               </button>
@@ -1087,7 +1094,7 @@ export default function InboxClient() {
                   key={`composer-${reply}`}
                   type="button"
                   onClick={() => setText(reply)}
-                  className="rounded-full border border-white/10 bg-[#111b21] px-3 py-1.5 text-xs text-[#aebac1] transition hover:bg-[#17232a]"
+                  className="rounded-full border border-white/10 bg-[#111b21] px-3 py-1.5 text-xs text-[#d8c2b4] transition hover:bg-[#17232a]"
                 >
                   usar modelo
                 </button>
@@ -1096,7 +1103,7 @@ export default function InboxClient() {
             <div className="rounded-[24px] border border-white/10 bg-[#111b21] p-3 shadow-[0_14px_30px_rgba(0,0,0,0.22)]">
               <div className="flex gap-2">
                 <textarea
-                  className="min-h-24 w-full rounded-[20px] border border-white/10 bg-[#0b141a] px-4 py-3 text-sm text-[#e9edef] outline-none placeholder:text-[#6a7c85] focus:border-[#25d366]/30"
+                  className="min-h-24 w-full rounded-[20px] border border-white/10 bg-[#0b141a] px-4 py-3 text-sm text-[#e9edef] outline-none placeholder:text-[#6a7c85] focus:border-[#9d4e31]/30"
                   placeholder="Digite sua resposta..."
                   value={text}
                   onChange={(e) => setText(e.target.value)}
@@ -1110,7 +1117,7 @@ export default function InboxClient() {
                 />
                 <button
                   type="button"
-                  className="rounded-[20px] bg-[#25d366] px-5 text-sm font-medium text-[#042b14] transition hover:bg-[#34e07b] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-[20px] bg-[#9d4e31] px-5 text-sm font-medium text-[#fff7ee] transition hover:bg-[#8a442a] disabled:cursor-not-allowed disabled:opacity-50"
                   onClick={() => void onSend()}
                   disabled={!selected?.conversation_id || sending}
                 >
@@ -1134,14 +1141,14 @@ export default function InboxClient() {
           <div className="mb-4 xl:hidden">
             <button
               type="button"
-              className="rounded-full border border-white/10 bg-[#1f2c34] px-4 py-2 text-sm text-[#d9e6eb] transition hover:bg-[#24333c]"
+              className={`rounded-full border px-4 py-2 text-sm transition ${BRAND_GHOST}`}
               onClick={() => setMobilePane("chat")}
             >
               Voltar ao chat
             </button>
           </div>
-          <h2 className="text-lg font-semibold tracking-[-0.03em] text-[#e9edef]">Contexto da conversa</h2>
-          <p className="mt-1 text-sm text-[#8696a0]">informações do contato e ações rápidas.</p>
+          <h2 className="text-lg font-semibold tracking-[-0.03em] text-[#e9edef]">Contexto operacional</h2>
+          <p className="mt-1 text-sm text-[#8696a0]">contato, ownership e acoes de decisao.</p>
 
           {selected ? (
             <div className="mt-5 space-y-4">
@@ -1170,7 +1177,7 @@ export default function InboxClient() {
                   <button
                     type="button"
                     onClick={() => void copySelectedPhone()}
-                    className="rounded-full border border-white/10 bg-[#1f2c34] px-3 py-1.5 text-xs text-[#d9e6eb] transition hover:bg-[#24333c]"
+                    className={`rounded-full border px-3 py-1.5 text-xs transition ${BRAND_GHOST}`}
                   >
                     copiar numero
                   </button>
@@ -1219,19 +1226,19 @@ export default function InboxClient() {
                     value={assigneeNameDraft}
                     onChange={(e) => setAssigneeNameDraft(e.target.value)}
                     placeholder="nome do responsavel"
-                    className="w-full rounded-[16px] border border-white/10 bg-[#111b21] px-4 py-3 text-sm text-[#e9edef] outline-none placeholder:text-[#6a7c85] focus:border-[#25d366]/30"
+                    className="w-full rounded-[16px] border border-white/10 bg-[#111b21] px-4 py-3 text-sm text-[#e9edef] outline-none placeholder:text-[#6a7c85] focus:border-[#9d4e31]/30"
                   />
                   <input
                     value={assigneeTeamDraft}
                     onChange={(e) => setAssigneeTeamDraft(e.target.value)}
                     placeholder="time ou squad"
-                    className="w-full rounded-[16px] border border-white/10 bg-[#111b21] px-4 py-3 text-sm text-[#e9edef] outline-none placeholder:text-[#6a7c85] focus:border-[#25d366]/30"
+                    className="w-full rounded-[16px] border border-white/10 bg-[#111b21] px-4 py-3 text-sm text-[#e9edef] outline-none placeholder:text-[#6a7c85] focus:border-[#9d4e31]/30"
                   />
                   <button
                     type="button"
                     disabled={savingContext}
                     onClick={() => void saveAssignment()}
-                    className="rounded-[16px] border border-[#25d366]/20 bg-[#103529] px-4 py-3 text-sm font-medium text-[#d7ffe7] transition hover:bg-[#12402f] disabled:opacity-50"
+                    className="rounded-[16px] border border-[#9d4e31]/25 bg-[#8f492e] px-4 py-3 text-sm font-medium text-[#fff1e8] transition hover:bg-[#7f4129] disabled:opacity-50"
                   >
                     Salvar responsavel
                   </button>
@@ -1244,12 +1251,12 @@ export default function InboxClient() {
                   value={draftNote}
                   onChange={(e) => setDraftNote(e.target.value)}
                   placeholder="anote contexto, objeções, próximos passos, tom da conversa..."
-                  className="mt-3 min-h-28 w-full rounded-[18px] border border-white/10 bg-[#111b21] px-4 py-3 text-sm text-[#e9edef] outline-none placeholder:text-[#6a7c85] focus:border-[#25d366]/30"
+                  className="mt-3 min-h-28 w-full rounded-[18px] border border-white/10 bg-[#111b21] px-4 py-3 text-sm text-[#e9edef] outline-none placeholder:text-[#6a7c85] focus:border-[#9d4e31]/30"
                 />
                 <button
                   type="button"
                   onClick={saveDraftNote}
-                  className="mt-3 w-full rounded-[18px] border border-[#25d366]/20 bg-[#103529] px-4 py-3 text-sm font-medium text-[#d7ffe7] transition hover:bg-[#12402f]"
+                  className="mt-3 w-full rounded-[18px] border border-[#9d4e31]/25 bg-[#8f492e] px-4 py-3 text-sm font-medium text-[#fff1e8] transition hover:bg-[#7f4129]"
                 >
                   Salvar nota do contato
                 </button>
@@ -1269,9 +1276,7 @@ export default function InboxClient() {
                           onClick={() => void toggleLeadLabel(label.key)}
                           className={[
                             "rounded-full border px-3 py-1.5 text-xs transition disabled:opacity-50",
-                            active
-                              ? "border-[#25d366]/20 bg-[#103529] text-[#d7ffe7]"
-                              : "border-white/10 bg-[#111b21] text-[#aebac1] hover:bg-[#17232a]",
+                            active ? BRAND_ACTIVE : "border-white/10 bg-[#111b21] text-[#d8c2b4] hover:bg-[#17232a]",
                           ].join(" ")}
                         >
                           {label.name}

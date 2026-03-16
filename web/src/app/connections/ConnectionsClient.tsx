@@ -262,6 +262,16 @@ function identityModeLabel(mode?: string) {
   return mode || "sem_dados";
 }
 
+function providerRoleLabel(provider: "uazapi" | "baileys") {
+  return provider === "uazapi" ? "primario_mvp" : "contingencia";
+}
+
+function providerRoleHint(provider: "uazapi" | "baileys") {
+  return provider === "uazapi"
+    ? "Canal principal do MVP. Deve concentrar a operacao normal e o fluxo principal."
+    : "Canal de contingencia e aprendizagem. Deve permanecer funcional sem ganhar peso de canal principal antes da hora.";
+}
+
 function normalizeBrazilWhatsappNumber(raw?: string) {
   const digits = String(raw || "").replace(/[^\d]/g, "");
   // RUP-2026-012: BR mobile numbers should display with 9th digit.
@@ -532,7 +542,8 @@ export default function ConnectionsClient() {
   }
 
   const unifiedInstances = useMemo(() => {
-    // Canonical list for UI: merge UAZAPI + Baileys (+ health-only rows) by instance id.
+    // Canonical list for UI: merge UAZAPI + Baileys (+ health-only rows) by instance id
+    // without implying equal business role in the MVP.
     type WorkingInstance = Omit<UnifiedInstance, "overallStatus" | "tooltip">;
     const map = new Map<string, WorkingInstance>();
     const ensure = (id: string) => {
@@ -1058,6 +1069,14 @@ export default function ConnectionsClient() {
     if (!selectedInstanceId) return;
     const stopMinutes = Number(chatbotStopMinutes || "0");
     const stopWhenYouSendMsg = Number(chatbotStopWhenYouSendMsg || "0");
+    if (
+      chatbotEnabled &&
+      !window.confirm(
+        "Habilitar chatbot nativo da UAZAPI nesta instancia? Isso pode competir com o assistente da Ruptur se a ownership nao estiver isolada.",
+      )
+    ) {
+      return;
+    }
     await runBusy("chatbot-settings", async () => {
       await runUazapiInstanceOperation("update_chatbot_settings", {
         instance: selectedInstanceId,
@@ -1144,6 +1163,7 @@ export default function ConnectionsClient() {
               Essa area precisa substituir a falta de painel visual das contas ligadas por API. O foco aqui e ver
               status, numero, healthscore e decidir quando intervir.
             </p>
+            <p className="mt-2 text-xs text-zinc-400">No MVP, UAZAPI e canal primario. Baileys fica pronta para contingencia e virada futura.</p>
           </div>
 
           <div className="grid w-full max-w-xl grid-cols-3 gap-3">
@@ -1170,7 +1190,7 @@ export default function ConnectionsClient() {
           <div className="space-y-3">
             <div>
               <h2 className="text-lg font-semibold">Instancias</h2>
-              <p className="text-sm text-zinc-400">Lista unificada com pesquisa, filtros, status e dados conhecidos de UAZAPI/Baileys.</p>
+              <p className="text-sm text-zinc-400">Lista unificada com pesquisa, filtros, status e dados conhecidos de UAZAPI/Baileys, sem confundir papel no MVP.</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <input
@@ -1274,9 +1294,19 @@ export default function ConnectionsClient() {
                               UAZAPI
                             </span>
                           ) : null}
+                          {instance.hasUazapi ? (
+                            <span className="rounded-full border border-emerald-300/30 bg-emerald-500/10 px-2.5 py-1 text-[10px] uppercase tracking-[0.2em] text-emerald-100" title={providerRoleHint("uazapi")}>
+                              {providerRoleLabel("uazapi")}
+                            </span>
+                          ) : null}
                           {instance.hasBaileys ? (
                             <span className="rounded-full border border-amber-300/30 bg-amber-500/10 px-2.5 py-1 text-[10px] uppercase tracking-[0.2em] text-amber-100" title="Instancia existente no Baileys">
                               BAILEYS
+                            </span>
+                          ) : null}
+                          {instance.hasBaileys ? (
+                            <span className="rounded-full border border-amber-300/20 bg-black/20 px-2.5 py-1 text-[10px] uppercase tracking-[0.2em] text-amber-100" title={providerRoleHint("baileys")}>
+                              {providerRoleLabel("baileys")}
                             </span>
                           ) : null}
                           <span
@@ -1325,7 +1355,7 @@ export default function ConnectionsClient() {
 
         <div className="rounded-[28px] border border-white/10 bg-white/5 p-5">
           <h2 className="text-lg font-semibold">Painel operacional</h2>
-          <p className="mt-1 text-sm text-zinc-400">Gestao completa das contas por API, em abas.</p>
+          <p className="mt-1 text-sm text-zinc-400">Gestao completa das contas por API, em abas, com UAZAPI como trilha principal do MVP e Baileys como contingencia.</p>
           <div className="mt-5 rounded-[22px] border border-white/10 bg-black/20 p-4">
             <div className="text-xs uppercase tracking-[0.25em] text-zinc-500">provider ativo</div>
             <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -1352,10 +1382,14 @@ export default function ConnectionsClient() {
                 BAILEYS
               </button>
             </div>
+            <div className="mt-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-zinc-300">
+              {provider === "uazapi" ? "Papel ativo: canal primario do MVP." : "Papel ativo: contingencia estrategica e camada de aprendizado."}
+            </div>
             <div className="mt-4 text-xs uppercase tracking-[0.25em] text-zinc-500">instancia selecionada</div>
             <div className="mt-2 text-sm text-zinc-200">{selectedInstanceId || "nenhuma"}</div>
             {selectedUnifiedInstance ? (
               <div className="mt-2 space-y-1 text-xs text-zinc-400">
+                <div>Papel no MVP: {selectedUnifiedInstance.hasUazapi ? "uazapi primario" : "baileys contingencia"}</div>
                 <div>Numero: {selectedUnifiedInstance.number || "sem_numero"}</div>
                 <div>Status geral: {statusLabel(selectedUnifiedInstance.overallStatus)}</div>
                 {selectedUnifiedInstance.hasBaileys ? (
@@ -1564,6 +1598,9 @@ export default function ConnectionsClient() {
               <div className="mt-4 space-y-3">
                 {provider === "uazapi" ? (
                   <>
+                    <div className="rounded-xl border border-emerald-300/20 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-100">
+                      Fluxo principal do MVP. Aqui vale expor a criacao rica do provider porque a UAZAPI e o canal primario de operacao.
+                    </div>
                     <input value={createName} onChange={(e) => setCreateName(e.target.value)} placeholder="Nome da instancia" className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-zinc-200 outline-none" />
                     <input value={createSystemName} onChange={(e) => setCreateSystemName(e.target.value)} placeholder="SystemName (opcional)" className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-zinc-200 outline-none" />
                     <input value={createAdminField01} onChange={(e) => setCreateAdminField01(e.target.value)} placeholder="AdminField01 (opcional)" className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-zinc-200 outline-none" />
@@ -1576,6 +1613,9 @@ export default function ConnectionsClient() {
                   </>
                 ) : (
                   <>
+                    <div className="rounded-xl border border-amber-300/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+                      Fluxo de contingencia do MVP. Mantenha o minimo operacional necessario para QR, recuperacao, reset e observabilidade do self-host.
+                    </div>
                     <input value={createBaileysInstanceId} onChange={(e) => setCreateBaileysInstanceId(e.target.value)} placeholder="ID da instancia Baileys" className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-zinc-200 outline-none" />
                     <input value={createBaileysProfileName} onChange={(e) => setCreateBaileysProfileName(e.target.value)} placeholder="Perfil (opcional)" className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-zinc-200 outline-none" />
                     <input value={createBaileysSystemName} onChange={(e) => setCreateBaileysSystemName(e.target.value)} placeholder="SystemName (opcional)" className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-zinc-200 outline-none" />
@@ -1662,6 +1702,9 @@ export default function ConnectionsClient() {
                     <button type="button" onClick={() => void handleSaveDelaySettings()} disabled={!selectedInstanceId || busy !== null} className="rounded-full border border-white/10 px-4 py-2 text-sm text-zinc-200 hover:bg-white/5 disabled:opacity-50">
                       Salvar delay de fila
                     </button>
+                    <div className="rounded-xl border border-amber-300/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+                      Ownership: se a Ruptur for a dona do assistente nesta instancia, mantenha o chatbot nativo da UAZAPI desligado ou isolado. Nao deixe os dois responderem no mesmo fluxo.
+                    </div>
                     <label className="flex items-center gap-2 text-sm text-zinc-200"><input type="checkbox" checked={chatbotEnabled} onChange={(e) => setChatbotEnabled(e.target.checked)} />Chatbot habilitado</label>
                     <label className="flex items-center gap-2 text-sm text-zinc-200"><input type="checkbox" checked={chatbotIgnoreGroups} onChange={(e) => setChatbotIgnoreGroups(e.target.checked)} />Ignorar grupos</label>
                     <input value={chatbotStopConversation} onChange={(e) => setChatbotStopConversation(e.target.value)} placeholder="Palavra para parar conversa" className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-zinc-200 outline-none" />
@@ -1670,7 +1713,7 @@ export default function ConnectionsClient() {
                       <input value={chatbotStopWhenYouSendMsg} onChange={(e) => setChatbotStopWhenYouSendMsg(e.target.value)} placeholder="stopWhenYouSendMsg" className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-zinc-200 outline-none" />
                     </div>
                     <button type="button" onClick={() => void handleSaveChatbotSettings()} disabled={!selectedInstanceId || busy !== null} className="rounded-full border border-white/10 px-4 py-2 text-sm text-zinc-200 hover:bg-white/5 disabled:opacity-50">
-                      Salvar configuracao de chatbot
+                      Salvar chatbot nativo da UAZAPI
                     </button>
                     <textarea value={fieldsMapJson} onChange={(e) => setFieldsMapJson(e.target.value)} rows={5} placeholder='{"lead_field01":"origem","lead_field02":"segmento"}' className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 font-mono text-xs text-zinc-200 outline-none" />
                     <button type="button" onClick={() => void handleSaveFieldsMap()} disabled={!selectedInstanceId || busy !== null} className="rounded-full border border-white/10 px-4 py-2 text-sm text-zinc-200 hover:bg-white/5 disabled:opacity-50">

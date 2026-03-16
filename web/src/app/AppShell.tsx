@@ -35,90 +35,6 @@ export default function AppShell({
   }
 
   const currentItem = NAV_ITEMS.find((item) => pathname.startsWith(item.href)) ?? NAV_ITEMS[0];
-  const isInbox = pathname.startsWith("/inbox");
-
-  if (isInbox) {
-    return (
-      <div className="min-h-dvh bg-[#0b141a] text-[#e9edef]">
-        <div className="mx-auto min-h-dvh max-w-[1720px] px-2 py-2 sm:px-3 sm:py-3 lg:px-4">
-          <div className="grid min-h-[calc(100dvh-1rem)] gap-2 lg:grid-cols-[88px_minmax(0,1fr)]">
-            <aside className="hidden overflow-hidden rounded-[28px] border border-white/10 bg-[#111b21] shadow-[0_20px_60px_rgba(0,0,0,0.28)] lg:flex lg:flex-col">
-              <div className="border-b border-white/10 px-4 py-5">
-                <div className="text-[10px] uppercase tracking-[0.34em] text-[#7ba998]">Ruptur</div>
-                <div className="mt-2 text-xs uppercase tracking-[0.28em] text-[#aebac1]">Inbox</div>
-              </div>
-
-              <nav className="flex flex-1 flex-col gap-2 px-3 py-4">
-                {NAV_ITEMS.map((item) => {
-                  const active = pathname === item.href;
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      target={item.external ? "_blank" : undefined}
-                      rel={item.external ? "noreferrer" : undefined}
-                      className={[
-                        "flex min-h-14 items-center justify-center rounded-[18px] border transition",
-                        active
-                          ? "border-[#25d366]/25 bg-[#103529] text-[#d7ffe7]"
-                          : "border-white/10 bg-[#0b141a] text-[#8696a0] hover:bg-[#101b22] hover:text-[#d9e6eb]",
-                      ].join(" ")}
-                      title={item.label}
-                    >
-                      <span className="text-[10px] uppercase tracking-[0.22em]">{item.label.slice(0, 3)}</span>
-                    </Link>
-                  );
-                })}
-              </nav>
-            </aside>
-
-            <div className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-2">
-              <header className="overflow-hidden rounded-[28px] border border-white/10 bg-[#111b21] shadow-[0_20px_60px_rgba(0,0,0,0.24)]">
-                <div className="flex flex-col gap-3 px-4 py-4 sm:px-5 lg:flex-row lg:items-center lg:justify-between">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-[0.32em] text-[#7ba998]">
-                      <span>Inbox</span>
-                      <span className="rounded-full border border-white/10 bg-[#0b141a] px-2.5 py-1 text-[#aebac1]">MyChat</span>
-                    </div>
-                    <div className="mt-3 text-2xl font-semibold tracking-[-0.05em] text-[#e9edef] sm:text-[2rem]">
-                      conversa em primeiro plano.
-                    </div>
-                    <div className="mt-2 text-sm text-[#8696a0]">menos vitrine, mais leitura, resposta e contexto.</div>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    {NAV_ITEMS.map((item) => {
-                      const active = pathname === item.href;
-                      return (
-                        <Link
-                          key={item.href}
-                          href={item.href}
-                          target={item.external ? "_blank" : undefined}
-                          rel={item.external ? "noreferrer" : undefined}
-                          className={[
-                            "rounded-full border px-3 py-2 text-xs uppercase tracking-[0.18em] transition",
-                            active
-                              ? "border-[#25d366]/25 bg-[#103529] text-[#d7ffe7]"
-                              : "border-white/10 bg-[#0b141a] text-[#aebac1] hover:bg-[#101b22] hover:text-[#d9e6eb]",
-                          ].join(" ")}
-                        >
-                          {item.label}
-                        </Link>
-                      );
-                    })}
-                  </div>
-                </div>
-              </header>
-
-              <main className="min-h-0 overflow-hidden rounded-[28px] border border-white/10 bg-[#0f171d] p-2 shadow-[0_24px_80px_rgba(0,0,0,0.26)] sm:p-3">
-                <div className="min-h-full overflow-auto rounded-[24px] bg-[#0b141a] p-2 sm:p-3">{children}</div>
-              </main>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-dvh text-zinc-950">
@@ -134,7 +50,7 @@ export default function AppShell({
                 live
               </div>
             </div>
-            <div className="mt-3 text-sm text-zinc-600">operacao assistida, leitura rapida e modulo principal sempre visivel no mobile.</div>
+            <div className="mt-3 text-sm text-zinc-600">operacao assistida com prioridade clara e modulo principal sempre visivel no mobile.</div>
           </div>
 
           <nav className="flex gap-2 overflow-x-auto px-3 py-3">
@@ -181,7 +97,7 @@ export default function AppShell({
             <div className="grid grid-cols-2 gap-px border-b border-black/10 bg-black/10 text-[10px] uppercase tracking-[0.28em]">
               <div className="bg-[#f3ecdf] px-4 py-4 text-zinc-500">
                 stack
-                <div className="mt-2 text-xs tracking-[0.12em] text-zinc-900">uazapi + baileys</div>
+                <div className="mt-2 text-xs tracking-[0.12em] text-zinc-900">uazapi primaria + baileys contingencia</div>
               </div>
               <div className="bg-[#f3ecdf] px-4 py-4 text-zinc-500">
                 ambiente
@@ -216,7 +132,7 @@ export default function AppShell({
 
             <div className="mt-auto border-t border-black/10 px-5 py-4">
               <div className="text-[10px] uppercase tracking-[0.3em] text-zinc-500">modo</div>
-              <div className="mt-2 text-sm text-zinc-700">operacao assistida para equipe comercial</div>
+              <div className="mt-2 text-sm text-zinc-700">operacao assistida com primario e contingencia definidos</div>
             </div>
           </aside>
 
@@ -234,9 +150,9 @@ export default function AppShell({
                     operacao clara, decisao rapida e menos cenografia entre a equipe e a conversa.
                   </div>
                   <div className="mt-5 flex flex-wrap gap-2 text-[11px] uppercase tracking-[0.24em] text-zinc-500">
-                    <span className="rounded-full border border-black/10 bg-white px-3 py-1.5">canal primario ativo</span>
+                    <span className="rounded-full border border-black/10 bg-white px-3 py-1.5">uazapi primaria</span>
+                    <span className="rounded-full border border-black/10 bg-white px-3 py-1.5">contingencia pronta</span>
                     <span className="rounded-full border border-black/10 bg-white px-3 py-1.5">crm em linha</span>
-                    <span className="rounded-full border border-black/10 bg-white px-3 py-1.5">acoes manuais liberadas</span>
                   </div>
                 </div>
 
@@ -251,7 +167,7 @@ export default function AppShell({
                   </div>
                   <div className="bg-[#efe4d4] px-5 py-4">
                     <div className="text-[10px] uppercase tracking-[0.28em] text-zinc-500">foco</div>
-                    <div className="mt-2 text-sm font-medium text-zinc-900">leitura operacional</div>
+                    <div className="mt-2 text-sm font-medium text-zinc-900">leitura, resposta e governanca</div>
                   </div>
                 </div>
               </div>
