@@ -179,6 +179,13 @@ function extractBaileysInstances(input: unknown): RupturBaileysInstance[] {
         ? item.number_variants.filter((value): value is string => typeof value === "string")
         : undefined,
       me_jid: typeof item.me_jid === "string" ? item.me_jid : undefined,
+      profileName: typeof item.profileName === "string" ? item.profileName : undefined,
+      systemName: typeof item.systemName === "string" ? item.systemName : undefined,
+      adminField01: typeof item.adminField01 === "string" ? item.adminField01 : undefined,
+      adminField02: typeof item.adminField02 === "string" ? item.adminField02 : undefined,
+      browser: typeof item.browser === "string" ? item.browser : undefined,
+      syncFullHistory: typeof item.syncFullHistory === "boolean" ? item.syncFullHistory : undefined,
+      markOnlineOnConnect: typeof item.markOnlineOnConnect === "boolean" ? item.markOnlineOnConnect : undefined,
       connection: status,
       hasQr,
     });
@@ -207,6 +214,9 @@ type UnifiedInstance = {
   baileysTransportNumber?: string;
   baileysIdentityMode?: string;
   baileysMeJid?: string;
+  baileysBrowser?: string;
+  baileysSyncFullHistory?: boolean;
+  baileysMarkOnlineOnConnect?: boolean;
   number?: string;
   profileName?: string;
   systemName?: string;
@@ -371,6 +381,13 @@ export default function ConnectionsClient() {
   const [createFingerprintProfile, setCreateFingerprintProfile] = useState("");
   const [createBrowser, setCreateBrowser] = useState("");
   const [createBaileysInstanceId, setCreateBaileysInstanceId] = useState("");
+  const [createBaileysProfileName, setCreateBaileysProfileName] = useState("");
+  const [createBaileysSystemName, setCreateBaileysSystemName] = useState("");
+  const [createBaileysAdminField01, setCreateBaileysAdminField01] = useState("");
+  const [createBaileysAdminField02, setCreateBaileysAdminField02] = useState("");
+  const [createBaileysBrowser, setCreateBaileysBrowser] = useState("");
+  const [createBaileysSyncFullHistory, setCreateBaileysSyncFullHistory] = useState(true);
+  const [createBaileysMarkOnlineOnConnect, setCreateBaileysMarkOnlineOnConnect] = useState(false);
   const [renameValue, setRenameValue] = useState("");
   const [editAdminField01, setEditAdminField01] = useState("");
   const [editAdminField02, setEditAdminField02] = useState("");
@@ -474,13 +491,6 @@ export default function ConnectionsClient() {
   }, [loadConnectionsData]);
 
   useEffect(() => {
-    if (provider !== "baileys" || !selectedInstanceId) return;
-    void getBaileysStatus(selectedInstanceId)
-      .then((item) => setBaileysStatus(item))
-      .catch((e) => setError(e instanceof Error ? e.message : String(e)));
-  }, [provider, selectedInstanceId]);
-
-  useEffect(() => {
     if (provider !== "uazapi" || !selectedInstanceId) return;
     void getUazapiStatus(selectedInstanceId)
       .then((item) =>
@@ -579,8 +589,15 @@ export default function ConnectionsClient() {
       item.baileysTransportNumber = item.baileysTransportNumber || instance.number_whatsapp;
       item.baileysIdentityMode = item.baileysIdentityMode || instance.number_mode;
       item.baileysMeJid = item.baileysMeJid || instance.me_jid;
+      item.baileysBrowser = item.baileysBrowser || instance.browser;
+      item.baileysSyncFullHistory = item.baileysSyncFullHistory ?? instance.syncFullHistory;
+      item.baileysMarkOnlineOnConnect = item.baileysMarkOnlineOnConnect ?? instance.markOnlineOnConnect;
       item.baileysStatus = instance.connection || item.baileysStatus;
       item.number = item.number || item.baileysDisplayNumber || extractPhoneFromInstanceId(item.displayId);
+      item.profileName = item.profileName || instance.profileName;
+      item.systemName = item.systemName || instance.systemName;
+      item.adminField01 = item.adminField01 || instance.adminField01;
+      item.adminField02 = item.adminField02 || instance.adminField02;
       item.hasQr = item.hasQr || Boolean(instance.hasQr);
     }
 
@@ -631,6 +648,9 @@ export default function ConnectionsClient() {
         `Numero WhatsApp: ${item.baileysTransportNumber || "sem_dados"}`,
         `Modo identidade: ${identityModeLabel(item.baileysIdentityMode)}`,
         `Me JID: ${item.baileysMeJid || "sem_dados"}`,
+        `Browser Baileys: ${item.baileysBrowser || "sem_dados"}`,
+        `SyncFullHistory: ${item.baileysSyncFullHistory === false ? "nao" : "sim"}`,
+        `MarkOnlineOnConnect: ${item.baileysMarkOnlineOnConnect ? "sim" : "nao"}`,
         `Conectado desde: ${formatDateTime(item.connectedSince)}`,
         `Ultima atualizacao: ${formatDateTime(item.lastUpdatedAt)}`,
       ].join("\n");
@@ -693,15 +713,31 @@ export default function ConnectionsClient() {
     () => baileysInstances.find((instance) => matchesBaileysInstanceId(instance, selectedInstanceId)) || null,
     [baileysInstances, selectedInstanceId],
   );
+  const selectedBaileysTargetId = useMemo(
+    () => (selectedBaileysInstance ? publicBaileysInstanceId(selectedBaileysInstance) || effectiveBaileysInstanceId(selectedBaileysInstance) || null : null),
+    [selectedBaileysInstance],
+  );
   const selectedUnifiedInstance = useMemo(
     () => unifiedInstances.find((instance) => instance.id === selectedInstanceId) || null,
     [selectedInstanceId, unifiedInstances],
   );
   const selectedUazapiDetails = uazapiStatus || selectedUazapiInstance;
+  const canManageSelectedBaileys = Boolean(selectedBaileysTargetId);
+
+  useEffect(() => {
+    if (provider !== "baileys") return;
+    if (!selectedBaileysTargetId) {
+      setBaileysStatus(null);
+      return;
+    }
+    void getBaileysStatus(selectedBaileysTargetId)
+      .then((item) => setBaileysStatus(item))
+      .catch((e) => setError(e instanceof Error ? e.message : String(e)));
+  }, [provider, selectedBaileysTargetId]);
 
   useEffect(() => {
     // Keep operational tabs usable by forcing the active provider to one that exists for the selected instance.
-    if (!selectedUnifiedInstance) return;
+    if (!selectedUnifiedInstance || activeTab === "criacao") return;
     if (provider === "uazapi" && !selectedUnifiedInstance.hasUazapi && selectedUnifiedInstance.hasBaileys) {
       setProvider("baileys");
       return;
@@ -709,7 +745,7 @@ export default function ConnectionsClient() {
     if (provider === "baileys" && !selectedUnifiedInstance.hasBaileys && selectedUnifiedInstance.hasUazapi) {
       setProvider("uazapi");
     }
-  }, [provider, selectedUnifiedInstance]);
+  }, [activeTab, provider, selectedUnifiedInstance]);
 
   useEffect(() => {
     if (provider !== "uazapi") return;
@@ -785,9 +821,10 @@ export default function ConnectionsClient() {
   }
 
   async function handleBaileysConnectQr() {
-    if (!selectedInstanceId) return;
+    const targetInstance = selectedBaileysTargetId || selectedInstanceId;
+    if (!targetInstance) return;
     await runBusy("baileys-connect-qr", async () => {
-      const item = await connectBaileysInstance(selectedInstanceId);
+      const item = await connectBaileysInstance(targetInstance);
       setBaileysStatus(item);
       setOpMessage("QR de conexao Baileys acionado.");
       await refresh();
@@ -795,10 +832,11 @@ export default function ConnectionsClient() {
   }
 
   async function handleBaileysReset() {
-    if (!selectedInstanceId) return;
-    if (!window.confirm(`Resetar a sessao Baileys de ${selectedInstanceId}? Isso vai exigir novo QR.`)) return;
+    const targetInstance = selectedBaileysTargetId || selectedInstanceId;
+    if (!targetInstance) return;
+    if (!window.confirm(`Resetar a sessao Baileys de ${targetInstance}? Isso vai exigir novo QR.`)) return;
     await runBusy("baileys-reset", async () => {
-      const item = await resetBaileysInstance(selectedInstanceId);
+      const item = await resetBaileysInstance(targetInstance);
       setBaileysStatus(item);
       setOpMessage("Sessao Baileys resetada. Gere ou escaneie o novo QR.");
       await refresh();
@@ -853,13 +891,31 @@ export default function ConnectionsClient() {
       return;
     }
     await runBusy("create-baileys", async () => {
-      await createBaileysInstance({ instance });
-      // Baileys creation only seeds runtime/auth state; pairing starts when we
-      // explicitly request connection and wait for the QR/status transition.
-      const item = await connectBaileysInstance(instance);
+      // Expose only fields that are either official Baileys SocketConfig options
+      // or operational metadata that the Ruptur can persist and surface.
+      let item = await createBaileysInstance({
+        instance,
+        profileName: createBaileysProfileName.trim() || undefined,
+        systemName: createBaileysSystemName.trim() || undefined,
+        adminField01: createBaileysAdminField01.trim() || undefined,
+        adminField02: createBaileysAdminField02.trim() || undefined,
+        browser: createBaileysBrowser.trim() || undefined,
+        syncFullHistory: createBaileysSyncFullHistory,
+        markOnlineOnConnect: createBaileysMarkOnlineOnConnect,
+      });
+      if (!item.qrcode && item.status !== "connected") {
+        item = await connectBaileysInstance(instance);
+      }
       setBaileysStatus(item);
       setOpMessage(`Instancia Baileys ${instance} criada e colocada em modo de conexao.`);
       setCreateBaileysInstanceId("");
+      setCreateBaileysProfileName("");
+      setCreateBaileysSystemName("");
+      setCreateBaileysAdminField01("");
+      setCreateBaileysAdminField02("");
+      setCreateBaileysBrowser("");
+      setCreateBaileysSyncFullHistory(true);
+      setCreateBaileysMarkOnlineOnConnect(false);
       setSelectedInstanceId(instance);
       setActiveTab("visualizacao");
       await refresh();
@@ -867,13 +923,14 @@ export default function ConnectionsClient() {
   }
 
   async function handleDeleteBaileys() {
-    if (!selectedInstanceId) return;
+    const targetInstance = selectedBaileysTargetId || selectedInstanceId;
+    if (!targetInstance) return;
     const ok = window.confirm(
-      `Excluir permanentemente a instancia ${selectedInstanceId}? Isso remove auth, QR, cache de retry e qualquer sessao anterior.`,
+      `Excluir permanentemente a instancia ${targetInstance}? Isso remove auth, QR, cache de retry e qualquer sessao anterior.`,
     );
     if (!ok) return;
     await runBusy("delete-baileys", async () => {
-      await deleteBaileysInstance(selectedInstanceId);
+      await deleteBaileysInstance(targetInstance);
       setBaileysStatus(null);
       setOpMessage("Instancia Baileys excluida com limpeza completa de sessao e cache.");
       setSelectedInstanceId(null);
@@ -1071,8 +1128,8 @@ export default function ConnectionsClient() {
       ? selectedUazapiDetails?.qrcode || (selectedInstanceId
         ? `${rupturApiBaseUrl()}/integrations/uazapi/qrcode.png?instance=${encodeURIComponent(selectedInstanceId)}`
         : null)
-      : baileysStatus?.qrcode || (selectedInstanceId
-        ? `${rupturApiBaseUrl()}/integrations/baileys/qrcode.png?instance=${encodeURIComponent(selectedInstanceId)}`
+      : baileysStatus?.qrcode || (selectedBaileysTargetId
+        ? `${rupturApiBaseUrl()}/integrations/baileys/qrcode.png?instance=${encodeURIComponent(selectedBaileysTargetId)}`
         : null);
   const qrFailed = Boolean(qrUrl && failedQrUrl === qrUrl);
 
@@ -1155,7 +1212,20 @@ export default function ConnectionsClient() {
               </button>
               <button
                 type="button"
-                onClick={() => setActiveTab("criacao")}
+                onClick={() => {
+                  setActiveTab("criacao");
+                  setOpMessage(null);
+                  setError(null);
+                  setFailedQrUrl(null);
+                  if (provider === "baileys" && selectedUnifiedInstance && !selectedUnifiedInstance.hasBaileys) {
+                    setSelectedInstanceId(null);
+                    setBaileysStatus(null);
+                  }
+                  if (provider === "uazapi" && selectedUnifiedInstance && !selectedUnifiedInstance.hasUazapi) {
+                    setSelectedInstanceId(null);
+                    setUazapiStatus(null);
+                  }
+                }}
                 className="rounded-full border border-sky-300/30 bg-sky-500/10 px-4 py-2 text-sm text-sky-100 hover:bg-sky-500/20"
                 title="Criar uma nova instancia no provedor ativo"
               >
@@ -1302,7 +1372,7 @@ export default function ConnectionsClient() {
                 <button
                   type="button"
                   onClick={() => void (provider === "uazapi" ? handleUazapiConnectQr() : handleBaileysConnectQr())}
-                  disabled={busy !== null}
+                  disabled={busy !== null || (provider === "baileys" && !canManageSelectedBaileys)}
                   className="rounded-full border border-white/10 px-3 py-1.5 text-xs uppercase tracking-[0.2em] text-zinc-200 hover:bg-white/5 disabled:opacity-50"
                   title="Gerar ou renovar QR da instancia selecionada"
                 >
@@ -1311,7 +1381,7 @@ export default function ConnectionsClient() {
                 <button
                   type="button"
                   onClick={() => void (provider === "uazapi" ? handleDeleteUazapi() : handleDeleteBaileys())}
-                  disabled={busy !== null}
+                  disabled={busy !== null || (provider === "baileys" && !canManageSelectedBaileys)}
                   className="rounded-full border border-red-300/30 px-3 py-1.5 text-xs uppercase tracking-[0.2em] text-red-100 hover:bg-red-500/10 disabled:opacity-50"
                   title="Excluir a instancia selecionada com limpeza do que o provedor suportar"
                 >
@@ -1338,7 +1408,7 @@ export default function ConnectionsClient() {
               <button
                 type="button"
                 onClick={() => void (provider === "uazapi" ? handleUazapiConnectQr() : handleBaileysConnectQr())}
-                disabled={!selectedInstanceId || busy !== null}
+                disabled={!selectedInstanceId || busy !== null || (provider === "baileys" && !canManageSelectedBaileys)}
                 className="rounded-full border border-white/10 px-3 py-1.5 text-xs uppercase tracking-[0.2em] text-zinc-200 hover:bg-white/5 disabled:opacity-50"
                 title="Gerar ou renovar QR da instancia selecionada"
               >
@@ -1407,6 +1477,34 @@ export default function ConnectionsClient() {
                         <span className="text-zinc-500">Me JID:</span>{" "}
                         {selectedBaileysInstance?.me_jid || baileysStatus?.me_jid || selectedUnifiedInstance?.baileysMeJid || "sem_dados"}
                       </div>
+                      <div>
+                        <span className="text-zinc-500">Perfil:</span>{" "}
+                        {selectedBaileysInstance?.profileName || baileysStatus?.profileName || selectedUnifiedInstance?.profileName || "sem_dados"}
+                      </div>
+                      <div>
+                        <span className="text-zinc-500">SystemName:</span>{" "}
+                        {selectedBaileysInstance?.systemName || baileysStatus?.systemName || selectedUnifiedInstance?.systemName || "sem_dados"}
+                      </div>
+                      <div>
+                        <span className="text-zinc-500">AdminField01:</span>{" "}
+                        {selectedBaileysInstance?.adminField01 || baileysStatus?.adminField01 || selectedUnifiedInstance?.adminField01 || "sem_dados"}
+                      </div>
+                      <div>
+                        <span className="text-zinc-500">AdminField02:</span>{" "}
+                        {selectedBaileysInstance?.adminField02 || baileysStatus?.adminField02 || selectedUnifiedInstance?.adminField02 || "sem_dados"}
+                      </div>
+                      <div>
+                        <span className="text-zinc-500">Browser:</span>{" "}
+                        {selectedBaileysInstance?.browser || baileysStatus?.browser || selectedUnifiedInstance?.baileysBrowser || "padrao"}
+                      </div>
+                      <div>
+                        <span className="text-zinc-500">SyncFullHistory:</span>{" "}
+                        {(selectedBaileysInstance?.syncFullHistory ?? baileysStatus?.syncFullHistory ?? selectedUnifiedInstance?.baileysSyncFullHistory ?? true) ? "sim" : "nao"}
+                      </div>
+                      <div>
+                        <span className="text-zinc-500">MarkOnlineOnConnect:</span>{" "}
+                        {(selectedBaileysInstance?.markOnlineOnConnect ?? baileysStatus?.markOnlineOnConnect ?? selectedUnifiedInstance?.baileysMarkOnlineOnConnect ?? false) ? "sim" : "nao"}
+                      </div>
                     </div>
                     <div className="rounded-xl border border-white/10 bg-black/20 p-3 text-xs text-zinc-400">
                       A interface continua usando o numero BR com 9. O transporte responde automaticamente no identificador real devolvido pelo WhatsApp.
@@ -1415,7 +1513,7 @@ export default function ConnectionsClient() {
                       <button
                         type="button"
                         onClick={() => void handleBaileysConnectQr()}
-                        disabled={!selectedInstanceId || busy !== null}
+                        disabled={!canManageSelectedBaileys || busy !== null}
                         className="rounded-full border border-white/10 px-4 py-2 text-sm text-zinc-200 hover:bg-white/5 disabled:opacity-50"
                       >
                         Gerar/Atualizar QR
@@ -1423,7 +1521,7 @@ export default function ConnectionsClient() {
                       <button
                         type="button"
                         onClick={() => void handleBaileysReset()}
-                        disabled={!selectedInstanceId || busy !== null}
+                        disabled={!canManageSelectedBaileys || busy !== null}
                         className="rounded-full border border-red-300/20 px-4 py-2 text-sm text-red-100 hover:bg-red-500/10 disabled:opacity-50"
                       >
                         Resetar sessao
@@ -1431,7 +1529,7 @@ export default function ConnectionsClient() {
                       <button
                         type="button"
                         onClick={() => void handleDeleteBaileys()}
-                        disabled={!selectedInstanceId || busy !== null}
+                        disabled={!canManageSelectedBaileys || busy !== null}
                         className="rounded-full border border-red-300/30 px-4 py-2 text-sm text-red-100 hover:bg-red-500/10 disabled:opacity-50"
                       >
                         Excluir instancia
@@ -1479,6 +1577,19 @@ export default function ConnectionsClient() {
                 ) : (
                   <>
                     <input value={createBaileysInstanceId} onChange={(e) => setCreateBaileysInstanceId(e.target.value)} placeholder="ID da instancia Baileys" className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-zinc-200 outline-none" />
+                    <input value={createBaileysProfileName} onChange={(e) => setCreateBaileysProfileName(e.target.value)} placeholder="Perfil (opcional)" className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-zinc-200 outline-none" />
+                    <input value={createBaileysSystemName} onChange={(e) => setCreateBaileysSystemName(e.target.value)} placeholder="SystemName (opcional)" className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-zinc-200 outline-none" />
+                    <input value={createBaileysAdminField01} onChange={(e) => setCreateBaileysAdminField01(e.target.value)} placeholder="AdminField01 (opcional)" className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-zinc-200 outline-none" />
+                    <input value={createBaileysAdminField02} onChange={(e) => setCreateBaileysAdminField02(e.target.value)} placeholder="AdminField02 (opcional)" className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-zinc-200 outline-none" />
+                    <input value={createBaileysBrowser} onChange={(e) => setCreateBaileysBrowser(e.target.value)} placeholder="browser (opcional, ex.: Mac OS|Desktop|14.4.1)" className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-zinc-200 outline-none" />
+                    <label className="flex items-center gap-2 text-sm text-zinc-200">
+                      <input type="checkbox" checked={createBaileysSyncFullHistory} onChange={(e) => setCreateBaileysSyncFullHistory(e.target.checked)} />
+                      SyncFullHistory
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-zinc-200">
+                      <input type="checkbox" checked={createBaileysMarkOnlineOnConnect} onChange={(e) => setCreateBaileysMarkOnlineOnConnect(e.target.checked)} />
+                      MarkOnlineOnConnect
+                    </label>
                     <button type="button" onClick={() => void handleCreateBaileys()} disabled={busy !== null} className="rounded-full border border-white/10 px-4 py-2 text-sm text-zinc-200 hover:bg-white/5 disabled:opacity-50">
                       Criar instancia Baileys
                     </button>
@@ -1503,7 +1614,7 @@ export default function ConnectionsClient() {
                   </>
                 ) : (
                   <div className="rounded-xl border border-dashed border-white/15 bg-black/20 p-4 text-sm text-zinc-400">
-                    A API Baileys atual nao expoe endpoint de edicao de metadados de instancia.
+                    A edicao de metadados Baileys ainda nao foi aberta no painel. Hoje a configuracao funcional acontece na criacao e no reset da sessao.
                   </div>
                 )}
               </div>

@@ -35,11 +35,12 @@ const sentMessageStoreRoot = String(process.env.BAILEYS_SENT_MESSAGE_STORE_DIR |
 const eagerStartDefaultInstance = String(process.env.BAILEYS_EAGER_START_DEFAULT || "false").trim().toLowerCase() === "true";
 const lazyStartDefaultInstance = String(process.env.BAILEYS_LAZY_START_DEFAULT || "false").trim().toLowerCase() === "true";
 const bootNamedInstances = String(process.env.BAILEYS_BOOT_NAMED_INSTANCES || "true").trim().toLowerCase() !== "false";
+const instanceMetaFileName = "instance-meta.json";
 
 
 const logger = pino({ level: logLevel });
 
-const instances = new Map(); // instanceId -> {id, authDir, socket, lastConnection, lastQr, startPromise, resetting, deleting}
+const instances = new Map(); // instanceId -> {id, authDir, socket, lastConnection, lastQr, startPromise, resetting, deleting, meta}
 
 const require = createRequire(import.meta.url);
 let baileysHelper = null;
@@ -169,6 +170,7 @@ function getOrCreateInstance(instanceId) {
     lastQr: null,
     startPromise: null,
     deleting: false,
+    meta: null,
   };
   instances.set(id, inst);
   return inst;
@@ -267,6 +269,7 @@ function instanceIdentity(inst) {
     number_display: identity.waPhoneDisplay || undefined,
     number_mode: identity.waPhoneMode,
     number_variants: identity.waPhoneVariants.length ? identity.waPhoneVariants : undefined,
+    ...summarizeInstanceMeta(inst?.meta),
   };
 }
 
@@ -354,6 +357,96 @@ function isDefaultInstance(instanceId) {
 
 function shouldLazyStartInstance(instanceId) {
   return !isDefaultInstance(instanceId) || lazyStartDefaultInstance;
+}
+
+function instanceMetaPath(instanceId) {
+  const id = sanitizeInstanceId(instanceId);
+  const authDir = id === "default" ? baseAuthDir : path.join(baseAuthDir, id);
+  return path.join(authDir, instanceMetaFileName);
+}
+
+function sanitizeMetaText(value, limit = 120) {
+  const text = String(value || "").trim();
+  return text ? text.slice(0, limit) : "";
+}
+
+function parseOptionalBoolean(value, fallback) {
+  if (value === undefined || value === null || value === "") return fallback;
+  if (typeof value === "boolean") return value;
+  const normalized = String(value).trim().toLowerCase();
+  if (["1", "true", "yes", "on", "sim"].includes(normalized)) return true;
+  if (["0", "false", "no", "off", "nao", "não"].includes(normalized)) return false;
+  return fallback;
+}
+
+function normalizeInstanceMeta(raw = {}) {
+  return {
+    profileName: sanitizeMetaText(raw.profileName, 120),
+    systemName: sanitizeMetaText(raw.systemName, 120),
+    adminField01: sanitizeMetaText(raw.adminField01, 120),
+    adminField02: sanitizeMetaText(raw.adminField02, 120),
+    browser: sanitizeMetaText(raw.browser, 120),
+    syncFullHistory: parseOptionalBoolean(raw.syncFullHistory, true),
+    markOnlineOnConnect: parseOptionalBoolean(raw.markOnlineOnConnect, false),
+  };
+}
+
+function summarizeInstanceMeta(meta = {}) {
+  const normalized = normalizeInstanceMeta(meta);
+  return {
+    profileName: normalized.profileName || undefined,
+    systemName: normalized.systemName || undefined,
+    adminField01: normalized.adminField01 || undefined,
+    adminField02: normalized.adminField02 || undefined,
+    browser: normalized.browser || undefined,
+    syncFullHistory: normalized.syncFullHistory,
+    markOnlineOnConnect: normalized.markOnlineOnConnect,
+  };
+}
+
+function socketBrowserFromMeta(meta = {}) {
+  const raw = sanitizeMetaText(meta.browser, 120);
+  if (!raw) return Browsers.macOS("Desktop");
+  const parts = raw
+    .split(/[|,;]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  if (parts.length >= 3) return [parts[0], parts[1], parts[2]];
+  if (parts.length === 2) return [parts[0], parts[1], "1.0.0"];
+  return [parts[0], "Desktop", "1.0.0"];
+}
+
+async function loadInstanceMeta(instanceId) {
+  try {
+    const content = await fs.readFile(instanceMetaPath(instanceId), "utf8");
+    return normalizeInstanceMeta(JSON.parse(content));
+  } catch {
+    return normalizeInstanceMeta();
+  }
+}
+
+async function ensureInstanceMeta(inst, seed = null) {
+  if (!inst.meta) inst.meta = await loadInstanceMeta(inst.id);
+  if (seed && typeof seed === "object") inst.meta = normalizeInstanceMeta({ ...inst.meta, ...seed });
+  return inst.meta;
+}
+
+async function saveInstanceMeta(inst, raw = null) {
+  const next = await ensureInstanceMeta(inst, raw || {});
+  await fs.mkdir(inst.authDir, { recursive: true });
+  await fs.writeFile(instanceMetaPath(inst.id), `${JSON.stringify(next, null, 2)}\n`, "utf8");
+  return next;
+}
+
+async function instanceExists(instanceId) {
+  const id = sanitizeInstanceId(instanceId);
+  if (instances.has(id)) return true;
+  try {
+    const stat = await fs.stat(path.dirname(instanceMetaPath(id)));
+    return stat.isDirectory();
+  } catch {
+    return false;
+  }
 }
 
 function safeStoreKey(value) {
@@ -731,6 +824,7 @@ async function startWhatsApp(inst) {
   await fs.mkdir(inst.authDir, { recursive: true });
   await fs.mkdir(sentMessageStoreDir(inst.id), { recursive: true });
   void prunePersistedSentMessages(inst.id);
+  await ensureInstanceMeta(inst);
   const { state, saveCreds } = await useMultiFileAuthState(inst.authDir);
   if (state?.creds?.me?.id) {
     inst.lastConnection = {
@@ -745,9 +839,11 @@ async function startWhatsApp(inst) {
     printQRInTerminal: false,
     logger,
     version,
-    browser: Browsers.macOS("Desktop"),
-    markOnlineOnConnect: false,
-    syncFullHistory: true,
+    // SocketConfig fields supported by the official Baileys runtime and exposed
+    // in the Ruptur panel for Baileys instance creation.
+    browser: socketBrowserFromMeta(inst.meta),
+    markOnlineOnConnect: Boolean(inst.meta?.markOnlineOnConnect),
+    syncFullHistory: inst.meta?.syncFullHistory !== false,
     getMessage: async (key) => getCachedMessage(inst, key),
   });
 
@@ -863,9 +959,14 @@ app.get("/health", (_req, res) => {
 // uazapi-ish endpoints (subset)
 app.get("/instance/status", async (_req, res) => {
   const instanceId = getInstanceId(_req);
+  if (!(await instanceExists(instanceId))) {
+    return res.status(404).json({ ok: false, error: "instance_not_found" });
+  }
   const inst = getOrCreateInstance(instanceId);
+  await ensureInstanceMeta(inst);
   if (!inst.socket && !inst.startPromise && shouldLazyStartInstance(instanceId)) {
-    // Lazy start so users can retrieve QR for new instances.
+    // Status for a known instance can resume the socket, but it must not create
+    // a brand-new companion just because the UI inspected another provider row.
     ensureStarted(instanceId).catch((err) => logger.error({ err, instance: instanceId }, "Falha ao iniciar instance"));
   }
 
@@ -914,7 +1015,10 @@ app.post("/instance/connect", async (_req, res) => {
 app.post("/instance", async (_req, res) => {
   const instanceId = getInstanceId(_req);
   try {
+    const inst = getOrCreateInstance(instanceId);
+    await saveInstanceMeta(inst, _req.body || {});
     await createInstanceSession(instanceId);
+    await waitForQrOrOpen(inst, 5000);
   } catch (err) {
     logger.error({ err, instance: instanceId }, "Falha ao criar instance");
     return res.status(502).json({ ok: false, error: "instance_create_failed" });
@@ -1023,7 +1127,11 @@ app.post("/send/presence", async (req, res) => {
 
 app.get("/qr.png", async (_req, res) => {
   const instanceId = getInstanceId(_req);
+  if (!(await instanceExists(instanceId))) {
+    return res.status(404).json({ ok: false, error: "instance_not_found" });
+  }
   const inst = getOrCreateInstance(instanceId);
+  await ensureInstanceMeta(inst);
   if (!inst.socket && !inst.startPromise && shouldLazyStartInstance(instanceId)) {
     ensureStarted(instanceId).catch((err) => logger.error({ err, instance: instanceId }, "Falha ao iniciar instance"));
   }

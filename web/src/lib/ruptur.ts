@@ -79,6 +79,13 @@ export type RupturBaileysInstance = {
   number_mode?: string;
   number_variants?: string[];
   me_jid?: string;
+  profileName?: string;
+  systemName?: string;
+  adminField01?: string;
+  adminField02?: string;
+  browser?: string;
+  syncFullHistory?: boolean;
+  markOnlineOnConnect?: boolean;
   connection?: string;
   hasQr?: boolean;
 };
@@ -95,6 +102,13 @@ export type RupturBaileysStatus = {
   number_mode?: string;
   number_variants?: string[];
   me_jid?: string;
+  profileName?: string;
+  systemName?: string;
+  adminField01?: string;
+  adminField02?: string;
+  browser?: string;
+  syncFullHistory?: boolean;
+  markOnlineOnConnect?: boolean;
   status?: string;
   qrcode?: string;
 };
@@ -330,7 +344,16 @@ export async function listBaileysInstances() {
   return (data.items || []) as RupturBaileysInstance[];
 }
 
-export async function createBaileysInstance(input: { instance: string }) {
+export async function createBaileysInstance(input: {
+  instance: string;
+  profileName?: string;
+  systemName?: string;
+  adminField01?: string;
+  adminField02?: string;
+  browser?: string;
+  syncFullHistory?: boolean;
+  markOnlineOnConnect?: boolean;
+}) {
   const data = await apiFetch("/integrations/baileys/instances", {
     method: "POST",
     headers: { "content-type": "application/json" },

@@ -20,6 +20,13 @@ LEGACY_INSTANCE_BY_CANONICAL = {
 
 class CreateInstanceRequest(BaseModel):
     instance: str = Field(min_length=1, description="ID da instância Baileys")
+    profileName: str | None = Field(default=None, description="Nome operacional exibido no painel")
+    systemName: str | None = Field(default=None, description="Sistema/dono operacional da instância")
+    adminField01: str | None = Field(default=None, description="Campo administrativo livre 01")
+    adminField02: str | None = Field(default=None, description="Campo administrativo livre 02")
+    browser: str | None = Field(default=None, description="User agent do companion no formato Nome|Dispositivo|Versão")
+    syncFullHistory: bool | None = Field(default=None, description="Sincroniza histórico completo do multi-device")
+    markOnlineOnConnect: bool | None = Field(default=None, description="Expõe presença online ao conectar")
 
 
 def _base_url() -> str:
@@ -118,7 +125,8 @@ def create_instance(req: CreateInstanceRequest) -> dict[str, Any]:
         requested = _clean_instance(req.instance)
         if not requested:
             raise HTTPException(status_code=400, detail="baileys_instance_required")
-        resp = _request("POST", "/instance", instance=requested)
+        payload = req.model_dump(exclude_none=True)
+        resp = _request("POST", "/instance", instance=requested, payload=payload)
         resp.raise_for_status()
         raw = resp.json().get("instance", {})
         if not isinstance(raw, dict):
@@ -159,6 +167,8 @@ def status(instance: str | None = Query(default=None)) -> dict[str, Any]:
         if not requested:
             raise HTTPException(status_code=400, detail="baileys_instance_required")
         resp = _request("GET", "/instance/status", instance=requested)
+        if resp.status_code == 404:
+            raise HTTPException(status_code=404, detail="baileys_instance_not_found")
         resp.raise_for_status()
         data = resp.json()
         raw = data.get("instance", {})
