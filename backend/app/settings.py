@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     openai_api_key: str | None = Field(default=None, alias="RUPTUR_OPENAI_API_KEY")
 
     baileys_base_url: str = Field(default="https://baileys.ruptur.cloud", alias="RUPTUR_BAILEYS_BASE_URL")
-    baileys_instance_id: str = Field(default="default", alias="RUPTUR_BAILEYS_INSTANCE_ID")
+    baileys_instance_id: str | None = Field(default=None, alias="RUPTUR_BAILEYS_INSTANCE_ID")
 
     allowed_groups_jids: str = Field(default="", alias="RUPTUR_ALLOWED_GROUPS_JIDS")
 

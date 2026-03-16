@@ -49,9 +49,14 @@ Foram incluidos comentarios curtos no `ConnectionsClient.tsx` para:
 ### VPS (CLI)
 - Arquivo sincronizado para:
   - `~/apps/ruptur-backend/web/src/app/connections/ConnectionsClient.tsx`
+- Documento sincronizado para:
+  - `~/apps/ruptur-backend/docs/jornada/connections-unified-list-2026-03-15.md`
 - Build do frontend no fluxo real da VPS:
   - `cd ~/apps/ruptur-backend/deploy/host2 && docker compose build ruptur-web`
   - resultado: sucesso (`Image host2-ruptur-web Built`).
+- Aplicacao em execucao atualizada:
+  - `cd ~/apps/ruptur-backend/deploy/host2 && docker compose up -d ruptur-web`
+  - resultado: container `ruptur-web` iniciado e log de boot do `next start` sem erro inicial.
 - Observacao operacional:
   - `npm` nao estava no PATH direto do usuario `ubuntu`; validacao foi feita via Docker Compose, que e o fluxo de deploy da VPS.
 

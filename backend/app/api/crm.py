@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+import httpx
 from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 
@@ -507,9 +508,38 @@ def _fetch_contact_profile_image(
             "jid": details.get("wa_chatid") or None,
         }
 
+    resolved_instance = str(instance or "").strip()
+    if not resolved_instance or resolved_instance.lower() == "default":
+        try:
+            with httpx.Client(timeout=10) as client_http:
+                resp = client_http.get(f"{settings.baileys_base_url.rstrip('/')}/health")
+                resp.raise_for_status()
+                data = resp.json()
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=f"baileys_instance_lookup_failed: {exc}")
+
+        resolved_instance = ""
+        for item in data.get("instances", []) or []:
+            if not isinstance(item, dict):
+                continue
+            candidate = str(item.get("instance") or item.get("id") or item.get("name") or "").strip()
+            if candidate and candidate.lower() != "default" and str(item.get("connection") or "").lower() == "open":
+                resolved_instance = candidate
+                break
+        if not resolved_instance:
+            for item in data.get("instances", []) or []:
+                if not isinstance(item, dict):
+                    continue
+                candidate = str(item.get("instance") or item.get("id") or item.get("name") or "").strip()
+                if candidate and candidate.lower() != "default":
+                    resolved_instance = candidate
+                    break
+        if not resolved_instance:
+            raise HTTPException(status_code=400, detail="baileys_instance_required")
+
     details = BaileysClient(
         base_url=settings.baileys_base_url,
-        instance_id=(instance or settings.baileys_instance_id or "default"),
+        instance_id=resolved_instance,
     ).chat_details(number=number, preview=preview)
     if not details.get("ok", True):
         raise HTTPException(status_code=502, detail=f"baileys_avatar_unavailable: {details.get('error') or 'unknown_error'}")

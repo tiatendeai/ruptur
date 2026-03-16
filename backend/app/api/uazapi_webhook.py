@@ -1,245 +1,352 @@
 from __future__ import annotations
-import os
-import uuid
+
 import logging
-import json
+from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 
-from app.db import DatabaseNotConfiguredError, connect
-from app.services.uazapi_ingest import ingest_uazapi_webhook, extract_message_fields
-from app.services.agent_service import agent_service
-from app.clients.uazapi import UazapiClient
 from app.clients.baileys import BaileysClient
-from app.services.media_service import media_service
+from app.db import connect
 from app.repositories import crm_repo
+from app.services.agent_service import agent_service
+from app.services.media_service import media_service
+from app.services.uazapi_ingest import extract_message_fields, ingest_uazapi_webhook
+from app.services.wa_identity import canonical_jid, digits_only, local_part, normalize_target_digits, parse_bool
 from app.settings import settings
 
 logger = logging.getLogger(__name__)
-
 router = APIRouter(prefix="/webhook", tags=["webhook"])
 
-def neutralize_br_number(number: str) -> str:
-    """
-    Remove o nono dígito de números brasileiros (especialmente DDD 31) 
-    para contornar o bug de sincronização do WhatsApp Mobile.
-    Ex: 5531989131980 -> 553189131980
-    """
-    digits = "".join(ch for ch in number if ch.isdigit())
-    if digits.startswith("55") and len(digits) == 13 and digits[4] == "9":
-        return digits[:4] + digits[5:]
-    return digits
+# Canonical BR numbers (current format with 9 digit for mobile).
+CANONICAL_BUSINESS_NUMBERS = {"5531981139540", "5531989131980"}
+BUSINESS_CANONICAL_BY_LEGACY = {
+    "553181139540": "5531981139540",
+    "553189131980": "5531989131980",
+}
+# RUP-2026-012: temporary compatibility while older auth folders are still in use.
+INSTANCE_BY_CANONICAL_PHONE = {
+    "5531981139540": "inst-553181139540",
+    "5531989131980": "inst-553189131980",
+}
+IAZINHA_COMMANDS = {"iazinha", "/iazinha", "/start-iazinha", "assistant", "/assistant", "/start-assistant", "/start-assistente"}
+JARVIS_COMMANDS = {"jarvis", "/jarvis", "/start-jarvis"}
+STATUS_COMMANDS = {"/session-status"}
+END_COMMANDS = {"/end-session", "/stop", "/stop-agent", "/agent-stop", "/stop-iazinha", "/stop-jarvis"}
+RESET_COMMANDS = {"#reset-session"}
+SESSION_TIMEOUT_SECONDS = 1800
+
+
+JARVIS_PASSWORD = "7"
+
+
+def is_jarvis_activation_attempt(value: str | None) -> bool:
+    normalized = normalize_command(value)
+    return normalized in JARVIS_COMMANDS or normalized in {"/jarvis-7", "jarvis 7", "/jarvis 7", "jarvis-7"}
+
+
+def is_iazinha_activation_attempt(value: str | None) -> bool:
+    normalized = normalize_command(value)
+    if normalized in IAZINHA_COMMANDS:
+        return True
+    return (
+        normalized.startswith("iazinha ")
+        or normalized.startswith("/iazinha ")
+        or normalized.startswith("assistant ")
+        or normalized.startswith("/assistant ")
+        or normalized.startswith("/start-iazinha")
+        or normalized.startswith("/start-assistant")
+        or normalized.startswith("/start-assistente")
+    )
+
+
+def has_jarvis_password(value: str | None) -> bool:
+    normalized = normalize_command(value)
+    return normalized in {"7", "/7", "jarvis 7", "/jarvis 7", "jarvis-7", "/jarvis-7"}
+
+
+def normalize_target(value: str | None) -> str:
+    return normalize_target_digits(value)
+
+
+def canonical_business_phone(value: str | None) -> str:
+    normalized = normalize_target(value)
+    if not normalized:
+        return ""
+    return BUSINESS_CANONICAL_BY_LEGACY.get(normalized, normalized)
+
+
+def normalize_command(value: str | None) -> str:
+    cleaned = (value or "").strip().lower()
+    while cleaned.endswith((".", ",", "!", "?", ":", ";")):
+        cleaned = cleaned[:-1].strip()
+    return cleaned
+
+
+def direct_user_jid(value: str | None) -> str | None:
+    raw = str(value or "").strip()
+    if not raw or raw == "status@broadcast" or "@g.us" in raw:
+        return None
+    if "@" in raw:
+        domain = raw.split("@", 1)[1].lower()
+        if domain in {"lid", "newsletter", "broadcast"}:
+            return None
+        if domain not in {"s.whatsapp.net", "c.us"}:
+            return None
+    phone = digits_only(local_part(raw))
+    if not phone:
+        return None
+    return f"{phone}@s.whatsapp.net"
+
+
+def is_self_chat(payload: dict[str, Any], chatid: str) -> bool:
+    data = payload.get("data", {}) if isinstance(payload.get("data"), dict) else {}
+    me_jid = payload.get("meJid") or data.get("meJid") or ""
+    sender = str(data.get("wa_sender") or data.get("sender") or "")
+    if bool(normalize_target(chatid) and normalize_target(chatid) == normalize_target(me_jid)):
+        return True
+    # WhatsApp desktop/self threads can arrive as @lid chats instead of the phone JID.
+    if chatid.endswith("@lid") and parse_bool(data.get("fromMe")):
+        me_phone = normalize_target(me_jid)
+        sender_phone = normalize_target(sender)
+        sender_is_self = bool(sender_phone and sender_phone == me_phone)
+        sender_is_lid = bool(sender and sender.endswith("@lid"))
+        if sender == chatid or sender_is_self or sender_is_lid or not sender:
+            return True
+    return False
+
+
+def is_assistant_output_message(body: str | None) -> bool:
+    normalized = (body or "").strip().lower()
+    return normalized.startswith("*iazinha:*") or normalized.startswith("*jarvis:*")
+
+
+def is_group_chat(chatid: str) -> bool:
+    return "@g.us" in chatid or chatid == "status@broadcast"
+
+
+def wants_audio_response(body: str | None) -> bool:
+    normalized = normalize_command(body)
+    triggers = ("audio", "áudio", "em audio", "em áudio", "me responda em audio", "me responda em áudio", "mande audio", "mande áudio", "responda em audio", "responda em áudio", "voz")
+    return any(token in normalized for token in triggers)
+
+
+def apply_persona_prefix(persona: str, text: str | None) -> str:
+    normalized = (text or "").strip()
+    if not normalized:
+        normalized = "Desculpe, nao consegui montar uma resposta agora."
+    low = normalized.lower()
+    if low.startswith("*iazinha:*") or low.startswith("*jarvis:*"):
+        return normalized
+    prefix = "*Jarvis:*" if persona == "jarvis" else "*IAzinha:*"
+    return f"{prefix} {normalized}"
+
+
+def ensure_session_metadata(metadata: dict[str, Any] | None) -> dict[str, Any]:
+    base = dict(metadata or {})
+    base.setdefault("session_status", "idle")
+    base.setdefault("active_persona", "iazinha")
+    base.setdefault("response_mode", "text")
+    base.setdefault("warmup_mode", False)
+    base.setdefault("jarvis_pending", False)
+    return base
+
+
+def is_managed_cross_chat(payload: dict[str, Any], fields: dict[str, Any], metadata: dict[str, Any]) -> bool:
+    owner = canonical_business_phone(payload.get("meJid") or payload.get("data", {}).get("meJid") or "")
+    sender = canonical_business_phone(fields.get("sender") or fields.get("chatid") or "")
+    if metadata.get("warmup_mode") is True:
+        return False
+    return bool(
+        owner
+        and sender
+        and owner in CANONICAL_BUSINESS_NUMBERS
+        and sender in CANONICAL_BUSINESS_NUMBERS
+        and owner != sender
+    )
+
+
+def resolve_baileys_instance_id(payload: dict[str, Any], lead_phone: str | None = None) -> str:
+    explicit = str(payload.get("instance") or "").strip()
+    if explicit and explicit.lower() != "default":
+        return explicit
+    me_jid = payload.get("meJid") or payload.get("data", {}).get("meJid") or ""
+    target = canonical_business_phone(me_jid) or canonical_business_phone(lead_phone)
+    if target:
+        return INSTANCE_BY_CANONICAL_PHONE.get(target, f"inst-{target}")
+    raise ValueError(
+        "baileys_instance_unresolved"
+        f": explicit={explicit or '-'} me_jid={me_jid or '-'} lead_phone={lead_phone or '-'}"
+    )
+
+
+def resolve_target_jid(payload: dict[str, Any], lead_phone: str | None = None) -> str:
+    data = payload.get("data", {}) if isinstance(payload.get("data"), dict) else {}
+    raw_chatid = str(data.get("wa_chatid") or data.get("chatid") or "").strip()
+    me_jid = str(payload.get("meJid") or data.get("meJid") or "").strip()
+
+    # RUP-2026-015: when WhatsApp already gives us a direct user JID/phone,
+    # reply in that exact thread instead of force-inserting the BR 9th digit.
+    for candidate in (raw_chatid, me_jid):
+        direct = direct_user_jid(candidate)
+        if direct:
+            return direct
+
+    # Lead phone remains a fallback when the transport only exposes @lid.
+    direct = direct_user_jid(lead_phone)
+    if direct:
+        return direct
+
+    if lead_phone:
+        fallback = canonical_jid(lead_phone)
+        if fallback:
+            return fallback
+    return raw_chatid
+
+
+def format_session_status(metadata: dict[str, Any], *, self_chat: bool) -> str:
+    auth = "self" if self_chat else ("ok" if metadata.get("session_status") == "active" else "pending")
+    return (
+        "*IAzinha:* Status da sessao\n"
+        f"- status: {metadata.get('session_status', 'idle')}\n"
+        f"- persona: {metadata.get('active_persona', 'iazinha')}\n"
+        f"- modo: {metadata.get('response_mode', 'text')}\n"
+        f"- auth: {auth}"
+    )
+
 
 async def process_ai_response(payload: dict[str, Any], lead_id: str, conversation_id: str, last_msg: str, message_id: str):
-    """
-    Processa a resposta da IA em segundo plano.
-    """
-    print(f"[DEBUG] Starting process_ai_response for lead={lead_id} conv={conversation_id} msg_id={message_id}")
     try:
         with connect() as conn:
-            # Pegar dados do lead
             lead = conn.execute(
-                """
-                SELECT name, phone, source, paused, manual_override
-                FROM leads
-                WHERE id = %s
-                """,
+                "SELECT name, phone, source, paused, manual_override FROM leads WHERE id = %s",
                 (lead_id,),
             ).fetchone()
             if not lead:
-                print(f"[DEBUG] Lead {lead_id} not found in DB")
                 return
-            
-            lead_name, lead_phone, lead_source, paused, manual_override = lead
-            
-            # UX: Inicia 'digitando...' imediatamente no WhatsApp (via Baileys)
-            is_baileys = "instance" in payload or "jid" in payload.get("data", {})
-            target_jid = None
-            if is_baileys and settings.baileys_base_url:
-                try:
-                    chatid = payload.get("data", {}).get("chatid")
-                    target_jid = chatid if chatid and "@" in chatid else f"{lead_phone}@s.whatsapp.net"
-                    client = BaileysClient(base_url=settings.baileys_base_url, instance_id=settings.baileys_instance_id)
-                    client.send_presence(jid=target_jid, presence="composing")
-                except:
-                    pass
+            lead_name, lead_phone, _lead_source, paused, manual_override = lead
+            if paused or manual_override:
+                logger.warning("AI response suppressed for lead=%s paused=%s manual_override=%s", lead_id, paused, manual_override)
+                return
 
-            print(f"[DEBUG] Processing for {lead_name} ({lead_phone})")
-            
-            # Puxar histórico recente (excluindo a mensagem atual que já foi passada)
+            data = payload.get("data", {})
+            chatid = data.get("chatid") or ""
+            current_msg = last_msg or ""
+            msg_lower = normalize_command(current_msg)
+            self_chat = is_self_chat(payload, chatid)
+            instance_id = resolve_baileys_instance_id(payload, lead_phone)
+            target_jid = resolve_target_jid(payload, lead_phone)
+
             history_rows = crm_repo.list_messages(conn, conversation_id=conversation_id, limit=10)
             history = []
-            for m in reversed(history_rows):
-                if m.id == message_id:
-                    continue # Pula a mensagem atual pois ela será o 'last_message'
-                role = "assistant" if m.direction == "out" else "user"
-                history.append({"role": role, "content": m.body or ""})
-            
-            print(f"[DEBUG] Reconstructed history (context): {json.dumps(history, ensure_ascii=False)}")
-            print(f"[DEBUG] Current message (trigger): '{last_msg}'")
-            
-            # Gerenciamento de Persona e Estado (Sessão)
-            metadata = crm_repo.get_conversation_metadata(conn, conversation_id=conversation_id)
-            active_persona = metadata.get("active_persona", "iazinha")
+            for message in reversed(history_rows):
+                if message.id == message_id:
+                    continue
+                role = "assistant" if message.direction == "out" else "user"
+                history.append({"role": role, "content": message.body or ""})
+
+            metadata = ensure_session_metadata(crm_repo.get_conversation_metadata(conn, conversation_id=conversation_id))
             last_activity = metadata.get("last_activity")
-            
-            # Lógica de Timeout (30 minutos)
-            from datetime import datetime
-            now_iso = datetime.now().isoformat()
-            if last_activity and active_persona == "jarvis":
+            if last_activity:
                 try:
-                    last_dt = datetime.fromisoformat(last_activity)
-                    diff = (datetime.now() - last_dt).total_seconds()
-                    if diff > 1800: # 30 min
-                        active_persona = "iazinha"
-                        print(f"[DEBUG] Session timeout (Jarvis -> IAzinha) after {diff}s")
-                except:
+                    age = (datetime.now() - datetime.fromisoformat(last_activity)).total_seconds()
+                    if age > SESSION_TIMEOUT_SECONDS and metadata.get("session_status") in {"active", "paused"}:
+                        metadata["session_status"] = "expired"
+                        metadata["active_persona"] = "iazinha"
+                except Exception:
                     pass
-            
-            # Atualiza última atividade
-            metadata["last_activity"] = now_iso
-            
-            # Lógica de Troca de Persona / Password Challenge
-            msg_body = last_msg or ""
-            msg_lower = msg_body.lower().strip()
-            
-            # 1. Solicitação de Ativação do Jarvis
-            if active_persona == "iazinha" and ("jarvis" in msg_lower or "senhor jarvis" in msg_lower):
-                # Se já mandou a senha na mesma frase (ex: "Jarvis 7")
-                if "7" in msg_lower:
-                    active_persona = "jarvis"
-                    metadata["active_persona"] = "jarvis"
-                    crm_repo.update_conversation_metadata(conn, conversation_id=conversation_id, metadata=metadata)
-                    response_text = "*Jarvis:* Protocolo de segurança validado. Em que posso ajudá-lo hoje, senhor?"
-                else:
-                    # Desafio de Senha
-                    response_text = "*IAzinha:* Identidade de nível superior detectada. Aguardando chave de ativação para prosseguir com o Protocolo Jarvis."
-                    print(f"[DEBUG] Password challenge sent for Jarvis activation.")
-                    # Pula o restante e manda o desafio
-                    external_id = crm_repo.store_out_message(conn, conversation_id=conversation_id, text=response_text, raw={"system_challenge": True})
-                    conn.commit()
-                    if is_baileys and settings.baileys_base_url:
-                        client.send_menu(jid=target_jid, text=response_text, choices=["Digitar Senha", "Cancelar"], footer="Segurança Jarvis 🦾")
-                    else:
-                        clean_number = neutralize_br_number(lead_phone)
-                        client = UazapiClient(base_url=settings.uazapi_base_url, token=settings.uazapi_token)
-                        client.send_text(number=clean_number, text=response_text)
-                    return
+            metadata["last_activity"] = datetime.now().isoformat()
 
-            # 2. Recebimento da Senha isolada
-            elif active_persona == "iazinha" and msg_lower == "7":
-                active_persona = "jarvis"
-                metadata["active_persona"] = "jarvis"
-                crm_repo.update_conversation_metadata(conn, conversation_id=conversation_id, metadata=metadata)
-                response_text = "*Jarvis:* Acesso concedido. Protocolo de ativação concluído. Como posso ajudar?"
-            
-            # 3. Resposta Normal (ou Jarvis já ativo)
-            else:
-                response_text = agent_service.get_response(
-                    lead_name=lead_name or lead_phone or "Cliente",
-                    last_message=msg_body,
-                    history=history,
-                    persona=active_persona
-                )
-                
-                # Se estiver no modo Jarvis e encerrar, reseta persona nos metadados
-                if active_persona == "jarvis" and ("encerrar" in msg_lower or "tchau" in msg_lower or "obrigado" in msg_lower):
-                    active_persona = "iazinha"
+            if msg_lower in RESET_COMMANDS:
+                metadata = {
+                    "session_status": "idle",
+                    "active_persona": "iazinha",
+                    "response_mode": "text",
+                    "warmup_mode": False,
+                    "jarvis_pending": False,
+                    "last_activity": metadata["last_activity"],
+                }
+                response_text = "*IAzinha:* Sessao resetada. Use /iazinha ou /jarvis."
+            elif msg_lower in END_COMMANDS:
+                metadata["session_status"] = "closed"
+                metadata["active_persona"] = "iazinha"
+                metadata["jarvis_pending"] = False
+                response_text = "*IAzinha:* Sessao encerrada."
+            elif msg_lower in STATUS_COMMANDS:
+                response_text = format_session_status(metadata, self_chat=self_chat)
+            elif is_iazinha_activation_attempt(msg_lower):
+                if self_chat:
+                    metadata["session_status"] = "active"
                     metadata["active_persona"] = "iazinha"
-                
-                # Salva o estado atualizado (persona e timestamp)
-                metadata["active_persona"] = active_persona
-                crm_repo.update_conversation_metadata(conn, conversation_id=conversation_id, metadata=metadata)
+                    metadata["jarvis_pending"] = False
+                    response_text = "*IAzinha:* Prontinha. Pode falar comigo."
+                else:
+                    response_text = "*IAzinha:* Por agora eu ativo em self-chat."
+            elif is_jarvis_activation_attempt(msg_lower):
+                if not self_chat:
+                    response_text = "*Jarvis:* Por agora eu ativo em self-chat."
+                elif has_jarvis_password(msg_lower):
+                    metadata["session_status"] = "active"
+                    metadata["active_persona"] = "jarvis"
+                    metadata["jarvis_pending"] = False
+                    response_text = "*Jarvis:* Protocolo de ativacao validado."
+                else:
+                    metadata["jarvis_pending"] = True
+                    response_text = "*Jarvis:* Informe a senha para ativacao."
+            elif metadata.get("jarvis_pending") and has_jarvis_password(msg_lower):
+                if self_chat:
+                    metadata["session_status"] = "active"
+                    metadata["active_persona"] = "jarvis"
+                    metadata["jarvis_pending"] = False
+                    response_text = "*Jarvis:* Protocolo de ativacao validado."
+                else:
+                    response_text = "*Jarvis:* Por agora eu ativo em self-chat."
+            else:
+                if metadata.get("session_status") != "active":
+                    crm_repo.update_conversation_metadata(conn, conversation_id=conversation_id, metadata=metadata)
+                    conn.commit()
+                    return
+                persona = metadata.get("active_persona", "iazinha")
+                # RUP-2026-009: AgentService migrated to profile/principal_name/user_message signature.
+                raw_response = agent_service.get_response(
+                    profile="ops",
+                    principal_name=lead_name or lead_phone or "Cliente",
+                    user_message=current_msg,
+                    history=history,
+                )
+                response_text = apply_persona_prefix(persona, raw_response)
 
-            # Define a voz baseada na assinatura da resposta
-            voice = "onyx" if "*Jarvis:*" in response_text else "nova"
-            print(f"[DEBUG] Session Persona: {active_persona} | Voice: {voice}")
-
-            # Decidir se envia áudio
-            wants_audio = "[Áudio Transcrito]" in last_msg or any(x in last_msg.lower() for x in ["áudio", "audio", "auio", "voz", "mande um áudio", "manda áudio", "manda audio"])
+            wants_audio = wants_audio_response(current_msg)
             audio_data = None
             if wants_audio:
-                # UX: Muda para 'gravando áudio...'
-                if is_baileys and settings.baileys_base_url:
-                    try:
-                        client.send_presence(jid=target_jid, presence="recording")
-                    except:
-                        pass
-                
-                audio_text = response_text.split(":", 1)[-1].strip() # Remove a assinatura do áudio
+                audio_text = response_text.replace("*IAzinha:*", "").replace("*Jarvis:*", "").strip()
+                voice = "nova" if metadata.get("active_persona") == "iazinha" else "onyx"
                 audio_data = media_service.text_to_speech_openai(audio_text, voice=voice)
-            
-            # Salvar no banco
+
             external_id = crm_repo.store_out_message(
-                conn, 
-                conversation_id=conversation_id, 
-                text=response_text, 
-                raw={"processed_by": "jarvis_ai", "audio_generated": audio_data is not None}
+                conn,
+                conversation_id=conversation_id,
+                text=response_text,
+                raw={"processed_by": "assistant", "instance_id": instance_id, "audio_generated": bool(audio_data)},
             )
+            crm_repo.update_conversation_metadata(conn, conversation_id=conversation_id, metadata=metadata)
             conn.commit()
-            print(f"[DEBUG] Stored Jarvis response message id: {external_id}")
+            logger.warning("Stored assistant response message id=%s instance=%s target=%s audio=%s", external_id, instance_id, target_jid, bool(audio_data))
 
-            # Enviar via Provedor correto
-            chatid = payload.get("data", {}).get("chatid")
-            is_baileys = "instance" in payload or "jid" in payload.get("data", {})
-            
-            if is_baileys and settings.baileys_base_url:
+            if settings.baileys_base_url:
+                client = BaileysClient(base_url=settings.baileys_base_url, instance_id=instance_id)
                 if audio_data:
-                    print(f"[DEBUG] Sending PTT via Baileys to {target_jid} (base64, {len(audio_data)} bytes)")
                     res = client.send_voice_jid(jid=target_jid, audio_data=audio_data)
-                    # Envia botões logo após o áudio para manter a conversa fluida
-                    client.send_menu(
-                        jid=target_jid,
-                        text="O que deseja fazer agora?",
-                        choices=["Encerrar conversa", "Fazer nova pergunta"],
-                        footer="Jarvis 🦾"
-                    )
                 else:
-                    print(f"[DEBUG] Sending via Baileys (Interactive Menu) to {target_jid}")
-                    # Envia a resposta de texto diretamente no corpo do menu de botões (mais eficiente)
-                    res = client.send_menu(
-                        jid=target_jid,
-                        text=response_text,
-                        choices=["Encerrar conversa", "Fazer nova pergunta"],
-                        footer="Jarvis 🦾"
-                    )
-                
-                # UX: Finaliza o status visual
-                try:
-                    client.send_presence(jid=target_jid, presence="paused")
-                except:
-                    pass
-                print(f"[DEBUG] Baileys response: {res}")
-            elif settings.uazapi_base_url and settings.uazapi_token:
-                clean_number = neutralize_br_number(lead_phone)
-                client = UazapiClient(base_url=settings.uazapi_base_url, token=settings.uazapi_token)
-                
-                if audio_data:
-                    filename = f"{uuid.uuid4()}.mp3"
-                    file_path = os.path.join("static", "audio", filename)
-                    with open(file_path, "wb") as f:
-                        f.write(audio_data)
-                    audio_url = f"{settings.public_url}/static/audio/{filename}"
-                    print(f"[DEBUG] Sending PTT via UAZAPI to {clean_number}: {audio_url}")
-                    res = client.send_ptt(number=clean_number, url=audio_url)
-                else:
-                    print(f"[DEBUG] Sending via UAZAPI to {clean_number}")
-                    res = client.send_text(number=clean_number, text=response_text)
-                print(f"[DEBUG] UAZAPI response: {res}")
-            else:
-                print("[DEBUG] No provider configured for sending response")
-
-    except Exception as e:
-        print(f"[DEBUG ERROR] Error in process_ai_response: {e}")
-        logger.error(f"Error in process_ai_response: {e}")
+                    res = client.send_text_jid(jid=target_jid, text=response_text)
+                logger.warning("Baileys response instance=%s result=%s", instance_id, res)
+    except Exception as exc:
+        logger.exception("Error in process_ai_response: %s", exc)
 
 
 @router.post("/uazapi")
 async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks) -> dict[str, Any]:
     payload = await request.json()
-    print(f"\n[WEBHOOK] Payload received: {str(payload)[:200]}...")
-    
     if not isinstance(payload, dict):
         raise HTTPException(status_code=400, detail="payload must be a JSON object")
 
@@ -247,39 +354,36 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks) ->
         with connect() as conn:
             result = ingest_uazapi_webhook(conn, payload)
             conn.commit()
-            print(f"[WEBHOOK] Ingestion result: stored={result.stored} lead={result.lead_id} conv={result.conversation_id}")
-            
             if result.stored and result.lead_id and result.conversation_id:
                 fields = extract_message_fields(payload)
                 chatid = fields.get("chatid") or ""
+                body = fields.get("body") or ""
                 from_me = fields.get("from_me")
-                
-                print(f"[WEBHOOK] Checking AI Trigger: chatid={chatid} from_me={from_me}")
-                
-                # Regra Universal de Bloqueio de Grupos: 
-                # O agente responde apenas em DMs.
-                is_group = "@g.us" in chatid
-                should_respond = not is_group
-                print(f"[WEBHOOK] is_group={is_group} -> should_respond={should_respond}")
-                
-                # Resiliência para from_me (pode vir como string em alguns adaptadores)
-                is_from_me = str(from_me).lower() == "true"
-                
-                if is_from_me is False and should_respond and result.message_id:
-                   # A regra agora é universal: responde em ambos os números (DMs apenas)
-                   print(f"[WEBHOOK] AI Response queued for lead {result.lead_id} (Message: {result.message_id})")
-                   background_tasks.add_task(
-                       process_ai_response, 
-                       payload, 
-                       result.lead_id, 
-                       result.conversation_id, 
-                       fields["body"], 
-                       result.message_id
-                   )
-                else:
-                   reason = "duplicate" if not result.message_id else "from_me/not_allowed"
-                   print(f"[WEBHOOK] AI Response SKIPPED (reason={reason}, from_me={from_me}, should_respond={should_respond})")
-
+                self_chat = is_self_chat(payload, chatid)
+                normalized_body = normalize_command(body)
+                metadata = ensure_session_metadata(crm_repo.get_conversation_metadata(conn, conversation_id=result.conversation_id))
+                explicit = (
+                    is_iazinha_activation_attempt(normalized_body)
+                    or normalized_body in (STATUS_COMMANDS | END_COMMANDS | RESET_COMMANDS)
+                    or is_jarvis_activation_attempt(normalized_body)
+                    or (metadata.get("jarvis_pending") and has_jarvis_password(normalized_body))
+                )
+                assistant_output = is_assistant_output_message(body)
+                session_active = metadata.get("session_status") == "active"
+                group_chat = is_group_chat(chatid)
+                managed_cross_chat = is_managed_cross_chat(payload, fields, metadata)
+                has_body = bool((body or "").strip())
+                self_chat_turn = self_chat and session_active and has_body and not assistant_output
+                inbound_turn = (not parse_bool(from_me)) and has_body and not assistant_output and not managed_cross_chat
+                # RUP-2026-007: core anti-loop and anti-group-spam gate.
+                # Respond only for explicit commands, active self-chat turns, or true inbound user turns.
+                should_respond = (not group_chat) and bool(result.message_id) and has_body and (explicit or self_chat_turn or inbound_turn)
+                logger.warning(
+                    "Trigger chatid=%s from_me=%s explicit=%s self_chat=%s assistant_output=%s managed_cross_chat=%s session_active=%s has_body=%s message_id=%s should_respond=%s",
+                    chatid, from_me, explicit, self_chat, assistant_output, managed_cross_chat, session_active, has_body, bool(result.message_id), should_respond,
+                )
+                if should_respond:
+                    background_tasks.add_task(process_ai_response, payload, result.lead_id, result.conversation_id, body, result.message_id)
             return {
                 "ok": True,
                 "stored": result.stored,
@@ -287,6 +391,6 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks) ->
                 "conversation_id": result.conversation_id,
                 "message_id": result.message_id,
             }
-    except Exception as e:
-        print(f"[WEBHOOK ERROR] {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as exc:
+        logger.exception("Webhook failure: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))

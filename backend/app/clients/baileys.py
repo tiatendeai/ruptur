@@ -9,9 +9,12 @@ logger = logging.getLogger(__name__)
 
 
 class BaileysClient:
-    def __init__(self, base_url: str, instance_id: str = "default"):
+    def __init__(self, base_url: str, instance_id: str):
+        resolved_instance = str(instance_id or "").strip()
+        if not resolved_instance or resolved_instance.lower() == "default":
+            raise ValueError("baileys_instance_required")
         self.base_url = base_url.rstrip("/")
-        self.instance_id = instance_id
+        self.instance_id = resolved_instance
 
     def _headers(self) -> dict[str, str]:
         return {

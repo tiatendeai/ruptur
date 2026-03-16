@@ -29,6 +29,11 @@ services:
       - BAILEYS_LOG_LEVEL=info
       - WHISPER_BASE_URL=http://whisper:8001
       - BAILEYS_FORWARD_WEBHOOK_URL=http://ruptur-backend:8000/webhook/uazapi
+      - BAILEYS_SENT_MESSAGE_STORE_DIR=/data/sent-messages
+      - BAILEYS_SENT_MESSAGE_TTL_MS=1209600000
+      - BAILEYS_EAGER_START_DEFAULT=false
+      - BAILEYS_LAZY_START_DEFAULT=false
+      - BAILEYS_BOOT_NAMED_INSTANCES=true
     volumes:
       - baileys_data:/data
     restart: unless-stopped
