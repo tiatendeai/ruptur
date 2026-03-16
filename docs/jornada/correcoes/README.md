@@ -24,3 +24,4 @@ Registros mais recentes:
 - `2026-03-16-rup-2026-016-baileys-reset-auth-stale-crypto.md`
 - `2026-03-16-rup-2026-017-instance-lifecycle-create-delete-panel.md`
 - `2026-03-16-rup-2026-018-instance-create-auto-connect.md`
+- `2026-03-16-rup-2026-019-baileys-create-attrs-and-no-ghost-status.md`

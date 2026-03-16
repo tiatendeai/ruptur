@@ -144,6 +144,18 @@ Leia este arquivo primeiro. Se a tarefa tocar OpenAI ou Baileys, consulte tambem
   - `number_display`
   - `number_mode`
   - `number_variants`
+- A criacao de instancia Baileys no painel deve expor apenas atributos com utilidade real:
+  - `instance`
+  - `profileName`
+  - `systemName`
+  - `adminField01`
+  - `adminField02`
+  - `browser`
+  - `syncFullHistory`
+  - `markOnlineOnConnect`
+- `status` e `qr` de Baileys nao devem criar sessao nova implicitamente:
+  - instancia inexistente deve responder `404`
+  - criacao/pairing devem acontecer por `POST /instance`
 - Ativacao por audio depende de transcricao chegar corretamente ao webhook; nao existe trilha separada de wake word.
 
 ## Fontes oficiais obrigatorias

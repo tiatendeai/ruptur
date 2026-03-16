@@ -13,3 +13,4 @@ Itens prontos para virar cards/draft issues:
 9. Preparar runbook de producao e rollback do assistente
 10. Publicar MVP assistido em ambiente de producao
 11. Padronizar lifecycle de instancias no painel com criacao, conexao imediata e exclusao limpa
+12. Expor atributos funcionais do Baileys na criacao e impedir sessao fantasma por consulta de status
