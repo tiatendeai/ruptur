@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { rupturApiBaseUrl } from "@/lib/config";
 import {
+  createBaileysInstance,
   createUazapiInstance,
+  deleteBaileysInstance,
   connectBaileysInstance,
   connectUazapiInstance,
   getBaileysStatus,
@@ -11,6 +13,7 @@ import {
   listBaileysInstances,
   listChannelHealth,
   listUazapiInstances,
+  resetBaileysInstance,
   runUazapiInstanceOperation,
   type RupturBaileysInstance,
   type RupturBaileysStatus,
@@ -163,7 +166,22 @@ function extractBaileysInstances(input: unknown): RupturBaileysInstance[] {
             ? item.state
             : undefined;
     const hasQr = typeof item.hasQr === "boolean" ? item.hasQr : Boolean(item.qrcode || item.qr || item.qrCode);
-    out.push({ instance, connection: status, hasQr });
+    out.push({
+      instance,
+      instance_display: typeof item.instance_display === "string" ? item.instance_display : undefined,
+      instance_canonical: typeof item.instance_canonical === "string" ? item.instance_canonical : undefined,
+      instance_effective: typeof item.instance_effective === "string" ? item.instance_effective : undefined,
+      number_canonical: typeof item.number_canonical === "string" ? item.number_canonical : undefined,
+      number_whatsapp: typeof item.number_whatsapp === "string" ? item.number_whatsapp : undefined,
+      number_display: typeof item.number_display === "string" ? item.number_display : undefined,
+      number_mode: typeof item.number_mode === "string" ? item.number_mode : undefined,
+      number_variants: Array.isArray(item.number_variants)
+        ? item.number_variants.filter((value): value is string => typeof value === "string")
+        : undefined,
+      me_jid: typeof item.me_jid === "string" ? item.me_jid : undefined,
+      connection: status,
+      hasQr,
+    });
   }
   return out;
 }
@@ -181,8 +199,14 @@ type UnifiedConnectionStatus = "connected" | "connecting" | "disconnected" | "un
 
 type UnifiedInstance = {
   id: string;
+  displayId: string;
   hasUazapi: boolean;
   hasBaileys: boolean;
+  baileysEffectiveId?: string;
+  baileysDisplayNumber?: string;
+  baileysTransportNumber?: string;
+  baileysIdentityMode?: string;
+  baileysMeJid?: string;
   number?: string;
   profileName?: string;
   systemName?: string;
@@ -220,6 +244,75 @@ function statusLabel(status: UnifiedConnectionStatus) {
   if (status === "connecting") return "conectando";
   if (status === "disconnected") return "desconectado";
   return "desconhecido";
+}
+
+function identityModeLabel(mode?: string) {
+  if (mode === "legacy_without_ninth_digit") return "legado_sem_9";
+  if (mode === "canonical_with_ninth_digit") return "canonico_com_9";
+  return mode || "sem_dados";
+}
+
+function normalizeBrazilWhatsappNumber(raw?: string) {
+  const digits = String(raw || "").replace(/[^\d]/g, "");
+  // RUP-2026-012: BR mobile numbers should display with 9th digit.
+  if (digits.startsWith("55") && digits.length === 12 && ["6", "7", "8", "9"].includes(digits[4] || "")) {
+    return `${digits.slice(0, 4)}9${digits.slice(4)}`;
+  }
+  return digits;
+}
+
+function extractPhoneFromInstanceId(instanceId?: string) {
+  const value = (instanceId || "").trim();
+  if (!value) return undefined;
+  const exact = value.match(/^(?:inst-|chip-)?(\d{10,15})$/i);
+  if (exact?.[1]) return normalizeBrazilWhatsappNumber(exact[1]);
+  const inline = value.match(/(\d{10,15})/);
+  return normalizeBrazilWhatsappNumber(inline?.[1]);
+}
+
+function canonicalizeBaileysInstanceId(raw?: string) {
+  const value = (raw || "").trim();
+  if (!value) return "";
+  const phone = extractPhoneFromInstanceId(value);
+  if (phone) return `inst-${phone}`;
+  return value;
+}
+
+function publicBaileysInstanceId(
+  item?: Partial<RupturBaileysInstance> | Partial<RupturBaileysStatus> | null,
+) {
+  if (!item) return "";
+  const candidates = [item.instance_canonical, item.instance_display, item.instance];
+  for (const candidate of candidates) {
+    if (typeof candidate !== "string") continue;
+    const normalized = canonicalizeBaileysInstanceId(candidate);
+    if (normalized) return normalized;
+  }
+  return "";
+}
+
+function effectiveBaileysInstanceId(
+  item?: Partial<RupturBaileysInstance> | Partial<RupturBaileysStatus> | null,
+) {
+  if (!item) return "";
+  const candidates = [item.instance_effective, item.instance];
+  for (const candidate of candidates) {
+    if (typeof candidate !== "string") continue;
+    const normalized = candidate.trim();
+    if (normalized) return normalized;
+  }
+  return "";
+}
+
+function matchesBaileysInstanceId(
+  item: Partial<RupturBaileysInstance> | Partial<RupturBaileysStatus> | null | undefined,
+  rawId: string | null | undefined,
+) {
+  const target = canonicalizeBaileysInstanceId(rawId || "");
+  if (!target) return false;
+  return [publicBaileysInstanceId(item), canonicalizeBaileysInstanceId(effectiveBaileysInstanceId(item))]
+    .filter(Boolean)
+    .some((candidate) => candidate === target);
 }
 
 function pickKnownDate(raw?: Record<string, unknown>) {
@@ -329,6 +422,10 @@ export default function ConnectionsClient() {
       errors.push(`baileys: ${baileysResponse.reason instanceof Error ? baileysResponse.reason.message : String(baileysResponse.reason)}`);
     }
 
+    const uazapiLoaded = instanceResponse.status === "fulfilled";
+    const baileysLoaded = baileysResponse.status === "fulfilled";
+    const canAssertMissingInstance = uazapiLoaded && baileysLoaded;
+
     setError(errors.length ? errors.join(" | ") : null);
     // Preserve user context after refresh: keep current selection if it still exists in any provider.
     setSelectedInstanceId((current) => {
@@ -337,10 +434,23 @@ export default function ConnectionsClient() {
         if (item.name) ids.add(item.name);
       }
       for (const item of nextBaileysItems) {
-        if (item.instance) ids.add(item.instance);
+        const publicId = publicBaileysInstanceId(item);
+        const effectiveId = effectiveBaileysInstanceId(item);
+        if (publicId) ids.add(publicId);
+        if (effectiveId) ids.add(effectiveId);
       }
-      if (current && ids.has(current)) return current;
-      return pickPreferredUazapiInstance(nextUazapiItems)?.name || pickPreferredBaileysInstance(nextBaileysItems)?.instance || null;
+      // RUP-2026-010: keep current selection when refresh partially/fully fails.
+      if (current) {
+        if (ids.has(current)) return current;
+        if (!canAssertMissingInstance) return current;
+      }
+      const preferredBaileys = pickPreferredBaileysInstance(nextBaileysItems);
+      const preferred =
+        pickPreferredUazapiInstance(nextUazapiItems)?.name ||
+        publicBaileysInstanceId(preferredBaileys) ||
+        effectiveBaileysInstanceId(preferredBaileys) ||
+        null;
+      return preferred || (canAssertMissingInstance ? null : current);
     });
   }, []);
 
@@ -398,12 +508,14 @@ export default function ConnectionsClient() {
         const availableOnTarget =
           next === "uazapi"
             ? instances.some((item) => item.name === current)
-            : baileysInstances.some((item) => item.instance === current);
+            : baileysInstances.some((item) => matchesBaileysInstanceId(item, current));
         if (availableOnTarget) return current;
       }
       return next === "uazapi"
         ? pickPreferredUazapiInstance(instances)?.name || null
-        : pickPreferredBaileysInstance(baileysInstances)?.instance || null;
+        : publicBaileysInstanceId(pickPreferredBaileysInstance(baileysInstances)) ||
+            effectiveBaileysInstanceId(pickPreferredBaileysInstance(baileysInstances)) ||
+            null;
     });
     if (next !== "baileys") setBaileysStatus(null);
     if (next !== "uazapi") setUazapiStatus(null);
@@ -419,6 +531,7 @@ export default function ConnectionsClient() {
       if (existing) return existing;
       const created: WorkingInstance = {
         id: key,
+        displayId: key,
         hasUazapi: false,
         hasBaileys: false,
       };
@@ -441,8 +554,9 @@ export default function ConnectionsClient() {
       if (!id) continue;
       const item = ensure(id);
       item.hasUazapi = true;
+      item.displayId = item.displayId || id;
       item.uazapiStatus = instance.status || item.uazapiStatus;
-      item.number = instance.number || item.number;
+      item.number = normalizeBrazilWhatsappNumber(instance.number) || item.number;
       item.profileName = instance.profileName || item.profileName;
       item.systemName = instance.systemName || item.systemName;
       item.adminField01 = instance.adminField01 || item.adminField01;
@@ -453,25 +567,38 @@ export default function ConnectionsClient() {
     }
 
     for (const instance of baileysInstances) {
-      const id = (instance.instance || "").trim();
+      const id = publicBaileysInstanceId(instance) || effectiveBaileysInstanceId(instance);
       if (!id) continue;
       const item = ensure(id);
       item.hasBaileys = true;
+      item.displayId = publicBaileysInstanceId(instance) || item.displayId || id;
+      item.baileysEffectiveId = effectiveBaileysInstanceId(instance) || item.baileysEffectiveId;
+      item.baileysDisplayNumber =
+        item.baileysDisplayNumber ||
+        normalizeBrazilWhatsappNumber(instance.number_display || instance.number_canonical || instance.number_whatsapp);
+      item.baileysTransportNumber = item.baileysTransportNumber || instance.number_whatsapp;
+      item.baileysIdentityMode = item.baileysIdentityMode || instance.number_mode;
+      item.baileysMeJid = item.baileysMeJid || instance.me_jid;
       item.baileysStatus = instance.connection || item.baileysStatus;
+      item.number = item.number || item.baileysDisplayNumber || extractPhoneFromInstanceId(item.displayId);
       item.hasQr = item.hasQr || Boolean(instance.hasQr);
     }
 
     for (const item of health) {
-      const id = (item.instance_id || "").trim();
+      const providerKey = (item.provider || "").toLowerCase();
+      const id =
+        providerKey === "baileys"
+          ? canonicalizeBaileysInstanceId(item.instance_id || "")
+          : (item.instance_id || "").trim();
       if (!id) continue;
       const row = ensure(id);
-      const providerKey = (item.provider || "").toLowerCase();
       if (providerKey === "uazapi") {
         row.hasUazapi = true;
         row.uazapiStatus = row.uazapiStatus || item.status;
       }
       if (providerKey === "baileys") {
         row.hasBaileys = true;
+        row.baileysEffectiveId = row.baileysEffectiveId || (item.instance_id || "").trim();
         row.baileysStatus = row.baileysStatus || item.status;
       }
       if (!row.connectedSince && normalizeConnectionStatus(item.status) === "connected") {
@@ -495,11 +622,15 @@ export default function ConnectionsClient() {
               : "unknown";
       const tooltip = [
         `Instancia: ${item.id}`,
+        `Sessao Baileys: ${item.baileysEffectiveId || "sem_sessao"}`,
         `Provedores: ${item.hasUazapi ? "UAZAPI" : ""}${item.hasUazapi && item.hasBaileys ? " + " : ""}${item.hasBaileys ? "Baileys" : ""}`,
         `Status geral: ${statusLabel(overallStatus)}`,
         `Status UAZAPI: ${item.uazapiStatus || "sem_dados"}`,
         `Status Baileys: ${item.baileysStatus || "sem_dados"}`,
-        `Numero: ${item.number || "sem_numero"}`,
+        `Numero exibido: ${item.number || "sem_numero"}`,
+        `Numero WhatsApp: ${item.baileysTransportNumber || "sem_dados"}`,
+        `Modo identidade: ${identityModeLabel(item.baileysIdentityMode)}`,
+        `Me JID: ${item.baileysMeJid || "sem_dados"}`,
         `Conectado desde: ${formatDateTime(item.connectedSince)}`,
         `Ultima atualizacao: ${formatDateTime(item.lastUpdatedAt)}`,
       ].join("\n");
@@ -527,7 +658,19 @@ export default function ConnectionsClient() {
       if (providerFilter === "both" && !(item.hasUazapi && item.hasBaileys)) return false;
       if (statusFilter !== "all" && item.overallStatus !== statusFilter) return false;
       if (!query) return true;
-      return [item.id, item.number, item.profileName, item.systemName, item.adminField01, item.adminField02]
+      return [
+        item.id,
+        item.displayId,
+        item.number,
+        item.baileysDisplayNumber,
+        item.baileysTransportNumber,
+        item.baileysMeJid,
+        item.profileName,
+        item.systemName,
+        item.adminField01,
+        item.adminField02,
+      ]
+        .concat(item.baileysEffectiveId || "")
         .filter((value): value is string => Boolean(value))
         .some((value) => value.toLowerCase().includes(query));
     });
@@ -547,7 +690,7 @@ export default function ConnectionsClient() {
     [instances, selectedInstanceId],
   );
   const selectedBaileysInstance = useMemo(
-    () => baileysInstances.find((instance) => (instance.instance || null) === selectedInstanceId) || null,
+    () => baileysInstances.find((instance) => matchesBaileysInstanceId(instance, selectedInstanceId)) || null,
     [baileysInstances, selectedInstanceId],
   );
   const selectedUnifiedInstance = useMemo(
@@ -641,6 +784,27 @@ export default function ConnectionsClient() {
     });
   }
 
+  async function handleBaileysConnectQr() {
+    if (!selectedInstanceId) return;
+    await runBusy("baileys-connect-qr", async () => {
+      const item = await connectBaileysInstance(selectedInstanceId);
+      setBaileysStatus(item);
+      setOpMessage("QR de conexao Baileys acionado.");
+      await refresh();
+    });
+  }
+
+  async function handleBaileysReset() {
+    if (!selectedInstanceId) return;
+    if (!window.confirm(`Resetar a sessao Baileys de ${selectedInstanceId}? Isso vai exigir novo QR.`)) return;
+    await runBusy("baileys-reset", async () => {
+      const item = await resetBaileysInstance(selectedInstanceId);
+      setBaileysStatus(item);
+      setOpMessage("Sessao Baileys resetada. Gere ou escaneie o novo QR.");
+      await refresh();
+    });
+  }
+
   async function handleCreateUazapi() {
     const name = createName.trim();
     if (!name) {
@@ -648,6 +812,8 @@ export default function ConnectionsClient() {
       return;
     }
     await runBusy("create-uazapi", async () => {
+      // The panel should leave creation already in pairing mode so the operator
+      // does not need to bounce between "create" and "connect" manually.
       await createUazapiInstance({
         name,
         systemName: createSystemName.trim() || undefined,
@@ -656,30 +822,62 @@ export default function ConnectionsClient() {
         fingerprintProfile: createFingerprintProfile.trim() || undefined,
         browser: createBrowser.trim() || undefined,
       });
-      setOpMessage(`Instancia ${name} criada.`);
+      const item = await connectUazapiInstance(name);
+      setUazapiStatus({
+        id: item.id || name,
+        name,
+        status: item.status,
+        qrcode: item.qrcode,
+        paircode: item.paircode,
+        number: item.number || item.owner,
+        profileName: item.profileName,
+        raw: item as Record<string, unknown>,
+      });
+      setOpMessage(`Instancia ${name} criada e colocada em modo de conexao.`);
       setCreateName("");
       setCreateSystemName("");
       setCreateAdminField01("");
       setCreateAdminField02("");
       setCreateFingerprintProfile("");
       setCreateBrowser("");
-      await refresh();
       setSelectedInstanceId(name);
+      setActiveTab("visualizacao");
+      await refresh();
     });
   }
 
   async function handleCreateBaileys() {
-    const instance = createBaileysInstanceId.trim();
+    const instance = canonicalizeBaileysInstanceId(createBaileysInstanceId.trim());
     if (!instance) {
       setError("Informe o ID da instancia Baileys.");
       return;
     }
     await runBusy("create-baileys", async () => {
-      await connectBaileysInstance(instance);
-      setOpMessage(`Instancia Baileys ${instance} criada/conectada.`);
+      await createBaileysInstance({ instance });
+      // Baileys creation only seeds runtime/auth state; pairing starts when we
+      // explicitly request connection and wait for the QR/status transition.
+      const item = await connectBaileysInstance(instance);
+      setBaileysStatus(item);
+      setOpMessage(`Instancia Baileys ${instance} criada e colocada em modo de conexao.`);
       setCreateBaileysInstanceId("");
-      await refresh();
       setSelectedInstanceId(instance);
+      setActiveTab("visualizacao");
+      await refresh();
+    });
+  }
+
+  async function handleDeleteBaileys() {
+    if (!selectedInstanceId) return;
+    const ok = window.confirm(
+      `Excluir permanentemente a instancia ${selectedInstanceId}? Isso remove auth, QR, cache de retry e qualquer sessao anterior.`,
+    );
+    if (!ok) return;
+    await runBusy("delete-baileys", async () => {
+      await deleteBaileysInstance(selectedInstanceId);
+      setBaileysStatus(null);
+      setOpMessage("Instancia Baileys excluida com limpeza completa de sessao e cache.");
+      setSelectedInstanceId(null);
+      await refresh();
     });
   }
 
@@ -873,9 +1071,9 @@ export default function ConnectionsClient() {
       ? selectedUazapiDetails?.qrcode || (selectedInstanceId
         ? `${rupturApiBaseUrl()}/integrations/uazapi/qrcode.png?instance=${encodeURIComponent(selectedInstanceId)}`
         : null)
-      : selectedInstanceId
+      : baileysStatus?.qrcode || (selectedInstanceId
         ? `${rupturApiBaseUrl()}/integrations/baileys/qrcode.png?instance=${encodeURIComponent(selectedInstanceId)}`
-        : null;
+        : null);
   const qrFailed = Boolean(qrUrl && failedQrUrl === qrUrl);
 
   return (
@@ -955,6 +1153,14 @@ export default function ConnectionsClient() {
               >
                 Atualizar
               </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("criacao")}
+                className="rounded-full border border-sky-300/30 bg-sky-500/10 px-4 py-2 text-sm text-sky-100 hover:bg-sky-500/20"
+                title="Criar uma nova instancia no provedor ativo"
+              >
+                Criar instancia
+              </button>
             </div>
           </div>
 
@@ -991,7 +1197,7 @@ export default function ConnectionsClient() {
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="space-y-2">
-                        <div className="text-lg font-medium">{instance.id}</div>
+                        <div className="text-lg font-medium">{instance.displayId || instance.id}</div>
                         <div className="flex flex-wrap items-center gap-2">
                           {instance.hasUazapi ? (
                             <span className="rounded-full border border-sky-300/30 bg-sky-500/10 px-2.5 py-1 text-[10px] uppercase tracking-[0.2em] text-sky-100" title="Instancia existente na UAZAPI">
@@ -1056,9 +1262,8 @@ export default function ConnectionsClient() {
               <button
                 type="button"
                 onClick={() => switchProvider("uazapi")}
-                disabled={Boolean(selectedInstanceId && !selectedUnifiedInstance?.hasUazapi)}
                 className={[
-                  "rounded-full border px-3 py-1.5 text-xs uppercase tracking-[0.2em] transition disabled:cursor-not-allowed disabled:opacity-40",
+                  "rounded-full border px-3 py-1.5 text-xs uppercase tracking-[0.2em] transition",
                   provider === "uazapi" ? "border-sky-300/40 bg-sky-500/10 text-sky-100" : "border-white/10 text-zinc-300 hover:bg-white/5",
                 ].join(" ")}
                 title="Usar operacoes da UAZAPI para esta instancia"
@@ -1068,9 +1273,8 @@ export default function ConnectionsClient() {
               <button
                 type="button"
                 onClick={() => switchProvider("baileys")}
-                disabled={Boolean(selectedInstanceId && !selectedUnifiedInstance?.hasBaileys)}
                 className={[
-                  "rounded-full border px-3 py-1.5 text-xs uppercase tracking-[0.2em] transition disabled:cursor-not-allowed disabled:opacity-40",
+                  "rounded-full border px-3 py-1.5 text-xs uppercase tracking-[0.2em] transition",
                   provider === "baileys" ? "border-amber-300/40 bg-amber-500/10 text-amber-100" : "border-white/10 text-zinc-300 hover:bg-white/5",
                 ].join(" ")}
                 title="Usar operacoes do Baileys para esta instancia"
@@ -1084,7 +1288,35 @@ export default function ConnectionsClient() {
               <div className="mt-2 space-y-1 text-xs text-zinc-400">
                 <div>Numero: {selectedUnifiedInstance.number || "sem_numero"}</div>
                 <div>Status geral: {statusLabel(selectedUnifiedInstance.overallStatus)}</div>
+                {selectedUnifiedInstance.hasBaileys ? (
+                  <>
+                    <div>Numero WhatsApp: {selectedUnifiedInstance.baileysTransportNumber || "sem_dados"}</div>
+                    <div>Modo identidade: {identityModeLabel(selectedUnifiedInstance.baileysIdentityMode)}</div>
+                  </>
+                ) : null}
                 <div>Conectado desde: {formatDateTime(selectedUnifiedInstance.connectedSince)}</div>
+              </div>
+            ) : null}
+            {selectedInstanceId ? (
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => void (provider === "uazapi" ? handleUazapiConnectQr() : handleBaileysConnectQr())}
+                  disabled={busy !== null}
+                  className="rounded-full border border-white/10 px-3 py-1.5 text-xs uppercase tracking-[0.2em] text-zinc-200 hover:bg-white/5 disabled:opacity-50"
+                  title="Gerar ou renovar QR da instancia selecionada"
+                >
+                  Gerar/Atualizar QR
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void (provider === "uazapi" ? handleDeleteUazapi() : handleDeleteBaileys())}
+                  disabled={busy !== null}
+                  className="rounded-full border border-red-300/30 px-3 py-1.5 text-xs uppercase tracking-[0.2em] text-red-100 hover:bg-red-500/10 disabled:opacity-50"
+                  title="Excluir a instancia selecionada com limpeza do que o provedor suportar"
+                >
+                  Excluir instancia
+                </button>
               </div>
             ) : null}
             <div className="mt-4 flex flex-wrap gap-2">
@@ -1101,6 +1333,17 @@ export default function ConnectionsClient() {
                   {tab}
                 </button>
               ))}
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => void (provider === "uazapi" ? handleUazapiConnectQr() : handleBaileysConnectQr())}
+                disabled={!selectedInstanceId || busy !== null}
+                className="rounded-full border border-white/10 px-3 py-1.5 text-xs uppercase tracking-[0.2em] text-zinc-200 hover:bg-white/5 disabled:opacity-50"
+                title="Gerar ou renovar QR da instancia selecionada"
+              >
+                Gerar/Atualizar QR
+              </button>
             </div>
 
             {opMessage ? <div className="mt-4 rounded-xl border border-emerald-300/20 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">{opMessage}</div> : null}
@@ -1146,16 +1389,55 @@ export default function ConnectionsClient() {
                     </div>
                   </>
                 ) : (
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => selectedInstanceId && void connectBaileysInstance(selectedInstanceId).then(setBaileysStatus).catch((e) => setError(e instanceof Error ? e.message : String(e)))}
-                      disabled={!selectedInstanceId || busy !== null}
-                      className="rounded-full border border-white/10 px-4 py-2 text-sm text-zinc-200 hover:bg-white/5 disabled:opacity-50"
-                    >
-                      Gerar QR
-                    </button>
-                  </div>
+                  <>
+                    <div className="space-y-2 text-sm text-zinc-200">
+                      <div>
+                        <span className="text-zinc-500">Numero exibido:</span>{" "}
+                        {selectedBaileysInstance?.number_display || baileysStatus?.number_display || selectedUnifiedInstance?.number || "sem_numero"}
+                      </div>
+                      <div>
+                        <span className="text-zinc-500">Numero WhatsApp:</span>{" "}
+                        {selectedBaileysInstance?.number_whatsapp || baileysStatus?.number_whatsapp || selectedUnifiedInstance?.baileysTransportNumber || "sem_dados"}
+                      </div>
+                      <div>
+                        <span className="text-zinc-500">Modo de identidade:</span>{" "}
+                        {identityModeLabel(selectedBaileysInstance?.number_mode || baileysStatus?.number_mode || selectedUnifiedInstance?.baileysIdentityMode)}
+                      </div>
+                      <div className="break-all">
+                        <span className="text-zinc-500">Me JID:</span>{" "}
+                        {selectedBaileysInstance?.me_jid || baileysStatus?.me_jid || selectedUnifiedInstance?.baileysMeJid || "sem_dados"}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-white/10 bg-black/20 p-3 text-xs text-zinc-400">
+                      A interface continua usando o numero BR com 9. O transporte responde automaticamente no identificador real devolvido pelo WhatsApp.
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void handleBaileysConnectQr()}
+                        disabled={!selectedInstanceId || busy !== null}
+                        className="rounded-full border border-white/10 px-4 py-2 text-sm text-zinc-200 hover:bg-white/5 disabled:opacity-50"
+                      >
+                        Gerar/Atualizar QR
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleBaileysReset()}
+                        disabled={!selectedInstanceId || busy !== null}
+                        className="rounded-full border border-red-300/20 px-4 py-2 text-sm text-red-100 hover:bg-red-500/10 disabled:opacity-50"
+                      >
+                        Resetar sessao
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleDeleteBaileys()}
+                        disabled={!selectedInstanceId || busy !== null}
+                        className="rounded-full border border-red-300/30 px-4 py-2 text-sm text-red-100 hover:bg-red-500/10 disabled:opacity-50"
+                      >
+                        Excluir instancia
+                      </button>
+                    </div>
+                  </>
                 )}
                 {selectedInstanceId ? (
                   <div>
@@ -1198,7 +1480,7 @@ export default function ConnectionsClient() {
                   <>
                     <input value={createBaileysInstanceId} onChange={(e) => setCreateBaileysInstanceId(e.target.value)} placeholder="ID da instancia Baileys" className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-zinc-200 outline-none" />
                     <button type="button" onClick={() => void handleCreateBaileys()} disabled={busy !== null} className="rounded-full border border-white/10 px-4 py-2 text-sm text-zinc-200 hover:bg-white/5 disabled:opacity-50">
-                      Criar/Conectar instancia Baileys
+                      Criar instancia Baileys
                     </button>
                   </>
                 )}
@@ -1296,9 +1578,15 @@ export default function ConnectionsClient() {
                     </div>
                   </>
                 ) : (
-                  <div className="rounded-xl border border-dashed border-white/15 bg-black/20 p-4 text-sm text-zinc-400">
-                    A API Baileys atual oferece status/conexao/QR por instancia. Configuracoes avancadas de conta nao estao expostas neste gateway.
-                  </div>
+                  <>
+                    <div className="rounded-xl border border-dashed border-white/15 bg-black/20 p-4 text-sm text-zinc-400">
+                      O gateway Baileys agora permite criar, resetar e excluir instancias com limpeza completa de auth e cache. A interface continua escondendo a complexidade operacional do usuario final.
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" onClick={() => void handleBaileysReset()} disabled={!selectedInstanceId || busy !== null} className="rounded-full border border-amber-300/30 px-4 py-2 text-sm text-amber-100 hover:bg-amber-500/10 disabled:opacity-50">Resetar sessao</button>
+                      <button type="button" onClick={() => void handleDeleteBaileys()} disabled={!selectedInstanceId || busy !== null} className="rounded-full border border-red-300/30 px-4 py-2 text-sm text-red-100 hover:bg-red-500/10 disabled:opacity-50">Excluir instancia</button>
+                    </div>
+                  </>
                 )}
               </div>
             ) : null}

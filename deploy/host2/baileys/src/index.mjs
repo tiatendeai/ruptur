@@ -8,6 +8,7 @@ import fs from "node:fs/promises";
 import { createRequire } from "node:module";
 
 import makeWASocket, {
+  Browsers,
   DisconnectReason,
   fetchLatestBaileysVersion,
   generateWAMessageFromContent,
@@ -22,10 +23,23 @@ const forwardWebhookUrl = String(process.env.BAILEYS_FORWARD_WEBHOOK_URL || "").
 
 const bulkMinDelayMs = Number.parseInt(process.env.BAILEYS_BULK_MIN_DELAY_MS || "1200", 10);
 const bulkMaxDelayMs = Number.parseInt(process.env.BAILEYS_BULK_MAX_DELAY_MS || "3500", 10);
+const outboundGuardWindowMs = Number.parseInt(process.env.BAILEYS_OUTBOUND_GUARD_WINDOW_MS || "60000", 10);
+const outboundGuardMaxPerWindow = Number.parseInt(process.env.BAILEYS_OUTBOUND_GUARD_MAX || "10", 10);
+const textPresenceMs = Number.parseInt(process.env.BAILEYS_TEXT_PRESENCE_MS || "1200", 10);
+const audioPresenceMs = Number.parseInt(process.env.BAILEYS_AUDIO_PRESENCE_MS || "1800", 10);
+const forwardGroupMessages = String(process.env.BAILEYS_FORWARD_GROUP_MESSAGES || "false").trim().toLowerCase() === "true";
+const forwardStatusMessages = String(process.env.BAILEYS_FORWARD_STATUS_MESSAGES || "false").trim().toLowerCase() === "true";
+const sentMessageCacheLimit = Number.parseInt(process.env.BAILEYS_SENT_MESSAGE_CACHE_LIMIT || "4000", 10);
+const sentMessageTtlMs = Number.parseInt(process.env.BAILEYS_SENT_MESSAGE_TTL_MS || "1209600000", 10);
+const sentMessageStoreRoot = String(process.env.BAILEYS_SENT_MESSAGE_STORE_DIR || path.join(path.dirname(baseAuthDir), "sent-messages")).trim();
+const eagerStartDefaultInstance = String(process.env.BAILEYS_EAGER_START_DEFAULT || "false").trim().toLowerCase() === "true";
+const lazyStartDefaultInstance = String(process.env.BAILEYS_LAZY_START_DEFAULT || "false").trim().toLowerCase() === "true";
+const bootNamedInstances = String(process.env.BAILEYS_BOOT_NAMED_INSTANCES || "true").trim().toLowerCase() !== "false";
+
 
 const logger = pino({ level: logLevel });
 
-const instances = new Map(); // instanceId -> {id, authDir, socket, lastConnection, lastQr, startPromise}
+const instances = new Map(); // instanceId -> {id, authDir, socket, lastConnection, lastQr, startPromise, resetting, deleting}
 
 const require = createRequire(import.meta.url);
 let baileysHelper = null;
@@ -48,6 +62,12 @@ process.on("uncaughtException", (err) => {
 const jobs = new Map(); // jobId -> {status,total,sent,failed,createdAt,startedAt,finishedAt,errors}
 let bulkQueue = []; // [{jobId, instanceId, jid, text}]
 let bulkWorkerRunning = false;
+const outboundGuard = new Map(); // `${instanceId}:${jid}` -> [timestamps]
+const sentMessages = new Map(); // `${instanceId}:${messageId}` -> { message, ts }
+
+function jidUserPart(value) {
+  return String(value || "").split("@", 1)[0].split(":", 1)[0];
+}
 
 function extractMessageText(message = {}) {
   if (!message || typeof message !== "object") return null;
@@ -67,11 +87,25 @@ function extractMessageText(message = {}) {
   if (typeof message.listResponseMessage?.title === "string") {
     return message.listResponseMessage.title.trim();
   }
+  const nested = [
+    message.ephemeralMessage?.message,
+    message.viewOnceMessage?.message,
+    message.viewOnceMessageV2?.message,
+    message.viewOnceMessageV2Extension?.message,
+    message.documentWithCaptionMessage?.message,
+    message.protocolMessage?.editedMessage,
+  ];
+  for (const item of nested) {
+    if (!item || typeof item !== "object") continue;
+    const text = extractMessageText(item);
+    if (text) return text;
+  }
   return null;
 }
 
 async function forwardWebhook(payload) {
   if (!forwardWebhookUrl) return;
+  const startedAt = Date.now();
   try {
     const resp = await fetch(forwardWebhookUrl, {
       method: "POST",
@@ -79,10 +113,31 @@ async function forwardWebhook(payload) {
       body: JSON.stringify(payload),
     });
     if (!resp.ok) {
-      logger.warn({ status: resp.status, forwardWebhookUrl }, "Falha ao encaminhar webhook para o Ruptur.");
+      logger.warn(
+        {
+          status: resp.status,
+          latencyMs: Date.now() - startedAt,
+          forwardWebhookUrl,
+          instance: payload?.instance,
+          chatid: payload?.data?.chatid,
+          messageid: payload?.data?.messageid,
+        },
+        "Falha ao encaminhar webhook para o Ruptur.",
+      );
+    } else {
+      logger.info(
+        {
+          status: resp.status,
+          latencyMs: Date.now() - startedAt,
+          instance: payload?.instance,
+          chatid: payload?.data?.chatid,
+          messageid: payload?.data?.messageid,
+        },
+        "Webhook encaminhado para o Ruptur.",
+      );
     }
   } catch (err) {
-    logger.warn({ err, forwardWebhookUrl }, "Erro ao encaminhar webhook para o Ruptur.");
+    logger.warn({ err, latencyMs: Date.now() - startedAt, forwardWebhookUrl }, "Erro ao encaminhar webhook para o Ruptur.");
   }
 }
 
@@ -113,29 +168,128 @@ function getOrCreateInstance(instanceId) {
     lastConnection: { status: "starting" },
     lastQr: null,
     startPromise: null,
+    deleting: false,
   };
   instances.set(id, inst);
   return inst;
 }
 
+function normalizeDigits(value) {
+  return String(value || "").replace(/[^\d]/g, "");
+}
+
+function canonicalizeBrNumber(value) {
+  const digits = normalizeDigits(value);
+  // BR mobile canonical form: 55 + DDD + 9 + 8 digits.
+  // Keep fixed-line numbers unchanged.
+  if (digits.startsWith("55") && digits.length === 12 && ["6", "7", "8", "9"].includes(digits[4])) {
+    return `${digits.slice(0, 4)}9${digits.slice(4)}`;
+  }
+  return digits;
+}
+
+function canonicalPhone(value) {
+  return canonicalizeBrNumber(jidUserPart(value));
+}
+
+function rawPhone(value) {
+  return normalizeDigits(jidUserPart(value));
+}
+
+function jidDomain(value) {
+  const v = String(value || "").trim();
+  const at = v.indexOf("@");
+  if (at === -1) return "";
+  return v.slice(at + 1).toLowerCase();
+}
+
+function canonicalJid(value) {
+  const v = String(value || "").trim();
+  if (!v || /\s/.test(v)) return null;
+  if (v === "status@broadcast" || v.includes("@g.us")) return v;
+  if (v.includes("@")) {
+    const domain = jidDomain(v);
+    // RUP-2026-007: @lid and channel/newsletter IDs are not phone-addressable JIDs.
+    if (domain === "lid" || domain === "newsletter" || domain === "broadcast") return null;
+    // RUP-2026-007: canonicalize only direct WhatsApp user JIDs.
+    if (domain && domain !== "s.whatsapp.net" && domain !== "c.us") return null;
+  }
+  const phone = canonicalPhone(v);
+  if (!phone) return null;
+  return `${phone}@s.whatsapp.net`;
+}
+
+function directUserJid(value) {
+  const v = String(value || "").trim();
+  if (!v || /\s/.test(v)) return null;
+  if (v === "status@broadcast" || v.includes("@g.us")) return v;
+  if (v.includes("@")) {
+    const domain = jidDomain(v);
+    if (domain === "lid" || domain === "newsletter" || domain === "broadcast") return null;
+    if (domain && domain !== "s.whatsapp.net" && domain !== "c.us") return null;
+  }
+  const phone = rawPhone(v);
+  if (!phone) return null;
+  return `${phone}@s.whatsapp.net`;
+}
+
+function identityFromJid(jid) {
+  const meJid = String(jid || "").trim();
+  // The connected session tells us how WhatsApp currently identifies this
+  // account. Keep that value as transport truth and derive the BR-canonical
+  // number only for display/business layers.
+  const waPhonePreferred = rawPhone(meJid);
+  const waPhoneCanonical = canonicalizeBrNumber(waPhonePreferred);
+  const waPhoneDisplay = waPhoneCanonical || waPhonePreferred || "";
+  const waPhoneMode =
+    waPhonePreferred && waPhoneCanonical && waPhonePreferred !== waPhoneCanonical
+      ? "legacy_without_ninth_digit"
+      : waPhonePreferred
+        ? "canonical_with_ninth_digit"
+        : undefined;
+  const waPhoneVariants = [...new Set([waPhonePreferred, waPhoneCanonical].filter(Boolean))];
+  return {
+    meJid,
+    waPhonePreferred,
+    waPhoneCanonical,
+    waPhoneDisplay,
+    waPhoneMode,
+    waPhoneVariants,
+  };
+}
+
+function instanceIdentity(inst) {
+  const identity = identityFromJid(inst?.socket?.user?.id || inst?.lastConnection?.meJid || "");
+  return {
+    me_jid: identity.meJid || undefined,
+    number_whatsapp: identity.waPhonePreferred || undefined,
+    number_canonical: identity.waPhoneCanonical || undefined,
+    number_display: identity.waPhoneDisplay || undefined,
+    number_mode: identity.waPhoneMode,
+    number_variants: identity.waPhoneVariants.length ? identity.waPhoneVariants : undefined,
+  };
+}
+
 function normalizeRecipient(value) {
   const v = String(value || "").trim();
   if (!v || /\s/.test(v)) return null;
-  if (v.includes("@")) return v;
+  if (v.includes("@")) return directUserJid(v) || v;
+  const canonical = canonicalJid(v);
+  if (canonical) return canonical;
   return `${v}@s.whatsapp.net`;
 }
 
 function brVariants(number) {
-  const digits = String(number || "").replace(/[^\d]/g, "");
+  const digits = canonicalPhone(number);
   if (!digits.startsWith("55")) return [digits];
   // 55 + DDD(2) + subscriber
-  if (digits.length === 12) {
-    // missing 9 (likely mobile): 55 DD XXXXXXXX -> 55 DD 9XXXXXXXX
-    return [digits, `${digits.slice(0, 4)}9${digits.slice(4)}`];
-  }
   if (digits.length === 13 && digits[4] === "9") {
-    // has 9: 55 DD 9XXXXXXXX -> 55 DD XXXXXXXX
+    // canonical mobile (with 9) + legacy variant (without 9).
     return [digits, `${digits.slice(0, 4)}${digits.slice(5)}`];
+  }
+  if (digits.length === 12 && ["6", "7", "8", "9"].includes(digits[4])) {
+    // best effort for raw legacy mobile number.
+    return [`${digits.slice(0, 4)}9${digits.slice(4)}`, digits];
   }
   return [digits];
 }
@@ -143,7 +297,10 @@ function brVariants(number) {
 async function resolveJid(inst, raw) {
   const v = String(raw || "").trim();
   if (!v || /\s/.test(v)) return null;
-  if (v.includes("@")) return v;
+  // Explicit JIDs returned by WhatsApp should win over local BR 9-digit
+  // canonicalization. Rewriting them can create duplicate threads or failed
+  // deliveries for legacy Brazilian accounts.
+  if (v.includes("@")) return directUserJid(v) || v;
   if (!inst?.socket) return normalizeRecipient(v);
 
   // Prefer provider confirmation (handles BR 9-digit inconsistencies).
@@ -167,6 +324,20 @@ function clampInt(value, min, max) {
   return Math.max(min, Math.min(max, n));
 }
 
+function guardOutbound(instanceId, jid) {
+  const key = `${instanceId}:${jid}`;
+  const now = Date.now();
+  const recent = (outboundGuard.get(key) || []).filter((ts) => now - ts < outboundGuardWindowMs);
+  if (recent.length >= outboundGuardMaxPerWindow) {
+    const earliest = recent[0] || now;
+    const retryAfterMs = Math.max(500, outboundGuardWindowMs - (now - earliest));
+    return { ok: false, retryAfterMs, count: recent.length };
+  }
+  recent.push(now);
+  outboundGuard.set(key, recent);
+  return { ok: true, retryAfterMs: 0, count: recent.length };
+}
+
 function decodeMaybeBase64File(file) {
   const f = String(file || "").trim();
   if (!f) return null;
@@ -175,6 +346,181 @@ function decodeMaybeBase64File(file) {
   if (m) return { kind: "buffer", value: Buffer.from(m[2], "base64"), mimetype: m[1] };
   if (/^[a-z0-9+/=\r\n]+$/i.test(f) && f.length > 64) return { kind: "buffer", value: Buffer.from(f, "base64") };
   return null;
+}
+
+function isDefaultInstance(instanceId) {
+  return sanitizeInstanceId(instanceId) === "default";
+}
+
+function shouldLazyStartInstance(instanceId) {
+  return !isDefaultInstance(instanceId) || lazyStartDefaultInstance;
+}
+
+function safeStoreKey(value) {
+  return String(value || "").replace(/[^a-z0-9._-]/gi, "_");
+}
+
+function sentMessageKey(instanceId, messageId) {
+  if (!instanceId || !messageId) return "";
+  return `${instanceId}:${messageId}`;
+}
+
+function sentMessageStoreDir(instanceId) {
+  return path.join(sentMessageStoreRoot, safeStoreKey(instanceId || "default"));
+}
+
+function sentMessageStorePath(instanceId, messageId) {
+  return path.join(sentMessageStoreDir(instanceId), `${safeStoreKey(messageId)}.json`);
+}
+
+function purgeSentMessages(instanceId) {
+  const prefix = `${instanceId}:`;
+  for (const key of sentMessages.keys()) {
+    if (key.startsWith(prefix)) sentMessages.delete(key);
+  }
+}
+
+function pruneSentMessages() {
+  while (sentMessages.size > sentMessageCacheLimit) {
+    const oldestKey = sentMessages.keys().next().value;
+    if (!oldestKey) break;
+    sentMessages.delete(oldestKey);
+  }
+}
+
+function serializeStoredMessage(value) {
+  return JSON.stringify(value, (_key, current) => {
+    if (Buffer.isBuffer(current)) {
+      return { __type: "buffer", data: current.toString("base64") };
+    }
+    if (current instanceof Uint8Array) {
+      return { __type: "uint8array", data: Buffer.from(current).toString("base64") };
+    }
+    return current;
+  });
+}
+
+function deserializeStoredMessage(value) {
+  return JSON.parse(value, (_key, current) => {
+    if (!current || typeof current !== "object") return current;
+    if (current.__type === "buffer" || current.__type === "uint8array") {
+      return Buffer.from(String(current.data || ""), "base64");
+    }
+    return current;
+  });
+}
+
+async function prunePersistedSentMessages(instanceId) {
+  const dir = sentMessageStoreDir(instanceId);
+  try {
+    const entries = await fs.readdir(dir, { withFileTypes: true });
+    const files = [];
+    const now = Date.now();
+    for (const entry of entries) {
+      if (!entry.isFile() || !entry.name.endsWith(".json")) continue;
+      const filePath = path.join(dir, entry.name);
+      let stats;
+      try {
+        stats = await fs.stat(filePath);
+      } catch {
+        continue;
+      }
+      if (sentMessageTtlMs > 0 && now - stats.mtimeMs > sentMessageTtlMs) {
+        await fs.rm(filePath, { force: true });
+        continue;
+      }
+      files.push({ filePath, mtimeMs: stats.mtimeMs });
+    }
+    if (files.length <= sentMessageCacheLimit) return;
+    files.sort((a, b) => a.mtimeMs - b.mtimeMs);
+    for (const item of files.slice(0, files.length - sentMessageCacheLimit)) {
+      await fs.rm(item.filePath, { force: true });
+    }
+  } catch (err) {
+    if (err?.code !== "ENOENT") {
+      logger.warn({ err, instance: instanceId }, "Falha ao podar cache persistido de mensagens.");
+    }
+  }
+}
+
+async function persistSentMessage(inst, envelope) {
+  const messageId = envelope?.key?.id;
+  const message = envelope?.message;
+  if (!inst?.id || !messageId || !message) return;
+  const payload = { ts: Date.now(), message };
+  try {
+    const dir = sentMessageStoreDir(inst.id);
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(sentMessageStorePath(inst.id, messageId), serializeStoredMessage(payload), "utf8");
+    void prunePersistedSentMessages(inst.id);
+  } catch (err) {
+    logger.warn({ err, instance: inst.id, messageId }, "Falha ao persistir mensagem outbound para retry.");
+  }
+}
+
+function rememberSentMessage(inst, envelope) {
+  const messageId = envelope?.key?.id;
+  const message = envelope?.message;
+  if (!inst?.id || !messageId || !message) return;
+  // RUP-2026-013: companion devices may request a resend when they receive
+  // a placeholder in self-chat. Keep outbound messages retrievable by getMessage.
+  sentMessages.set(sentMessageKey(inst.id, messageId), {
+    message,
+    ts: Date.now(),
+  });
+  pruneSentMessages();
+  void persistSentMessage(inst, envelope);
+}
+
+async function getPersistedMessage(inst, key) {
+  const messageId = key?.id;
+  if (!inst?.id || !messageId) return undefined;
+  try {
+    const filePath = sentMessageStorePath(inst.id, messageId);
+    const raw = await fs.readFile(filePath, "utf8");
+    const stored = deserializeStoredMessage(raw);
+    if (!stored?.message) return undefined;
+    if (sentMessageTtlMs > 0 && typeof stored.ts === "number" && Date.now() - stored.ts > sentMessageTtlMs) {
+      await fs.rm(filePath, { force: true });
+      return undefined;
+    }
+    sentMessages.set(sentMessageKey(inst.id, messageId), {
+      message: stored.message,
+      ts: typeof stored.ts === "number" ? stored.ts : Date.now(),
+    });
+    pruneSentMessages();
+    return stored.message;
+  } catch (err) {
+    if (err?.code !== "ENOENT") {
+      logger.warn({ err, instance: inst?.id, messageId }, "Falha ao carregar mensagem persistida para retry.");
+    }
+    return undefined;
+  }
+}
+
+async function getCachedMessage(inst, key) {
+  const lookupKey = sentMessageKey(inst?.id, key?.id);
+  if (!lookupKey) return undefined;
+  const cached = sentMessages.get(lookupKey);
+  if (cached?.message) {
+    logger.info({ instance: inst?.id, messageId: key?.id, found: true, source: "memory" }, "Baileys getMessage lookup");
+    return cached.message;
+  }
+  const persisted = await getPersistedMessage(inst, key);
+  logger.info({ instance: inst?.id, messageId: key?.id, found: Boolean(persisted), source: persisted ? "disk" : "miss" }, "Baileys getMessage lookup");
+  return persisted;
+}
+
+async function sendAndRemember(inst, jid, content, options) {
+  const result = await inst.socket.sendMessage(jid, content, options);
+  rememberSentMessage(inst, result);
+  return result;
+}
+
+async function relayAndRemember(inst, jid, envelope, options) {
+  await inst.socket.relayMessage(jid, envelope.message, options);
+  rememberSentMessage(inst, envelope);
+  return envelope;
 }
 
 async function qrPngDataUrl() {
@@ -192,6 +538,26 @@ function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+async function withPresence(inst, jid, presence, delayMs, fn) {
+  // RUP-2026-008: standardize typing/recording presence before assistant sends.
+  const normalizedDelay = Math.max(0, Math.min(5000, Number.parseInt(String(delayMs || 0), 10) || 0));
+  try {
+    if (presence) {
+      await inst.socket.sendPresenceUpdate(presence, jid);
+      if (normalizedDelay > 0) await sleep(normalizedDelay);
+    }
+    return await fn();
+  } finally {
+    if (presence) {
+      try {
+        await inst.socket.sendPresenceUpdate("paused", jid);
+      } catch {
+        // ignore presence-finalization errors
+      }
+    }
+  }
+}
+
 async function waitForOpen(inst, timeoutMs = 15000) {
   const startedAt = Date.now();
   while (Date.now() - startedAt < timeoutMs) {
@@ -199,6 +565,108 @@ async function waitForOpen(inst, timeoutMs = 15000) {
     await sleep(250);
   }
   return inst.lastConnection?.connection === "open";
+}
+
+async function waitForQrOrOpen(inst, timeoutMs = 5000) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    if (inst.lastConnection?.hasQr) return true;
+    if (inst.lastConnection?.connection === "open") return true;
+    await sleep(200);
+  }
+  return Boolean(inst.lastConnection?.hasQr || inst.lastConnection?.connection === "open");
+}
+
+async function removeInstanceFiles(inst, { auth = false, sent = false } = {}) {
+  if (sent) {
+    purgeSentMessages(inst.id);
+    try {
+      await fs.rm(sentMessageStoreDir(inst.id), { recursive: true, force: true });
+    } catch (err) {
+      logger.warn({ err, instance: inst.id }, "Falha ao limpar cache persistido de mensagens da instancia.");
+    }
+  }
+  if (auth) {
+    try {
+      await fs.rm(inst.authDir, { recursive: true, force: true });
+    } catch (err) {
+      logger.warn({ err, instance: inst.id }, "Falha ao limpar auth da instancia.");
+    }
+  }
+}
+
+function purgeInstanceRuntime(inst) {
+  if (!inst?.id) return;
+  const prefix = `${inst.id}:`;
+  for (const key of outboundGuard.keys()) {
+    if (key.startsWith(prefix)) outboundGuard.delete(key);
+  }
+  bulkQueue = bulkQueue.filter((item) => item.instanceId !== inst.id);
+}
+
+async function resetInstanceSession(inst, { restart = true, logout = true, deleting = false } = {}) {
+  inst.deleting = Boolean(deleting);
+  inst.resetting = true;
+  const socket = inst.socket;
+  inst.socket = null;
+  inst.startPromise = null;
+  inst.lastQr = null;
+  inst.lastConnection = {
+    ...(inst.lastConnection || {}),
+    connection: "close",
+    hasQr: false,
+    status: "resetting",
+  };
+
+  if (socket) {
+    if (logout) {
+      try {
+        // Evolution API also hardened reconnect/logout by clearing stale crypto
+        // material. We explicitly log out before removing local auth.
+        await socket.logout();
+      } catch (err) {
+        logger.warn({ err, instance: inst.id }, "Falha ao executar logout da instancia antes do reset.");
+      }
+    }
+    try {
+      socket.ws?.close?.();
+    } catch {
+      // ignore
+    }
+    try {
+      socket.end?.(new Error("instance_reset"));
+    } catch {
+      // ignore
+    }
+  }
+
+  await removeInstanceFiles(inst, { auth: true, sent: true });
+
+  inst.lastConnection = {
+    connection: "close",
+    hasQr: false,
+    status: restart ? "restarting" : "reset",
+  };
+  inst.resetting = false;
+
+  if (restart) {
+    inst.deleting = false;
+    await ensureStarted(inst.id);
+  }
+}
+
+async function createInstanceSession(instanceId) {
+  const inst = getOrCreateInstance(instanceId);
+  await ensureStarted(inst.id);
+  return inst;
+}
+
+async function deleteInstanceSession(instanceId, { logout = true } = {}) {
+  const inst = getOrCreateInstance(instanceId);
+  await resetInstanceSession(inst, { restart: false, logout, deleting: true });
+  purgeInstanceRuntime(inst);
+  instances.delete(inst.id);
+  return inst;
 }
 
 async function runBulkWorker() {
@@ -225,7 +693,7 @@ async function runBulkWorker() {
       }
 
       try {
-        await inst.socket.sendMessage(item.jid, { text: item.text });
+        await sendAndRemember(inst, item.jid, { text: item.text });
         job.sent += 1;
       } catch (err) {
         job.failed += 1;
@@ -261,7 +729,15 @@ async function ensureStarted(instanceId) {
 
 async function startWhatsApp(inst) {
   await fs.mkdir(inst.authDir, { recursive: true });
+  await fs.mkdir(sentMessageStoreDir(inst.id), { recursive: true });
+  void prunePersistedSentMessages(inst.id);
   const { state, saveCreds } = await useMultiFileAuthState(inst.authDir);
+  if (state?.creds?.me?.id) {
+    inst.lastConnection = {
+      ...(inst.lastConnection || {}),
+      meJid: state.creds.me.id,
+    };
+  }
   const { version } = await fetchLatestBaileysVersion();
 
   inst.socket = makeWASocket({
@@ -269,6 +745,10 @@ async function startWhatsApp(inst) {
     printQRInTerminal: false,
     logger,
     version,
+    browser: Browsers.macOS("Desktop"),
+    markOnlineOnConnect: false,
+    syncFullHistory: true,
+    getMessage: async (key) => getCachedMessage(inst, key),
   });
 
   inst.socket.ev.on("creds.update", saveCreds);
@@ -278,6 +758,7 @@ async function startWhatsApp(inst) {
     const next = { ...(inst.lastConnection || {}) };
     if (typeof connection === "string") next.connection = connection;
     if (lastDisconnect !== undefined) next.lastDisconnect = lastDisconnect;
+    if (inst.socket?.user?.id) next.meJid = inst.socket.user.id;
     if (qr) next.hasQr = true;
     else if (typeof connection === "string") next.hasQr = false;
     inst.lastConnection = next;
@@ -290,10 +771,16 @@ async function startWhatsApp(inst) {
 
     if (connection === "close") {
       const code = lastDisconnect?.error?.output?.statusCode;
-      const shouldReconnect = code !== DisconnectReason.loggedOut;
+      const loggedOut = code === DisconnectReason.loggedOut;
+      const shouldReconnect = !inst.resetting && !inst.deleting && !loggedOut;
       logger.warn({ instance: inst.id, code }, "Conexão fechada.");
       inst.socket = null;
       inst.lastQr = null;
+      if (loggedOut) {
+        // Mirrors the reconnect hardening seen in Evolution: when WA invalidates
+        // the companion, drop stale local auth/key material before the next QR.
+        void removeInstanceFiles(inst, { auth: true, sent: true });
+      }
       if (shouldReconnect) ensureStarted(inst.id).catch((err) => logger.error({ err }, "Falha ao reconectar"));
     }
 
@@ -306,21 +793,58 @@ async function startWhatsApp(inst) {
     for (const item of messages || []) {
       const remoteJid = item?.key?.remoteJid;
       if (!remoteJid) continue;
+      // RUP-2026-010: avoid flooding backend with group/status traffic by default.
+      if (!forwardGroupMessages && remoteJid.includes("@g.us")) continue;
+      if (!forwardStatusMessages && remoteJid === "status@broadcast") continue;
+      const senderRaw = item?.key?.participant || remoteJid;
+      const fromMe = Boolean(item?.key?.fromMe);
+      const meJid = inst?.socket?.user?.id || "";
+      const chatCanonical = canonicalJid(remoteJid) || remoteJid;
+      const senderCanonical = canonicalJid(senderRaw) || senderRaw;
       const payload = {
         event: "message",
         instance: inst.id,
+        meJid,
         data: {
           messageid: item?.key?.id || crypto.randomUUID(),
-          chatid: remoteJid,
-          sender: item?.key?.participant || remoteJid,
+          chatid: chatCanonical,
+          wa_chatid: remoteJid,
+          chatid_canonical: chatCanonical,
+          sender: senderCanonical,
+          wa_sender: senderRaw,
+          sender_canonical: senderCanonical,
+          meJid,
           senderName: item?.pushName || "",
           text: extractMessageText(item?.message || {}),
-          fromMe: Boolean(item?.key?.fromMe),
+          fromMe,
         },
       };
       await forwardWebhook(payload);
     }
   });
+}
+
+async function bootstrapNamedInstancesOnStartup() {
+  if (!bootNamedInstances) return;
+  try {
+    const entries = await fs.readdir(baseAuthDir, { withFileTypes: true });
+    const instanceIds = entries
+      .filter((entry) => entry.isDirectory() && entry.name.startsWith("inst-") && !entry.name.includes(".bak-"))
+      .map((entry) => sanitizeInstanceId(entry.name))
+      .filter((instanceId) => instanceId && instanceId !== "default");
+    if (!instanceIds.length) return;
+    logger.info({ instances: instanceIds }, "Bootstrapping named Baileys instances.");
+    const results = await Promise.allSettled(instanceIds.map((instanceId) => ensureStarted(instanceId)));
+    for (const [index, result] of results.entries()) {
+      if (result.status === "rejected") {
+        logger.error({ err: result.reason, instance: instanceIds[index] }, "Falha ao iniciar instancia nomeada no boot.");
+      }
+    }
+  } catch (err) {
+    if (err?.code !== "ENOENT") {
+      logger.error({ err }, "Falha ao listar diretorios de auth para boot das instancias nomeadas.");
+    }
+  }
 }
 
 const app = express();
@@ -331,6 +855,7 @@ app.get("/health", (_req, res) => {
     instance: i.id,
     connection: i.lastConnection?.connection || "unknown",
     hasQr: Boolean(i.lastConnection?.hasQr),
+    ...instanceIdentity(i),
   }));
   res.json({ ok: true, service: "ruptur-baileys", instances: summary });
 });
@@ -339,7 +864,7 @@ app.get("/health", (_req, res) => {
 app.get("/instance/status", async (_req, res) => {
   const instanceId = getInstanceId(_req);
   const inst = getOrCreateInstance(instanceId);
-  if (!inst.socket && !inst.startPromise) {
+  if (!inst.socket && !inst.startPromise && shouldLazyStartInstance(instanceId)) {
     // Lazy start so users can retrieve QR for new instances.
     ensureStarted(instanceId).catch((err) => logger.error({ err, instance: instanceId }, "Falha ao iniciar instance"));
   }
@@ -359,6 +884,7 @@ app.get("/instance/status", async (_req, res) => {
       instance: {
         id: inst.id,
         status,
+        ...instanceIdentity(inst),
         qrcode: inst.lastQr ? await (async () => {
           const png = await QRCode.toBuffer(inst.lastQr, { type: "png", margin: 1, scale: 8 });
           return `data:image/png;base64,${png.toString("base64")}`;
@@ -373,12 +899,57 @@ app.get("/instance/status", async (_req, res) => {
 app.post("/instance/connect", async (_req, res) => {
   const instanceId = getInstanceId(_req);
   try {
-    await ensureStarted(instanceId);
+    const inst = await ensureStarted(instanceId);
+    // Pairing UX is much better when connect waits briefly for QR emission
+    // instead of immediately returning "unknown" while the socket is still
+    // negotiating the initial multi-device registration.
+    await waitForQrOrOpen(inst, 5000);
   } catch (err) {
     logger.error({ err, instance: instanceId }, "Falha ao iniciar instance");
   }
   // In Baileys, "connect" is just: have a QR available when not logged-in.
   return app._router.handle({ ..._req, url: "/instance/status", method: "GET" }, res, () => {});
+});
+
+app.post("/instance", async (_req, res) => {
+  const instanceId = getInstanceId(_req);
+  try {
+    await createInstanceSession(instanceId);
+  } catch (err) {
+    logger.error({ err, instance: instanceId }, "Falha ao criar instance");
+    return res.status(502).json({ ok: false, error: "instance_create_failed" });
+  }
+  return app._router.handle({ ..._req, url: "/instance/status", method: "GET" }, res, () => {});
+});
+
+app.post("/instance/reset", async (_req, res) => {
+  const instanceId = getInstanceId(_req);
+  const inst = getOrCreateInstance(instanceId);
+  try {
+    await resetInstanceSession(inst, { restart: true, logout: true });
+  } catch (err) {
+    logger.error({ err, instance: instanceId }, "Falha ao resetar instance");
+    return res.status(502).json({ ok: false, error: "instance_reset_failed" });
+  }
+  return app._router.handle({ ..._req, url: "/instance/status", method: "GET" }, res, () => {});
+});
+
+app.delete("/instance", async (_req, res) => {
+  const instanceId = getInstanceId(_req);
+  try {
+    await deleteInstanceSession(instanceId, { logout: true });
+  } catch (err) {
+    logger.error({ err, instance: instanceId }, "Falha ao excluir instance");
+    return res.status(502).json({ ok: false, error: "instance_delete_failed" });
+  }
+  return res.json({
+    ok: true,
+    instance: {
+      id: sanitizeInstanceId(instanceId),
+      status: "deleted",
+      deleted: true,
+    },
+  });
 });
 
 app.post("/chat/details", async (req, res) => {
@@ -422,7 +993,7 @@ app.post("/send/presence", async (req, res) => {
   const instanceId = getInstanceId(req);
   const number = String(req.body?.number || "").trim();
   const presence = String(req.body?.presence || "").trim(); // composing | recording | paused
-  const delay = clampInt(req.body?.delay, 0, 300000) ?? 30000;
+  const delay = clampInt(req.body?.delay, 0, 30000) ?? 10000;
 
   if (!number || /\s/.test(number)) return res.status(400).json({ ok: false, error: "number_invalid" });
   if (!presence) return res.status(400).json({ ok: false, error: "presence_required" });
@@ -430,7 +1001,7 @@ app.post("/send/presence", async (req, res) => {
   if (!inst.socket) return res.status(503).json({ ok: false, error: "not_ready" });
   if (!(await waitForOpen(inst))) return res.status(503).json({ ok: false, error: "not_connected" });
 
-  const jid = normalizeRecipient(number);
+  const jid = await resolveJid(inst, number);
   if (!jid) return res.status(400).json({ ok: false, error: "number_invalid" });
 
   const allowed = new Set(["composing", "recording", "paused"]);
@@ -453,7 +1024,7 @@ app.post("/send/presence", async (req, res) => {
 app.get("/qr.png", async (_req, res) => {
   const instanceId = getInstanceId(_req);
   const inst = getOrCreateInstance(instanceId);
-  if (!inst.socket && !inst.startPromise) {
+  if (!inst.socket && !inst.startPromise && shouldLazyStartInstance(instanceId)) {
     ensureStarted(instanceId).catch((err) => logger.error({ err, instance: instanceId }, "Falha ao iniciar instance"));
   }
   if (!inst.lastQr) return res.status(404).json({ ok: false, error: "qr_not_available" });
@@ -480,7 +1051,12 @@ app.post("/send/text", async (req, res) => {
   try {
     const jid = await resolveJid(inst, to);
     if (!jid) return res.status(400).json({ ok: false, error: "to_invalid" });
-    const r = await inst.socket.sendMessage(jid, { text });
+    const gate = guardOutbound(inst.id, jid);
+    if (!gate.ok) {
+      logger.warn({ instance: inst.id, jid, count: gate.count, retryAfterMs: gate.retryAfterMs }, "Outbound guard bloqueou envio de texto.");
+      return res.status(429).json({ ok: false, error: "rate_limited", retry_after_ms: gate.retryAfterMs });
+    }
+    const r = await withPresence(inst, jid, "composing", textPresenceMs, async () => sendAndRemember(inst, jid, { text }));
     return res.json({ ok: true, instance: inst.id, result: r });
   } catch (err) {
     logger.error({ err }, "Falha ao enviar mensagem");
@@ -658,6 +1234,7 @@ app.post("/send/menu", async (req, res) => {
           nativeFlowMessage: { buttons },
         };
         const r = await baileysHelper.sendInteractiveMessage(inst.socket, jid, { interactiveMessage });
+        rememberSentMessage(inst, r);
         return res.json({
           ok: true,
           instance: inst.id,
@@ -694,7 +1271,7 @@ app.post("/send/menu", async (req, res) => {
       for (const content of candidates) {
         try {
           const msg = generateWAMessageFromContent(jid, content, { userJid: inst.socket.user?.id });
-          await inst.socket.relayMessage(jid, msg.message, { messageId: msg.key.id });
+          await relayAndRemember(inst, jid, msg, { messageId: msg.key.id });
           return res.json({
             ok: true,
             instance: inst.id,
@@ -756,6 +1333,7 @@ app.post("/send/menu", async (req, res) => {
           nativeFlowMessage: { buttons },
         };
         const r = await baileysHelper.sendInteractiveMessage(inst.socket, jid, { interactiveMessage });
+        rememberSentMessage(inst, r);
         return res.json({
           ok: true,
           instance: inst.id,
@@ -765,7 +1343,7 @@ app.post("/send/menu", async (req, res) => {
         });
       }
 
-      const r = await inst.socket.sendMessage(jid, {
+      const r = await sendAndRemember(inst, jid, {
         text,
         footer: footerText || undefined,
         buttonText: listButton,
@@ -785,7 +1363,7 @@ app.post("/send/menu", async (req, res) => {
   } catch (err) {
     logger.error({ err }, "Falha ao enviar menu (interactive)");
     const fallback = `${text}\n\n${choiceStrings.join("\n")}`;
-    const r = await inst.socket.sendMessage(jid, { text: fallback });
+    const r = await sendAndRemember(inst, jid, { text: fallback });
     return res.json({ ok: true, instance: inst.id, result: r, format: "fallback_text" });
   }
 });
@@ -811,6 +1389,11 @@ app.post("/send/media", async (req, res) => {
   if (!jid) return res.status(400).json({ ok: false, error: "to_invalid" });
 
   try {
+    const gate = guardOutbound(inst.id, jid);
+    if (!gate.ok) {
+      logger.warn({ instance: inst.id, jid, count: gate.count, retryAfterMs: gate.retryAfterMs }, "Outbound guard bloqueou envio de midia.");
+      return res.status(429).json({ ok: false, error: "rate_limited", retry_after_ms: gate.retryAfterMs });
+    }
     let content;
     const media =
       decoded.kind === "url"
@@ -834,7 +1417,9 @@ app.post("/send/media", async (req, res) => {
       };
     else return res.status(400).json({ ok: false, error: "type_invalid" });
 
-    const r = await inst.socket.sendMessage(jid, content);
+    const presence = type === "audio" || type === "ptt" ? "recording" : "composing";
+    const delay = type === "audio" || type === "ptt" ? audioPresenceMs : textPresenceMs;
+    const r = await withPresence(inst, jid, presence, delay, async () => sendAndRemember(inst, jid, content));
     return res.json({ ok: true, instance: inst.id, result: r });
   } catch (err) {
     logger.error({ err }, "Falha ao enviar mídia");
@@ -885,6 +1470,7 @@ app.post("/send/button-url", async (req, res) => {
       };
 
       const r = await baileysHelper.sendInteractiveMessage(inst.socket, jid, { interactiveMessage });
+      rememberSentMessage(inst, r);
       return res.json({
         ok: true,
         instance: inst.id,
@@ -896,7 +1482,7 @@ app.post("/send/button-url", async (req, res) => {
     }
 
     // Prefer "hydrated template" URL button.
-    const r = await inst.socket.sendMessage(jid, {
+    const r = await sendAndRemember(inst, jid, {
       templateMessage: {
         hydratedTemplate: {
           hydratedContentText: `${text}\n\n${url}`,
@@ -921,7 +1507,7 @@ app.post("/send/button-url", async (req, res) => {
   } catch (err1) {
     logger.warn({ err: err1 }, "Falha ao enviar URL button via hydratedTemplate, tentando templateButtons");
     try {
-      const r = await inst.socket.sendMessage(jid, {
+      const r = await sendAndRemember(inst, jid, {
         text: `${text}\n\n${url}`,
         footer: footerText || undefined,
         templateButtons: [{ index: 1, urlButton: { displayText: buttonText, url } }],
@@ -959,7 +1545,8 @@ app.post("/status/text", async (req, res) => {
       ? audience.map((v) => (v.includes("@") ? v : `${v}@s.whatsapp.net`))
       : undefined;
 
-    const r = await inst.socket.sendMessage(
+    const r = await sendAndRemember(
+      inst,
       "status@broadcast",
       { text },
       statusJidList ? { statusJidList } : undefined,
@@ -986,14 +1573,14 @@ app.post("/send/status", async (req, res) => {
 
   try {
     if (type === "text") {
-      const r = await inst.socket.sendMessage("status@broadcast", { text });
+      const r = await sendAndRemember(inst, "status@broadcast", { text });
       return res.json({ ok: true, instance: inst.id, result: r });
     }
     if (type === "image") {
       const decoded = decodeMaybeBase64File(file);
       if (!decoded) return res.status(400).json({ ok: false, error: "file_invalid" });
       const media = decoded.kind === "url" ? { url: decoded.value } : decoded.value;
-      const r = await inst.socket.sendMessage("status@broadcast", { image: media, caption: text || undefined });
+      const r = await sendAndRemember(inst, "status@broadcast", { image: media, caption: text || undefined });
       return res.json({ ok: true, instance: inst.id, result: r });
     }
     return res.status(400).json({ ok: false, error: "type_not_supported" });
@@ -1020,9 +1607,13 @@ app.post("/chat/check", async (req, res) => {
       continue;
     }
     try {
-      const v = query.replace(/^\+/, "");
-      const r = await inst.socket.onWhatsApp(v);
-      const item = Array.isArray(r) && r.length ? r[0] : null;
+      let item = null;
+      for (const candidate of brVariants(query.replace(/^\+/, ""))) {
+        if (!candidate) continue;
+        const r = await inst.socket.onWhatsApp(candidate);
+        item = Array.isArray(r) && r.length ? r[0] : null;
+        if (item?.exists) break;
+      }
       out.push({
         query,
         jid: item?.jid || "",
@@ -1112,9 +1703,15 @@ app.post("/ai/transcribe", async (req, res) => {
   }
 });
 
-ensureStarted("default").catch((err) => {
-  logger.error({ err }, "Falha ao iniciar Baileys (default instance)");
-  process.exitCode = 1;
+if (eagerStartDefaultInstance) {
+  ensureStarted("default").catch((err) => {
+    logger.error({ err }, "Falha ao iniciar Baileys (default instance)");
+    process.exitCode = 1;
+  });
+}
+
+bootstrapNamedInstancesOnStartup().catch((err) => {
+  logger.error({ err }, "Falha ao bootstrapar instancias nomeadas do Baileys.");
 });
 
 app.listen(port, () => logger.info({ port }, "HTTP server pronto"));

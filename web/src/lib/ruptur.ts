@@ -70,12 +70,31 @@ export type RupturChannelHealth = {
 
 export type RupturBaileysInstance = {
   instance?: string;
+  instance_display?: string;
+  instance_canonical?: string;
+  instance_effective?: string;
+  number_canonical?: string;
+  number_whatsapp?: string;
+  number_display?: string;
+  number_mode?: string;
+  number_variants?: string[];
+  me_jid?: string;
   connection?: string;
   hasQr?: boolean;
 };
 
 export type RupturBaileysStatus = {
   id?: string;
+  instance?: string;
+  instance_display?: string;
+  instance_canonical?: string;
+  instance_effective?: string;
+  number_canonical?: string;
+  number_whatsapp?: string;
+  number_display?: string;
+  number_mode?: string;
+  number_variants?: string[];
+  me_jid?: string;
   status?: string;
   qrcode?: string;
 };
@@ -311,6 +330,24 @@ export async function listBaileysInstances() {
   return (data.items || []) as RupturBaileysInstance[];
 }
 
+export async function createBaileysInstance(input: { instance: string }) {
+  const data = await apiFetch("/integrations/baileys/instances", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  return (data.instance || {}) as RupturBaileysStatus;
+}
+
+export async function deleteBaileysInstance(instance?: string) {
+  const sp = new URLSearchParams();
+  if (instance) sp.set("instance", instance);
+  const data = await apiFetch(`/integrations/baileys/instances${sp.toString() ? `?${sp.toString()}` : ""}`, {
+    method: "DELETE",
+  });
+  return (data.instance || {}) as RupturBaileysStatus;
+}
+
 export async function getBaileysStatus(instance?: string) {
   const sp = new URLSearchParams();
   if (instance) sp.set("instance", instance);
@@ -322,6 +359,15 @@ export async function connectBaileysInstance(instance?: string) {
   const sp = new URLSearchParams();
   if (instance) sp.set("instance", instance);
   const data = await apiFetch(`/integrations/baileys/connect${sp.toString() ? `?${sp.toString()}` : ""}`, {
+    method: "POST",
+  });
+  return (data.instance || {}) as RupturBaileysStatus;
+}
+
+export async function resetBaileysInstance(instance?: string) {
+  const sp = new URLSearchParams();
+  if (instance) sp.set("instance", instance);
+  const data = await apiFetch(`/integrations/baileys/reset${sp.toString() ? `?${sp.toString()}` : ""}`, {
     method: "POST",
   });
   return (data.instance || {}) as RupturBaileysStatus;
