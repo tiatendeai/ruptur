@@ -6,14 +6,14 @@ from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 
-from app.clients.baileys import BaileysClient
 from app.db import connect
 from app.repositories import crm_repo
+from app.clients.uazapi import UazapiError
 from app.services.agent_service import agent_service
 from app.services.media_service import media_service
 from app.services.uazapi_ingest import extract_message_fields, ingest_uazapi_webhook
-from app.services.wa_identity import canonical_jid, digits_only, local_part, normalize_target_digits, parse_bool
 from app.settings import settings
+from app.uazapi_runtime import client as build_uazapi_client, resolve_token
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/webhook", tags=["webhook"])
@@ -38,6 +38,47 @@ SESSION_TIMEOUT_SECONDS = 1800
 
 
 JARVIS_PASSWORD = "7"
+
+
+def digits_only(value: str | None) -> str:
+    return "".join(ch for ch in str(value or "") if ch.isdigit())
+
+
+def local_part(value: str | None) -> str:
+    return str(value or "").split("@", 1)[0].split(":", 1)[0]
+
+
+def normalize_target_digits(value: str | None) -> str:
+    digits = digits_only(local_part(value))
+    if digits.startswith("55") and len(digits) == 12 and digits[4] in {"6", "7", "8", "9"}:
+        return f"{digits[:4]}9{digits[4:]}"
+    return digits
+
+
+def canonical_jid(value: str | None) -> str | None:
+    digits = normalize_target_digits(value)
+    if not digits:
+        return None
+    return f"{digits}@s.whatsapp.net"
+
+
+def parse_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    normalized = str(value).strip().lower()
+    return normalized in {"1", "true", "yes", "on", "sim"}
+
+
+def _payload_data(payload: dict[str, Any]) -> dict[str, Any]:
+    return payload.get("data", {}) if isinstance(payload.get("data"), dict) else {}
+
+
+def _message_data(payload: dict[str, Any]) -> dict[str, Any]:
+    fields = extract_message_fields(payload)
+    data = fields.get("data")
+    return data if isinstance(data, dict) else {}
 
 
 def is_jarvis_activation_attempt(value: str | None) -> bool:
@@ -100,13 +141,21 @@ def direct_user_jid(value: str | None) -> str | None:
 
 
 def is_self_chat(payload: dict[str, Any], chatid: str) -> bool:
-    data = payload.get("data", {}) if isinstance(payload.get("data"), dict) else {}
-    me_jid = payload.get("meJid") or data.get("meJid") or ""
-    sender = str(data.get("wa_sender") or data.get("sender") or "")
+    data = _payload_data(payload)
+    message_data = _message_data(payload)
+    me_jid = payload.get("meJid") or data.get("meJid") or message_data.get("meJid") or ""
+    sender = str(message_data.get("wa_sender") or message_data.get("sender") or data.get("wa_sender") or data.get("sender") or "")
+    from_me = message_data.get("fromMe")
+    if from_me is None:
+        from_me = message_data.get("isFromMe")
+    if from_me is None:
+        from_me = data.get("fromMe")
+    if from_me is None:
+        from_me = data.get("isFromMe")
     if bool(normalize_target(chatid) and normalize_target(chatid) == normalize_target(me_jid)):
         return True
     # WhatsApp desktop/self threads can arrive as @lid chats instead of the phone JID.
-    if chatid.endswith("@lid") and parse_bool(data.get("fromMe")):
+    if chatid.endswith("@lid") and parse_bool(from_me):
         me_phone = normalize_target(me_jid)
         sender_phone = normalize_target(sender)
         sender_is_self = bool(sender_phone and sender_phone == me_phone)
@@ -153,7 +202,9 @@ def ensure_session_metadata(metadata: dict[str, Any] | None) -> dict[str, Any]:
 
 
 def is_managed_cross_chat(payload: dict[str, Any], fields: dict[str, Any], metadata: dict[str, Any]) -> bool:
-    owner = canonical_business_phone(payload.get("meJid") or payload.get("data", {}).get("meJid") or "")
+    data = _payload_data(payload)
+    message_data = _message_data(payload)
+    owner = canonical_business_phone(payload.get("meJid") or data.get("meJid") or message_data.get("meJid") or "")
     sender = canonical_business_phone(fields.get("sender") or fields.get("chatid") or "")
     if metadata.get("warmup_mode") is True:
         return False
@@ -166,24 +217,18 @@ def is_managed_cross_chat(payload: dict[str, Any], fields: dict[str, Any], metad
     )
 
 
-def resolve_baileys_instance_id(payload: dict[str, Any], lead_phone: str | None = None) -> str:
-    explicit = str(payload.get("instance") or "").strip()
-    if explicit and explicit.lower() != "default":
-        return explicit
-    me_jid = payload.get("meJid") or payload.get("data", {}).get("meJid") or ""
-    target = canonical_business_phone(me_jid) or canonical_business_phone(lead_phone)
-    if target:
-        return INSTANCE_BY_CANONICAL_PHONE.get(target, f"inst-{target}")
-    raise ValueError(
-        "baileys_instance_unresolved"
-        f": explicit={explicit or '-'} me_jid={me_jid or '-'} lead_phone={lead_phone or '-'}"
-    )
+def resolve_uazapi_instance_id(payload: dict[str, Any]) -> str:
+    data = _payload_data(payload)
+    message_data = _message_data(payload)
+    explicit = str(payload.get("instance") or data.get("instance") or message_data.get("instance") or "").strip()
+    return explicit
 
 
 def resolve_target_jid(payload: dict[str, Any], lead_phone: str | None = None) -> str:
-    data = payload.get("data", {}) if isinstance(payload.get("data"), dict) else {}
-    raw_chatid = str(data.get("wa_chatid") or data.get("chatid") or "").strip()
-    me_jid = str(payload.get("meJid") or data.get("meJid") or "").strip()
+    data = _payload_data(payload)
+    message_data = _message_data(payload)
+    raw_chatid = str(message_data.get("wa_chatid") or message_data.get("chatid") or data.get("wa_chatid") or data.get("chatid") or "").strip()
+    me_jid = str(payload.get("meJid") or data.get("meJid") or message_data.get("meJid") or "").strip()
 
     # RUP-2026-015: when WhatsApp already gives us a direct user JID/phone,
     # reply in that exact thread instead of force-inserting the BR 9th digit.
@@ -215,6 +260,23 @@ def format_session_status(metadata: dict[str, Any], *, self_chat: bool) -> str:
     )
 
 
+def send_assistant_response_via_uazapi(
+    payload: dict[str, Any],
+    *,
+    target_jid: str,
+    response_text: str,
+    audio_data: bytes | None,
+) -> tuple[str, dict[str, Any]]:
+    instance_id = resolve_uazapi_instance_id(payload)
+    token = resolve_token(settings, token=None, instance=instance_id or None, admin_token=None)
+    client = build_uazapi_client(settings, token=token)
+    if audio_data:
+        result = client.send_ptt_base64(number=target_jid, audio_data=audio_data)
+    else:
+        result = client.send_text(number=target_jid, text=response_text)
+    return instance_id, result
+
+
 async def process_ai_response(payload: dict[str, Any], lead_id: str, conversation_id: str, last_msg: str, message_id: str):
     try:
         with connect() as conn:
@@ -229,12 +291,11 @@ async def process_ai_response(payload: dict[str, Any], lead_id: str, conversatio
                 logger.warning("AI response suppressed for lead=%s paused=%s manual_override=%s", lead_id, paused, manual_override)
                 return
 
-            data = payload.get("data", {})
-            chatid = data.get("chatid") or ""
+            fields = extract_message_fields(payload)
+            chatid = fields.get("chatid") or ""
             current_msg = last_msg or ""
             msg_lower = normalize_command(current_msg)
             self_chat = is_self_chat(payload, chatid)
-            instance_id = resolve_baileys_instance_id(payload, lead_phone)
             target_jid = resolve_target_jid(payload, lead_phone)
 
             history_rows = crm_repo.list_messages(conn, conversation_id=conversation_id, limit=10)
@@ -327,19 +388,26 @@ async def process_ai_response(payload: dict[str, Any], lead_id: str, conversatio
                 conn,
                 conversation_id=conversation_id,
                 text=response_text,
-                raw={"processed_by": "assistant", "instance_id": instance_id, "audio_generated": bool(audio_data)},
+                raw={"processed_by": "assistant", "transport_provider": "uazapi", "audio_generated": bool(audio_data)},
             )
             crm_repo.update_conversation_metadata(conn, conversation_id=conversation_id, metadata=metadata)
             conn.commit()
-            logger.warning("Stored assistant response message id=%s instance=%s target=%s audio=%s", external_id, instance_id, target_jid, bool(audio_data))
-
-            if settings.baileys_base_url:
-                client = BaileysClient(base_url=settings.baileys_base_url, instance_id=instance_id)
-                if audio_data:
-                    res = client.send_voice_jid(jid=target_jid, audio_data=audio_data)
-                else:
-                    res = client.send_text_jid(jid=target_jid, text=response_text)
-                logger.warning("Baileys response instance=%s result=%s", instance_id, res)
+            instance_id, res = send_assistant_response_via_uazapi(
+                payload,
+                target_jid=target_jid,
+                response_text=response_text,
+                audio_data=audio_data,
+            )
+            logger.warning(
+                "Stored assistant response message id=%s provider=uazapi instance=%s target=%s audio=%s",
+                external_id,
+                instance_id,
+                target_jid,
+                bool(audio_data),
+            )
+            logger.warning("UAZAPI response instance=%s result=%s", instance_id, res)
+    except UazapiError as exc:
+        logger.exception("Error sending assistant response via UAZAPI: %s", exc)
     except Exception as exc:
         logger.exception("Error in process_ai_response: %s", exc)
 
@@ -350,6 +418,9 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks) ->
     if not isinstance(payload, dict):
         raise HTTPException(status_code=400, detail="payload must be a JSON object")
 
+    raw_data = _payload_data(payload)
+    message_data = _message_data(payload)
+
     try:
         with connect() as conn:
             result = ingest_uazapi_webhook(conn, payload)
@@ -359,6 +430,16 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks) ->
                 chatid = fields.get("chatid") or ""
                 body = fields.get("body") or ""
                 from_me = fields.get("from_me")
+                if not result.message_id and not body:
+                    logger.warning(
+                        "UAZAPI webhook vazio instance=%s event=%s chatid=%s data_keys=%s type=%s from_me=%s",
+                        payload.get("instance") or raw_data.get("instance") or message_data.get("instance"),
+                        payload.get("event"),
+                        chatid,
+                        sorted((message_data or raw_data).keys())[:40],
+                        message_data.get("messageType") or message_data.get("type") or raw_data.get("messageType") or raw_data.get("type"),
+                        from_me,
+                    )
                 self_chat = is_self_chat(payload, chatid)
                 normalized_body = normalize_command(body)
                 metadata = ensure_session_metadata(crm_repo.get_conversation_metadata(conn, conversation_id=result.conversation_id))

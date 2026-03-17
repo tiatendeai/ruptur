@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import base64
+import logging
 from dataclasses import dataclass
 from typing import Any
 
 import httpx
+
+logger = logging.getLogger(__name__)
 
 
 class UazapiNotConfiguredError(RuntimeError):
@@ -241,6 +245,37 @@ class UazapiClient:
         except Exception as e:
             logger.error(f"Error sending PTT via UAZAPI: {e}")
             return {"ok": False, "error": str(e)}
+
+    def send_ptt_base64(self, *, number: str, audio_data: bytes, mimetype: str = "audio/mpeg") -> dict[str, Any]:
+        endpoint = f"{self.base_url.rstrip('/')}/send/media"
+        payload = {
+            "number": number,
+            "type": "ptt",
+            "file": base64.b64encode(audio_data).decode("utf-8"),
+            "mimetype": mimetype,
+        }
+        try:
+            with httpx.Client(timeout=60) as client:
+                resp = client.post(endpoint, json=payload, headers=self._headers())
+        except httpx.TimeoutException as exc:
+            raise UazapiError("uazapi_timeout", url=endpoint) from exc
+        except httpx.RequestError as exc:
+            raise UazapiError("uazapi_request_error", url=endpoint) from exc
+
+        if resp.is_error:
+            body = (resp.text or "")[:2000]
+            raise UazapiError(
+                "uazapi_http_error",
+                status_code=resp.status_code,
+                body=body,
+                url=str(resp.request.url),
+            )
+
+        try:
+            data = resp.json()
+        except Exception:
+            return {"raw": resp.text}
+        return data if isinstance(data, dict) else {"raw": data}
 
     def instance_status(self) -> dict[str, Any]:
         url = f"{self.base_url.rstrip('/')}/instance/status"

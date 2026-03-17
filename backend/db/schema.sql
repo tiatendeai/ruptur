@@ -30,11 +30,13 @@ CREATE TABLE IF NOT EXISTS conversations (
   lead_id uuid NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
   channel text NOT NULL,
   external_id text NOT NULL,
+  metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (channel, external_id)
 );
 
+ALTER TABLE conversations ADD COLUMN IF NOT EXISTS metadata jsonb NOT NULL DEFAULT '{}'::jsonb;
 CREATE INDEX IF NOT EXISTS conversations_lead_idx ON conversations (lead_id);
 CREATE INDEX IF NOT EXISTS conversations_updated_idx ON conversations (updated_at DESC);
 
