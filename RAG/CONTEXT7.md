@@ -44,6 +44,13 @@ Leia este arquivo primeiro. Se a tarefa tocar OpenAI ou Baileys, consulte tambem
   - o gateway passou a memorizar no cache de retry tambem mensagens elegiveis vindas de `messages.upsert`
   - no teste vivo apos o patch, as respostas `3EB0...` do assistente no `1980` passaram a registrar `Baileys getMessage lookup` com `found=true`
   - o ruído residual observado ficou concentrado no thread oficial `162611857477871@lid` (`Conta Oficial do Wtz`), e nao mais nas respostas do chat principal `5531989131980@s.whatsapp.net`
+- Decisao operacional aplicada no fim de `2026-03-16`:
+  - o webhook `UAZAPI` deixou de responder via `Baileys`
+  - o backend voltou a usar a propria `UAZAPI` como transporte de saida do assistente no MVP
+  - o cliente `UAZAPI` passou a suportar `PTT` em base64 via `POST /send/media`, alinhado a spec oficial
+  - as instancias `Baileys` de producao `inst-5531981139540` e `inst-5531989131980` foram removidas
+  - `https://baileys.ruptur.cloud/health` passou a retornar `instances: []`
+  - a validacao residual agora e visual: confirmar no cliente que o placeholder sumiu sem `Baileys` conectada
 - O painel e a API interna podem expor UAZAPI e Baileys lado a lado para operacao, mas isso nao significa paridade de papel no MVP.
 - `MyChat` faz parte do mesmo `Control Deck`; nao deve usar shell, copy ou semantica visual de produto paralelo ao resto do ecossistema.
 - Em UI interna:
@@ -173,6 +180,10 @@ Leia este arquivo primeiro. Se a tarefa tocar OpenAI ou Baileys, consulte tambem
   - `display_number`
   - `transport_identity`
 - Se existir divergencia entre documento antigo e este arquivo, este arquivo vence.
+- **Reordenacao de Pastas (2026-03-17)**:
+  - Todas as pastas de desenvolvimento foram movidas de `Downloads` para `/Users/diego/Documents/GitHub/`.
+  - A pasta `ruptur` no destino foi consolidada a partir da versao que continha as alteracoes locais pendentes.
+  - Repositorios sincronizados (Pull/Push) e ADK atualizado antes da migracao final.
 
 ## Pendencias conhecidas
 
