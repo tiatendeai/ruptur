@@ -24,6 +24,12 @@ Leia este arquivo primeiro. Se a tarefa tocar OpenAI ou Baileys, consulte tambem
 - Numeros do assistente em foco:
   - `5531981139540` -> instancia Baileys `inst-553181139540`
   - `5531989131980` -> instancia Baileys `inst-553189131980`
+- Estado validado em `2026-03-16`:
+  - `UAZAPI 9540` conectada em `chip-5531981139540`
+  - `UAZAPI 1980` conectada em `vufp7R`
+  - `Baileys 9540` aberta em `inst-5531981139540`, com transporte efetivo `553181139540`
+  - `Baileys 1980` aberta em `inst-5531989131980`, com transporte efetivo `553189131980`
+  - no `1980`, a ativacao `jarvis 7` foi validada de ponta a ponta e as respostas seguintes sairam como `Jarvis`
 - Distincao obrigatoria:
   - `display_number`: numero BR com nono digito para UX, CRM e formularios
   - `transport_number`: numero real que o WhatsApp usa naquela conta/sessao
@@ -33,6 +39,11 @@ Leia este arquivo primeiro. Se a tarefa tocar OpenAI ou Baileys, consulte tambem
 - Nao existe conceito de negocio de instancia `default`.
 - Qualquer uso de `default` no contexto Baileys deve ser tratado como legado tecnico e removido de novos fluxos.
 - O backend do assistente esta respondendo; o gargalo residual isolado hoje e transporte/sessao Signal quando aparecem erros como `Bad MAC` e `No matching sessions found for message`.
+- No `1980`, mesmo com persona validada e envio funcionando, o `Baileys` ainda apresenta ruido residual de sessao (`Bad MAC`, `No matching sessions found for message`, `sent retry receipt`) que pode explicar placeholder em alguns clientes.
+- Hotfix validado em `2026-03-16` para o `1980`:
+  - o gateway passou a memorizar no cache de retry tambem mensagens elegiveis vindas de `messages.upsert`
+  - no teste vivo apos o patch, as respostas `3EB0...` do assistente no `1980` passaram a registrar `Baileys getMessage lookup` com `found=true`
+  - o ruído residual observado ficou concentrado no thread oficial `162611857477871@lid` (`Conta Oficial do Wtz`), e nao mais nas respostas do chat principal `5531989131980@s.whatsapp.net`
 - O painel e a API interna podem expor UAZAPI e Baileys lado a lado para operacao, mas isso nao significa paridade de papel no MVP.
 - `MyChat` faz parte do mesmo `Control Deck`; nao deve usar shell, copy ou semantica visual de produto paralelo ao resto do ecossistema.
 - Em UI interna:
@@ -107,9 +118,6 @@ Leia este arquivo primeiro. Se a tarefa tocar OpenAI ou Baileys, consulte tambem
 - Lifecycle operacional do painel:
   - UAZAPI e Baileys devem expor `criar instancia` e `excluir instancia`
   - no painel, `criar instancia` deve deixar a conta imediatamente em modo de conexao
-  - a criacao deve acontecer em modal focado, separada do painel operacional
-  - IDs de instancia devem nascer opacos por padrao; numero do WhatsApp so entra depois da conexao
-  - campos tecnicos de create devem ficar em avancado, nao no fluxo primario
   - exclusao Baileys deve apagar auth, cache persistido de retry e runtime em memoria
   - a UI interna pode mostrar detalhes tecnicos; a UX do usuario final nao deve herdar essa complexidade
 - Regras de produto:

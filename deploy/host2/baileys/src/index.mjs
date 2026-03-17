@@ -547,22 +547,38 @@ async function persistSentMessage(inst, envelope) {
     await fs.writeFile(sentMessageStorePath(inst.id, messageId), serializeStoredMessage(payload), "utf8");
     void prunePersistedSentMessages(inst.id);
   } catch (err) {
-    logger.warn({ err, instance: inst.id, messageId }, "Falha ao persistir mensagem outbound para retry.");
+    logger.warn({ err, instance: inst.id, messageId }, "Falha ao persistir mensagem no cache de retry.");
   }
 }
 
-function rememberSentMessage(inst, envelope) {
+function rememberMessageEnvelope(inst, envelope, source = "runtime") {
   const messageId = envelope?.key?.id;
   const message = envelope?.message;
   if (!inst?.id || !messageId || !message) return;
-  // RUP-2026-013: companion devices may request a resend when they receive
-  // a placeholder in self-chat. Keep outbound messages retrievable by getMessage.
+  // Companion devices can ask for retry not only for messages sent by this
+  // socket, but also for self-chat turns authored on another linked device.
+  // Keep eligible messages retrievable by getMessage to avoid placeholders.
   sentMessages.set(sentMessageKey(inst.id, messageId), {
     message,
     ts: Date.now(),
   });
   pruneSentMessages();
   void persistSentMessage(inst, envelope);
+  logger.debug({ instance: inst.id, messageId, source }, "Mensagem mantida no cache de retry.");
+}
+
+function rememberSentMessage(inst, envelope) {
+  rememberMessageEnvelope(inst, envelope, "send");
+}
+
+function shouldCacheUpsertMessage(item) {
+  const remoteJid = String(item?.key?.remoteJid || "").trim();
+  if (!remoteJid) return false;
+  if (remoteJid === "status@broadcast" || remoteJid.includes("@g.us")) return false;
+  if (!item?.message) return false;
+  if (Boolean(item?.key?.fromMe)) return true;
+  if (remoteJid.endsWith("@lid")) return true;
+  return Boolean(directUserJid(remoteJid));
 }
 
 async function getPersistedMessage(inst, key) {
@@ -889,6 +905,9 @@ async function startWhatsApp(inst) {
     for (const item of messages || []) {
       const remoteJid = item?.key?.remoteJid;
       if (!remoteJid) continue;
+      if (shouldCacheUpsertMessage(item)) {
+        rememberMessageEnvelope(inst, item, "upsert");
+      }
       // RUP-2026-010: avoid flooding backend with group/status traffic by default.
       if (!forwardGroupMessages && remoteJid.includes("@g.us")) continue;
       if (!forwardStatusMessages && remoteJid === "status@broadcast") continue;
