@@ -21,6 +21,21 @@ http:
       service: ruptur-web
       tls:
         certResolver: le
+    app-warmup:
+      rule: Host(`app.ruptur.cloud`) && PathPrefix(`/warmup`)
+      entryPoints:
+        - websecure
+      middlewares:
+        - warmup-strip
+      service: warmup
+      tls:
+        certResolver: le
+
+  middlewares:
+    warmup-strip:
+      stripPrefix:
+        prefixes:
+          - /warmup
 
   services:
     baileys:
@@ -35,3 +50,7 @@ http:
       loadBalancer:
         servers:
           - url: http://ruptur-web:3000
+    warmup:
+      loadBalancer:
+        servers:
+          - url: http://warmup:4173

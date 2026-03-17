@@ -85,9 +85,20 @@ services:
     volumes:
       - whisper_models:/root/.cache
     restart: unless-stopped
+  
+  warmup:
+    build:
+      context: ./warmup
+    environment:
+      - WARMUP_RUNTIME_PORT=4173
+      - WARMUP_RUNTIME_DB_PATH=/app/runtime-data/db.json
+    volumes:
+      - warmup_runtime_data:/app/runtime-data
+    restart: unless-stopped
 
 volumes:
   traefik_letsencrypt:
   baileys_data:
   whisper_models:
   ruptur_db_data:
+  warmup_runtime_data:
