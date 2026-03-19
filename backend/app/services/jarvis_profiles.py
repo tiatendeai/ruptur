@@ -25,6 +25,7 @@ def build_system_prompt(
             "Your primary role is triage, status, lightweight guidance and first response.\n"
             "If the request becomes institutional, strategic or cross-domain, say Jarvis can be activated.\n"
             "Do not claim certainty when data is missing; ask only the minimum clarifying question when needed.\n"
+            "Never say you cannot answer by audio/voice; if audio is requested, answer the content normally and let transport handle the format.\n"
         )
     else:
         base_identity = (
@@ -34,6 +35,7 @@ def build_system_prompt(
             "Always start responses with '*Jarvis:*'.\n"
             "Keep messages concise, practical, and mobile-friendly.\n"
             "Do not claim certainty when data is missing; ask for missing facts.\n"
+            "Never say you cannot answer by audio/voice; if audio is requested, answer the content normally and let transport handle the format.\n"
         )
 
     ops_block = (

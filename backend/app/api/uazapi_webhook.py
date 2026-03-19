@@ -2,15 +2,16 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 
 from app.db import connect
-from app.repositories import crm_repo
+from app.repositories import crm_repo, jarvis_ops_repo
 from app.clients.uazapi import UazapiError
 from app.services.agent_service import agent_service
+from app.services.jarvis_daily_brief_service import build_executive_daily_brief
 from app.services.media_service import media_service
 from app.services.uazapi_ingest import extract_message_fields, ingest_uazapi_webhook
 from app.settings import settings
@@ -100,17 +101,7 @@ def is_jarvis_activation_attempt(value: str | None) -> bool:
 
 def is_iazinha_activation_attempt(value: str | None) -> bool:
     normalized = normalize_command(value)
-    if normalized in IAZINHA_COMMANDS:
-        return True
-    return (
-        normalized.startswith("iazinha ")
-        or normalized.startswith("/iazinha ")
-        or normalized.startswith("assistant ")
-        or normalized.startswith("/assistant ")
-        or normalized.startswith("/start-iazinha")
-        or normalized.startswith("/start-assistant")
-        or normalized.startswith("/start-assistente")
-    )
+    return normalized in IAZINHA_COMMANDS
 
 
 def has_jarvis_password(value: str | None) -> bool:
@@ -134,6 +125,30 @@ def normalize_command(value: str | None) -> str:
     while cleaned.endswith((".", ",", "!", "?", ":", ";")):
         cleaned = cleaned[:-1].strip()
     return cleaned
+
+
+def extract_inline_persona_request(value: str | None) -> tuple[str | None, str | None]:
+    text = (value or "").strip()
+    if not text:
+        return None, None
+
+    patterns = (
+        (
+            "iazinha",
+            r"^(?:/start-iazinha|/iazinha|iazinha|/assistant|assistant|/start-assistant|/start-assistente)(?:\s*[:,-])?\s+(.+)$",
+        ),
+        (
+            "jarvis",
+            r"^(?:/jarvis|jarvis)(?:\s*[:,-])?\s+(.+)$",
+        ),
+    )
+    for persona, pattern in patterns:
+        match = re.match(pattern, text, flags=re.IGNORECASE)
+        if match:
+            prompt = (match.group(1) or "").strip()
+            if prompt:
+                return persona, prompt
+    return None, None
 
 
 def direct_user_jid(value: str | None) -> str | None:
@@ -228,7 +243,65 @@ def audio_response_context(persona: str) -> list[str]:
         f"O transporte vai converter sua resposta em audio/PTT no WhatsApp para a persona {persona_label}.",
         "Nunca diga que nao consegue responder em audio, que so consegue texto ou que nao tem voz.",
         "Responda normalmente ao pedido principal do usuario; a entrega em audio sera cuidada fora do modelo.",
+        "E proibido responder com recusas do tipo 'nao consigo responder por audio' ou equivalentes.",
     ]
+
+
+def is_operational_brief_request(value: str | None) -> bool:
+    normalized = normalize_command(value)
+    if not normalized:
+        return False
+    anchor_hits = (
+        "resumo operacional",
+        "status operacional",
+        "brief operacional",
+        "resumo executivo",
+        "resumo curto",
+        "daily executiva",
+    )
+    context_hits = (
+        "ontem",
+        "hoje",
+        "amanha",
+        "amanhã",
+        "desafio",
+        "impedimento",
+        "vitoria",
+        "vitória",
+        "avanco",
+        "avanço",
+        "oportunidade",
+    )
+    return any(token in normalized for token in anchor_hits) and any(token in normalized for token in context_hits)
+
+
+def build_operational_duo_response(
+    *,
+    conn: Any,
+    principal_name: str,
+    limit: int = 5,
+) -> str:
+    snapshot = jarvis_ops_repo.mission_snapshot(conn)
+    blocked = jarvis_ops_repo.list_missions(conn, limit=limit, status="blocked")
+    critical_in_progress = jarvis_ops_repo.list_missions(conn, limit=limit, status="in_progress", priority="p0")
+    critical_planned = jarvis_ops_repo.list_missions(conn, limit=limit, status="planned", priority="p0")
+    delivery_news = jarvis_ops_repo.list_delivery_news(conn, limit=limit)
+    brief = build_executive_daily_brief(
+        principal_name=principal_name,
+        reference_date=date.today(),
+        snapshot=snapshot,
+        blocked=[row.__dict__ for row in blocked],
+        critical_in_progress=[row.__dict__ for row in critical_in_progress],
+        critical_planned=[row.__dict__ for row in critical_planned],
+        delivery_news=[row.__dict__ for row in delivery_news],
+        include_ai=True,
+    )
+    status_summary = str(brief.get("duo", {}).get("status", {}).get("summary") or "").strip()
+    jarvis_summary = str(brief.get("duo", {}).get("jarvis", {}).get("summary") or "").strip()
+    parts = [part for part in (status_summary, jarvis_summary) if part]
+    if parts:
+        return "\n\n".join(parts)
+    return "*IAzinha:* Ainda nao consegui montar o resumo operacional agora."
 
 
 def apply_persona_prefix(persona: str, text: str | None) -> str:
@@ -385,8 +458,10 @@ async def process_ai_response(payload: dict[str, Any], lead_id: str, conversatio
             msg_lower = normalize_command(current_msg)
             self_chat = is_self_chat(payload, chatid)
             target_candidates = resolve_target_candidates(payload, lead_phone)
-            wants_audio = wants_audio_response(current_msg)
-            effective_user_message = strip_audio_request_instruction(current_msg) if wants_audio else current_msg
+            inline_persona, inline_prompt = extract_inline_persona_request(current_msg)
+            source_user_message = inline_prompt or current_msg
+            wants_audio = wants_audio_response(source_user_message)
+            effective_user_message = strip_audio_request_instruction(source_user_message) if wants_audio else source_user_message
 
             history_rows = crm_repo.list_messages(conn, conversation_id=conversation_id, limit=10)
             history = []
@@ -407,6 +482,7 @@ async def process_ai_response(payload: dict[str, Any], lead_id: str, conversatio
                 except Exception:
                     pass
             metadata["last_activity"] = datetime.now().isoformat()
+            response_text: str | None = None
 
             if msg_lower in RESET_COMMANDS:
                 metadata = {
@@ -453,21 +529,46 @@ async def process_ai_response(payload: dict[str, Any], lead_id: str, conversatio
                 else:
                     response_text = "*Jarvis:* Por agora eu ativo em self-chat."
             else:
-                if metadata.get("session_status") != "active":
+                if inline_persona == "iazinha":
+                    metadata["session_status"] = "active"
+                    metadata["active_persona"] = "iazinha"
+                    metadata["jarvis_pending"] = False
+                elif inline_persona == "jarvis":
+                    if not self_chat:
+                        response_text = "*Jarvis:* Por agora eu ativo em self-chat."
+                        inline_persona = None
+                    elif metadata.get("active_persona") != "jarvis":
+                        response_text = "*Jarvis:* Ative primeiro com /jarvis e a senha."
+                        inline_persona = None
+                if response_text is None and inline_persona is None and metadata.get("session_status") != "active":
                     crm_repo.update_conversation_metadata(conn, conversation_id=conversation_id, metadata=metadata)
                     conn.commit()
                     return
-                persona = metadata.get("active_persona", "iazinha")
-                context_blocks = audio_response_context(persona) if wants_audio else None
-                raw_response = agent_service.get_response(
-                    profile="ops",
-                    principal_name=lead_name or lead_phone or "Cliente",
-                    user_message=effective_user_message,
-                    persona=persona,
-                    history=history,
-                    context_blocks=context_blocks,
-                )
-                response_text = apply_persona_prefix(persona, raw_response)
+                if response_text is not None:
+                    persona = metadata.get("active_persona", "iazinha")
+                elif inline_persona is None:
+                    persona = metadata.get("active_persona", "iazinha")
+                else:
+                    persona = inline_persona
+                principal_name = "Diego" if self_chat else (lead_name or lead_phone or "Cliente")
+                if response_text is not None:
+                    pass
+                elif persona == "iazinha" and self_chat and is_operational_brief_request(effective_user_message):
+                    response_text = build_operational_duo_response(
+                        conn=conn,
+                        principal_name=principal_name,
+                    )
+                else:
+                    context_blocks = audio_response_context(persona) if wants_audio else None
+                    raw_response = agent_service.get_response(
+                        profile="ops",
+                        principal_name=principal_name,
+                        user_message=effective_user_message,
+                        persona=persona,
+                        history=history,
+                        context_blocks=context_blocks,
+                    )
+                    response_text = apply_persona_prefix(persona, raw_response)
 
             audio_data = None
             if wants_audio:
@@ -533,12 +634,14 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks) ->
                     )
                 self_chat = is_self_chat(payload, chatid)
                 normalized_body = normalize_command(body)
+                inline_persona, inline_prompt = extract_inline_persona_request(body)
                 metadata = ensure_session_metadata(crm_repo.get_conversation_metadata(conn, conversation_id=result.conversation_id))
                 explicit = (
                     is_iazinha_activation_attempt(normalized_body)
                     or normalized_body in (STATUS_COMMANDS | END_COMMANDS | RESET_COMMANDS)
                     or is_jarvis_activation_attempt(normalized_body)
                     or (metadata.get("jarvis_pending") and has_jarvis_password(normalized_body))
+                    or bool(inline_persona and inline_prompt)
                 )
                 assistant_output = is_assistant_output_message(body)
                 session_active = metadata.get("session_status") == "active"

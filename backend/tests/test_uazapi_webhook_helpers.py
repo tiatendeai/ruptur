@@ -3,6 +3,9 @@ from __future__ import annotations
 import unittest
 
 from app.api.uazapi_webhook import (
+    extract_inline_persona_request,
+    is_iazinha_activation_attempt,
+    is_operational_brief_request,
     is_self_chat,
     resolve_target_candidates,
     resolve_uazapi_instance_id,
@@ -12,6 +15,13 @@ from app.api.uazapi_webhook import (
 
 
 class UazapiWebhookHelpersTest(unittest.TestCase):
+    def test_inline_iazinha_prompt_is_not_treated_as_plain_activation(self) -> None:
+        self.assertFalse(is_iazinha_activation_attempt("Iazinha me dê um resumo operacional"))
+        self.assertEqual(
+            extract_inline_persona_request("Iazinha, me dê um resumo operacional"),
+            ("iazinha", "me dê um resumo operacional"),
+        )
+
     def test_wants_audio_response_detects_ptbr_prompt(self) -> None:
         self.assertTrue(wants_audio_response("Me responda em áudio: qual o status?"))
 
@@ -19,6 +29,13 @@ class UazapiWebhookHelpersTest(unittest.TestCase):
         self.assertEqual(
             strip_audio_request_instruction("Me responda em áudio: qual o status da sessão?"),
             "qual o status da sessão?",
+        )
+
+    def test_operational_brief_detection_hits_on_exec_summary_requests(self) -> None:
+        self.assertTrue(
+            is_operational_brief_request(
+                "IAzinha me dê um resumo operacional curto de ontem para hoje e de hoje para amanhã, com desafios, vitórias e oportunidades",
+            )
         )
 
     def test_resolve_target_candidates_keep_same_thread_before_fallbacks(self) -> None:
