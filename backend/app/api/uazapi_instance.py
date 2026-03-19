@@ -3,15 +3,20 @@ from __future__ import annotations
 import base64
 from typing import Any
 
-from fastapi import APIRouter, Header, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 
+from app.api.security import require_any_role
 from app.clients.uazapi import UazapiError
 from app.settings import settings
 from app.uazapi_runtime import admin_client, client, resolve_token
 
 
-router = APIRouter(prefix="/integrations/uazapi", tags=["uazapi"])
+router = APIRouter(
+    prefix="/integrations/uazapi",
+    tags=["uazapi"],
+    dependencies=[Depends(require_any_role("tenant_admin", "ops_manager", "platform_admin"))],
+)
 
 SENSITIVE_KEYS = {"token", "admintoken", "apikey", "openai_apikey"}
 

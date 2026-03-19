@@ -4,13 +4,18 @@ import re
 from typing import Any
 
 import httpx
-from fastapi import APIRouter, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 
+from app.api.security import require_any_role
 from app.settings import settings
 
 
-router = APIRouter(prefix="/integrations/baileys", tags=["baileys"])
+router = APIRouter(
+    prefix="/integrations/baileys",
+    tags=["baileys"],
+    dependencies=[Depends(require_any_role("tenant_admin", "ops_manager", "platform_admin"))],
+)
 
 LEGACY_INSTANCE_BY_CANONICAL = {
     "inst-5531989131980": "inst-553189131980",

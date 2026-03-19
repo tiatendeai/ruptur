@@ -6,7 +6,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from app.api.security import require_jarvis_token
+from app.api.security import require_jarvis_access
 from app.db import DatabaseNotConfiguredError, connect
 from app.repositories import cfo_repo
 from app.services.jarvis_skill_runtime import get_skill
@@ -15,8 +15,8 @@ from app.services.jarvis_skill_runtime import get_skill
 from app.services import jarvis_cfo_skill as _jarvis_cfo_skill  # noqa: F401
 
 
-# Protected by the same optional token used by Jarvis routes.
-router = APIRouter(prefix="/cfo", tags=["cfo"], dependencies=[Depends(require_jarvis_token)])
+# Protegido por autenticacao humana com role forte ou por token de servico do Jarvis.
+router = APIRouter(prefix="/cfo", tags=["cfo"], dependencies=[Depends(require_jarvis_access)])
 
 
 class CfoClient(BaseModel):

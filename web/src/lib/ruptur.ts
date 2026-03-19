@@ -1,4 +1,5 @@
 import { rupturApiBaseUrl } from "./config";
+import { getBrowserSupabaseClient } from "./supabase/browser";
 
 export type RupturLead = {
   id: string;
@@ -141,7 +142,23 @@ export type RupturStage = {
 async function apiFetch(path: string, init?: RequestInit) {
   const base = rupturApiBaseUrl();
   const url = `${base}${path.startsWith("/") ? path : `/${path}`}`;
-  const res = await fetch(url, { ...init, cache: "no-store" });
+  const headers = new Headers(init?.headers || {});
+
+  if (typeof window !== "undefined") {
+    try {
+      const supabase = getBrowserSupabaseClient();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (session?.access_token) {
+        headers.set("authorization", `Bearer ${session.access_token}`);
+      }
+    } catch {
+      // Sem Supabase configurado ou sem sessao; o backend decide o bloqueio.
+    }
+  }
+
+  const res = await fetch(url, { ...init, headers, cache: "no-store" });
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`HTTP ${res.status}: ${text}`);

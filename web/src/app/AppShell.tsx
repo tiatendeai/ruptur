@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import LogoutButton from "@/components/auth/LogoutButton";
 
 type NavItem = {
   href: string;
@@ -30,7 +31,7 @@ export default function AppShell({
 }>) {
   const pathname = usePathname();
 
-  if (pathname === "/" || pathname.startsWith("/showcase")) {
+  if (pathname === "/" || pathname.startsWith("/showcase") || pathname.startsWith("/login")) {
     return <>{children}</>;
   }
 
@@ -80,8 +81,11 @@ export default function AppShell({
             <div className="border-b border-black/10 px-5 pb-5 pt-6">
               <div className="flex items-center justify-between gap-3">
                 <div className="text-[11px] uppercase tracking-[0.42em] text-[#9d4e31]">Ruptur Ops</div>
-                <div className="rounded-full border border-[#9d4e31]/20 bg-[#fffaf2] px-2.5 py-1 text-[10px] uppercase tracking-[0.24em] text-[#9d4e31]">
-                  live
+                <div className="flex items-center gap-2">
+                  <div className="rounded-full border border-[#9d4e31]/20 bg-[#fffaf2] px-2.5 py-1 text-[10px] uppercase tracking-[0.24em] text-[#9d4e31]">
+                    live
+                  </div>
+                  <LogoutButton />
                 </div>
               </div>
               <div className="mt-5 text-[2.4rem] font-semibold leading-[0.9] tracking-[-0.08em] text-[#16110f]">
@@ -168,6 +172,9 @@ export default function AppShell({
                   <div className="bg-[#efe4d4] px-5 py-4">
                     <div className="text-[10px] uppercase tracking-[0.28em] text-zinc-500">foco</div>
                     <div className="mt-2 text-sm font-medium text-zinc-900">leitura, resposta e governanca</div>
+                    <div className="mt-3">
+                      <LogoutButton />
+                    </div>
                   </div>
                 </div>
               </div>

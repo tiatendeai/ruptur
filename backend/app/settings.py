@@ -47,5 +47,8 @@ class Settings(BaseSettings):
 
     jarvis_admin_token: str | None = Field(default=None, alias="RUPTUR_JARVIS_ADMIN_TOKEN")
 
+    supabase_url: str | None = Field(default=None, alias="RUPTUR_SUPABASE_URL")
+    supabase_publishable_key: str | None = Field(default=None, alias="RUPTUR_SUPABASE_PUBLISHABLE_KEY")
+
 
 settings = Settings()

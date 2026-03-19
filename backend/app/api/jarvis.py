@@ -6,7 +6,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from app.api.security import require_jarvis_token
+from app.api.security import require_jarvis_access
 from app.db import DatabaseNotConfiguredError, connect
 from app.repositories import jarvis_ops_repo
 from app.services.agent_service import agent_service
@@ -17,9 +17,8 @@ from app.services import jarvis_cfo_skill as _jarvis_cfo_skill  # noqa: F401
 from app.services import jarvis_eggs_skill as _jarvis_eggs_skill  # noqa: F401
 
 
-# Single control plane for Diego. Token guard is optional via env and can be
-# enabled in production without changing client contracts.
-router = APIRouter(prefix="/jarvis", tags=["jarvis"], dependencies=[Depends(require_jarvis_token)])
+# Single control plane para Diego e para a camada de servico do Jarvis.
+router = APIRouter(prefix="/jarvis", tags=["jarvis"], dependencies=[Depends(require_jarvis_access)])
 
 
 class JarvisHistoryItem(BaseModel):

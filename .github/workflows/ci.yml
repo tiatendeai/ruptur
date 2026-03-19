@@ -1,0 +1,106 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - work
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-tests:
+    name: Backend | testes
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Baixar codigo
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+
+      - name: Instalar dependencias
+        run: pip install -r requirements-dev.txt
+
+      - name: Rodar testes backend
+        env:
+          PYTHONPATH: ${{ github.workspace }}/backend
+        run: pytest -q tests
+
+  web-quality:
+    name: Web | lint e build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - name: Baixar codigo
+        uses: actions/checkout@v4
+
+      - name: Configurar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Rodar lint
+        run: npm run lint
+
+      - name: Rodar build
+        env:
+          NEXT_PUBLIC_RUPTUR_API_BASE_URL: https://api.ruptur.cloud
+          NEXT_PUBLIC_SUPABASE_URL: https://project-ref.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_placeholder
+        run: npm run build
+
+  deploy-assets-check:
+    name: Deploy | validar compose e scripts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar codigo
+        uses: actions/checkout@v4
+
+      - name: Validar scripts shell
+        run: |
+          bash -n ops/kvm2/preflight.sh
+          bash -n ops/kvm2/smoke.sh
+          bash -n ops/kvm2/bootstrap_host.sh
+          bash -n ops/kvm2/validate_shared_env.sh
+          bash -n ops/kvm2/remote_deploy.sh
+          bash -n ops/kvm2/remote_rollback.sh
+
+      - name: Validar env compartilhado de exemplo
+        run: bash ops/kvm2/validate_shared_env.sh deploy/kvm2/.env.example
+
+      - name: Validar compose do kvm2
+        run: docker compose -f deploy/kvm2/docker-compose.yml --env-file deploy/kvm2/.env.example config >/tmp/ruptur-kvm2-compose.txt
+
+      - name: Validar build Docker do backend
+        run: docker build -f backend/Dockerfile backend
+
+      - name: Validar build Docker do web
+        run: |
+          docker build \
+            --build-arg NEXT_PUBLIC_RUPTUR_API_BASE_URL=https://api.ruptur.cloud \
+            --build-arg NEXT_PUBLIC_SUPABASE_URL=https://project-ref.supabase.co \
+            --build-arg NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_placeholder \
+            -f web/Dockerfile web

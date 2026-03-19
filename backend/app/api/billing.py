@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from psycopg.types.json import Jsonb
 
+from app.api.security import require_any_role
 from app.clients.asaas import AsaasClient, AsaasConfig, AsaasError
 from app.db import DatabaseNotConfiguredError, connect
 from app.services.billing_catalog import PLANS, get_plan, quote_amount_cents
@@ -15,7 +16,7 @@ from app.settings import settings
 router = APIRouter(prefix="/billing", tags=["billing"])
 
 
-@router.get("/plans")
+@router.get("/plans", dependencies=[Depends(require_any_role("billing_admin", "tenant_owner", "tenant_admin", "platform_admin"))])
 def list_plans() -> dict[str, Any]:
     return {
         "ok": True,
@@ -40,7 +41,7 @@ class QuoteRequest(BaseModel):
     attendants: int = Field(default=2, ge=1, le=999)
 
 
-@router.post("/quote")
+@router.post("/quote", dependencies=[Depends(require_any_role("billing_admin", "tenant_owner", "tenant_admin", "platform_admin"))])
 def quote(req: QuoteRequest) -> dict[str, Any]:
     try:
         amount_cents = quote_amount_cents(plan_key=req.plan_key, period=req.period, attendants=req.attendants)
@@ -67,7 +68,7 @@ class CheckoutRequest(BaseModel):
     success_url: str | None = Field(default=None, description="URL para redirecionar após pagamento (opcional)")
 
 
-@router.post("/checkout")
+@router.post("/checkout", dependencies=[Depends(require_any_role("billing_admin", "tenant_owner", "tenant_admin", "platform_admin"))])
 def create_checkout(req: CheckoutRequest) -> dict[str, Any]:
     if not settings.asaas_token:
         raise HTTPException(status_code=400, detail="asaas_not_configured")
@@ -179,4 +180,3 @@ async def asaas_webhook(request: Request) -> dict[str, Any]:
         return {"ok": True, "stored": False, "reason": "database_not_configured"}
 
     return {"ok": True, "stored": True}
-

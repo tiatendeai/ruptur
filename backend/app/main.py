@@ -4,6 +4,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import JSONResponse
 
 from app.settings import settings
 from app.api.crm import router as crm_router
@@ -18,6 +20,7 @@ from app.api.billing import router as billing_router
 from app.api.baileys_instance import router as baileys_instance_router
 from app.api.jarvis import router as jarvis_router
 from app.api.cfo import router as cfo_router
+from app.api.security import authenticate_request, is_public_path
 
 
 def create_app() -> FastAPI:
@@ -36,6 +39,22 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    class AuthMiddleware(BaseHTTPMiddleware):
+        async def dispatch(self, request, call_next):
+            if request.method == "OPTIONS" or is_public_path(request.url.path):
+                return await call_next(request)
+            try:
+                request.state.current_user = await authenticate_request(request)
+            except Exception as exc:
+                from fastapi import HTTPException
+
+                if isinstance(exc, HTTPException):
+                    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+                return JSONResponse(status_code=500, content={"detail": "auth_internal_error"})
+            return await call_next(request)
+
+    app.add_middleware(AuthMiddleware)
 
     # Criar pasta static se não existir
     static_path = os.path.join(os.getcwd(), "static")
