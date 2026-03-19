@@ -72,6 +72,20 @@ services:
         NEXT_PUBLIC_RUPTUR_API_BASE_URL: https://api.ruptur.cloud
     restart: unless-stopped
 
+  warmup:
+    build:
+      context: ./warmup
+      dockerfile: Dockerfile
+    environment:
+      - WARMUP_RUNTIME_HOST=0.0.0.0
+      - WARMUP_RUNTIME_PORT=4173
+      - WARMUP_RUNTIME_TICK_INTERVAL_MS=60000
+    volumes:
+      - warmup_runtime_data:/app/runtime-data
+    depends_on:
+      - ruptur-backend
+    restart: unless-stopped
+
   whisper:
     build:
       context: ./whisper

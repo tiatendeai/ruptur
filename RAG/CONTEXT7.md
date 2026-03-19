@@ -210,6 +210,13 @@ Leia este arquivo primeiro. Se a tarefa tocar OpenAI ou Baileys, consulte tambem
   - criacao/pairing devem acontecer por `POST /instance`
 - Ativacao por audio depende de transcricao chegar corretamente ao webhook; nao existe trilha separada de wake word.
 
+## Integração do Warmup Manager (mar 2026)
+
+- O plano de integração do Warmup Manager foi formalizado em `/Users/diego/Documents/GitHub/tiatendeai-business-boost/INTEGRATION_PLAN.md`; ele descreve como o serviço será hospedado dentro de `deploy/host2` do Ruptur com um novo contêiner Node que serve `dist/` + `runtime/`, roda `runtime/server.mjs` e responde por `/api/local/*`.
+- O router Traefik com Host `app.ruptur.cloud` e `PathPrefix(/warmup)` deve usar o middleware `StripPrefix=/warmup`, garantindo que os assets e as APIs funcionem mesmo dentro do domínio principal do console.
+- O script `scripts/export-to-ruptur.sh` prepara o bundle local (`npm run build` + cópia de `dist/`, `runtime/`, `package*.json`) e sincroniza para `deploy/host2/warmup`; ele exige que esse diretório exista no VPS e alerta caso precise ser criado manualmente.
+- Essa estrutura mantém o Warmup Manager isolado (fora do console Next), mas documentado e alinhado com backend, Traefik e Baileys.
+
 ## Fontes oficiais obrigatorias
 
 - OpenAI Responses vs Chat Completions:
