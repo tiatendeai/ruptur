@@ -62,6 +62,18 @@ function normalizeSettings(settings = {}) {
   return next;
 }
 
+function mergeRuntimeSettings(currentSettings = {}, incomingSettings = {}) {
+  const normalizedIncoming = normalizeSettings(incomingSettings ?? {});
+  const current = normalizeSettings(currentSettings ?? {});
+
+  return normalizeSettings({
+    ...current,
+    ...normalizedIncoming,
+    serverUrl: normalizedIncoming.serverUrl?.trim() || current.serverUrl,
+    adminToken: normalizedIncoming.adminToken?.trim() || current.adminToken || "",
+  });
+}
+
 function createEmptyPoolState() {
   return {
     persistent: {
@@ -357,15 +369,28 @@ function calculateHealthScore(params) {
 
 function normalizeInstanceState({ currentState, instance, round, now, resolvedNumber, instanceData }) {
   const base = currentState ?? createDefaultInstanceState(instance.token, instance.name);
+  const proxy = instanceData?.proxy ?? base.proxy;
+  const isManagedProxy = Boolean(
+    proxy?.managed
+    || proxy?.proxy_fallback === "internal_proxy"
+    || String(proxy?.proxy_url ?? "").startsWith("managed_pool://")
+  );
+  const hasCustomProxy = Boolean(proxy?.enabled && proxy?.proxy_url && !isManagedProxy);
   const next = {
     ...base,
     instanceName: instance.name,
     warmingNow: false,
     resolvedNumber: resolvedNumber ?? base.resolvedNumber,
-    proxy: instanceData?.proxy ?? base.proxy,
-    proxyStatus: instanceData?.proxy
-      ? (typeof instanceData.proxy === "string" ? "custom" : "internal")
-      : "none",
+    proxy,
+    proxyStatus: proxy?.validation_error
+      ? "error"
+      : isManagedProxy
+        ? "managed"
+        : hasCustomProxy
+          ? "custom"
+          : proxy
+            ? "internal"
+            : "unknown",
     updatedAt: now.toISOString(),
     nextEligibleAt: undefined,
   };
@@ -654,6 +679,14 @@ async function fetchInstanceStatus(token) {
   }, "Erro ao buscar status da instância");
 }
 
+async function fetchInstanceProxy(token) {
+  return fetchJson(`${state.config.settings.serverUrl}/instance/proxy`, {
+    headers: {
+      token,
+    },
+  }, "Erro ao buscar proxy da instância");
+}
+
 async function sendText(token, payload) {
   return fetchJson(`${state.config.settings.serverUrl}/send/text`, {
     method: "POST",
@@ -666,7 +699,7 @@ async function sendText(token, payload) {
 }
 
 async function sendAudio(token, payload) {
-  return fetchJson(`${state.config.settings.serverUrl}/send/audio`, {
+  return fetchJson(`${state.config.settings.serverUrl}/send/media`, {
     method: "POST",
     headers: {
       token,
@@ -991,7 +1024,8 @@ async function executePoolEntry(entry, instancesByToken, round) {
     if (message.contentType === "audio" && message.audioUrl) {
       await sendAudio(entry.senderToken, {
         number: receiverNumber,
-        audio: message.audioUrl,
+        type: message.audioMode || "ptt",
+        file: message.audioUrl,
         delay: entry.delayMs,
         readchat: state.config.settings.warmupReadChat,
         readmessages: state.config.settings.warmupReadMessages,
@@ -1165,6 +1199,10 @@ function buildSnapshot() {
       routinesCount: state.config.routines.length,
       messagesCount: state.config.messages.length,
       lastSyncedAt: state.lastSyncedAt,
+      warmupMinIntervalMs: state.config.settings.warmupMinIntervalMs,
+      warmupMaxDailyPerInstance: state.config.settings.warmupMaxDailyPerInstance,
+      warmupCooldownRounds: state.config.settings.warmupCooldownRounds,
+      antiBanMaxPerMinute: state.config.settings.antiBanMaxPerMinute,
     },
     recentLogs: state.logs.slice(0, 50),
     instanceStates: Object.values(state.instanceStates),
@@ -1193,14 +1231,22 @@ async function tick(reason = "interval") {
       await Promise.all(
         instances.map(async (instance) => {
           try {
-            const status = await fetchInstanceStatus(instance.token);
+            const [statusResult, proxyResult] = await Promise.allSettled([
+              fetchInstanceStatus(instance.token),
+              fetchInstanceProxy(instance.token),
+            ]);
+            const status = statusResult.status === "fulfilled" ? statusResult.value : null;
+            const proxy = proxyResult.status === "fulfilled" ? proxyResult.value : undefined;
             state.instanceStates[instance.token] = normalizeInstanceState({
               currentState: state.instanceStates[instance.token],
               instance,
               round,
               now: tickStartedAt,
               resolvedNumber: extractResolvedNumber(status, instance),
-              instanceData: instance,
+              instanceData: {
+                ...instance,
+                proxy,
+              },
             });
           } catch {
             state.instanceStates[instance.token] = normalizeInstanceState({
@@ -1459,7 +1505,7 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === "/api/local/warmup/sync") {
       const payload = await parseBody(req);
       state.config = {
-        settings: normalizeSettings(payload.settings ?? {}),
+        settings: mergeRuntimeSettings(state.config.settings, payload.settings ?? {}),
         routines: Array.isArray(payload.routines) ? payload.routines : [],
         messages: Array.isArray(payload.messages) ? payload.messages : [],
       };
