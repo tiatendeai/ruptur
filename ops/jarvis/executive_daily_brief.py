@@ -8,6 +8,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import date
+from pathlib import Path
 
 
 def _env(name: str, default: str = "") -> str:
@@ -66,11 +67,24 @@ def write_step_summary(markdown: str) -> None:
         handle.write("\n")
 
 
-def send_telegram(markdown: str) -> None:
+def persist_local_copy(markdown: str) -> str | None:
+    output_dir = _env("JARVIS_DAILY_OUTPUT_DIR")
+    if not output_dir:
+        return None
+    path = Path(output_dir).expanduser()
+    path.mkdir(parents=True, exist_ok=True)
+    target = path / f"daily-executive-{date.today().isoformat()}.md"
+    target.write_text(markdown + "\n", encoding="utf-8")
+    return str(target)
+
+
+def send_telegram(markdown: str) -> list[str]:
     bot_token = _env("TELEGRAM_BOT_TOKEN")
     user_ids = [item.strip() for item in _env("TELEGRAM_ALLOWED_USER_IDS").split(",") if item.strip()]
     if not bot_token or not user_ids:
-        return
+        return []
+
+    warnings: list[str] = []
     endpoint = f"https://api.telegram.org/bot{bot_token}/sendMessage"
     for chat_id in user_ids:
         payload = urllib.parse.urlencode(
@@ -81,8 +95,12 @@ def send_telegram(markdown: str) -> None:
             }
         ).encode("utf-8")
         req = urllib.request.Request(endpoint, data=payload, headers={"Content-Type": "application/x-www-form-urlencoded"})
-        with urllib.request.urlopen(req, timeout=30):
-            pass
+        try:
+            with urllib.request.urlopen(req, timeout=30):
+                pass
+        except Exception as exc:  # pragma: no cover - depende de credencial/canal real
+            warnings.append(f"telegram:{chat_id}:{exc}")
+    return warnings
 
 
 def main() -> int:
@@ -91,7 +109,12 @@ def main() -> int:
         markdown = render_markdown(payload)
         print(markdown)
         write_step_summary(markdown)
-        send_telegram(markdown)
+        local_copy = persist_local_copy(markdown)
+        warnings = send_telegram(markdown)
+        if local_copy:
+            print(f"\n[info] copia_local={local_copy}", file=sys.stderr)
+        for warning in warnings:
+            print(f"[warn] {warning}", file=sys.stderr)
         return 0
     except urllib.error.HTTPError as exc:
         print(f"ERRO HTTP ao buscar daily executiva: {exc.code}", file=sys.stderr)
