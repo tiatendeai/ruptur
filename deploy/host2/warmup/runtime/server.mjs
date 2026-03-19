@@ -1460,6 +1460,7 @@ function processWebhookPayload(payload) {
 function buildRuntimeConfigResponse() {
   return {
     settings: buildPublicSettings(state.config.settings),
+    runtime: buildRuntimeSecretMeta(state.config.settings),
     routines: state.config.routines,
     messages: state.config.messages,
     lastSyncedAt: state.lastSyncedAt,
@@ -1467,6 +1468,14 @@ function buildRuntimeConfigResponse() {
       enabled: state.scheduler.enabled,
       status: state.scheduler.status,
     },
+  };
+}
+
+function buildRuntimeSecretMeta(settings = {}) {
+  const trimmedToken = String(settings.adminToken ?? "").trim();
+  return {
+    adminTokenConfigured: Boolean(trimmedToken),
+    adminTokenLast4: trimmedToken ? trimmedToken.slice(-4) : undefined,
   };
 }
 
@@ -1528,11 +1537,20 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host ?? "localhost"}`);
   try {
     if (url.pathname === "/api/local/health") return createResponse(res, 200, { ok: true, port: PORT, scheduler: state.scheduler });
-    if (url.pathname === "/api/local/app/config") return createResponse(res, 200, { settings: buildPublicSettings(state.config.settings) });
+    if (url.pathname === "/api/local/app/config") {
+      return createResponse(res, 200, {
+        settings: buildPublicSettings(state.config.settings),
+        runtime: buildRuntimeSecretMeta(state.config.settings),
+      });
+    }
     if (url.pathname === "/api/local/warmup/webhook" && req.method === "POST") {
       const payload = await parseBody(req);
       processWebhookPayload(payload);
       return createResponse(res, 200, { received: true });
+    }
+    if (url.pathname === "/api/local/uazapi/instance/all") {
+      const instances = await fetchAllInstances();
+      return createResponse(res, 200, instances);
     }
     if (url.pathname === "/api/local/warmup/state") return createResponse(res, 200, buildSnapshot());
     if (url.pathname === "/api/local/warmup/config") return createResponse(res, 200, buildRuntimeConfigResponse());
