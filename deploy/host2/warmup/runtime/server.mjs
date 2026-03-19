@@ -1384,7 +1384,7 @@ function processWebhookPayload(payload) {
 
 function buildRuntimeConfigResponse() {
   return {
-    settings: state.config.settings,
+    settings: buildPublicSettings(state.config.settings),
     routines: state.config.routines,
     messages: state.config.messages,
     lastSyncedAt: state.lastSyncedAt,
@@ -1392,6 +1392,13 @@ function buildRuntimeConfigResponse() {
       enabled: state.scheduler.enabled,
       status: state.scheduler.status,
     },
+  };
+}
+
+function buildPublicSettings(settings = {}) {
+  return {
+    ...settings,
+    adminToken: "",
   };
 }
 
@@ -1441,7 +1448,7 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host ?? "localhost"}`);
   try {
     if (url.pathname === "/api/local/health") return createResponse(res, 200, { ok: true, port: PORT, scheduler: state.scheduler });
-    if (url.pathname === "/api/local/app/config") return createResponse(res, 200, { settings: state.config.settings });
+    if (url.pathname === "/api/local/app/config") return createResponse(res, 200, { settings: buildPublicSettings(state.config.settings) });
     if (url.pathname === "/api/local/warmup/webhook" && req.method === "POST") {
       const payload = await parseBody(req);
       processWebhookPayload(payload);
