@@ -1,0 +1,107 @@
+services:
+  traefik:
+    image: traefik:v3.1
+    command:
+      - --api.dashboard=true
+      - --providers.file.filename=/etc/traefik/dynamic.yml
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --certificatesresolvers.le.acme.httpchallenge=true
+      - --certificatesresolvers.le.acme.httpchallenge.entrypoint=web
+      - --certificatesresolvers.le.acme.email=${TRAEFIK_ACME_EMAIL}
+      - --certificatesresolvers.le.acme.storage=/letsencrypt/acme.json
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - ./traefik_dynamic.yml:/etc/traefik/dynamic.yml:ro
+      - traefik_letsencrypt:/letsencrypt
+    restart: unless-stopped
+
+  baileys:
+    build:
+      context: ./baileys
+    environment:
+      - PORT=3000
+      - BAILEYS_AUTH_DIR=/data/auth
+      - BAILEYS_LOG_LEVEL=info
+      - WHISPER_BASE_URL=http://whisper:8001
+      - BAILEYS_FORWARD_WEBHOOK_URL=http://ruptur-backend:8000/webhook/uazapi
+      - BAILEYS_SENT_MESSAGE_STORE_DIR=/data/sent-messages
+      - BAILEYS_SENT_MESSAGE_TTL_MS=1209600000
+      - BAILEYS_EAGER_START_DEFAULT=false
+      - BAILEYS_LAZY_START_DEFAULT=false
+      - BAILEYS_BOOT_NAMED_INSTANCES=true
+    volumes:
+      - baileys_data:/data
+    restart: unless-stopped
+
+  ruptur-db:
+    image: postgres:16
+    environment:
+      - POSTGRES_DB=ruptur
+      - POSTGRES_USER=ruptur
+      - POSTGRES_PASSWORD=ruptur
+    volumes:
+      - ruptur_db_data:/var/lib/postgresql/data
+      - ../../backend/db/schema.sql:/docker-entrypoint-initdb.d/001_schema.sql:ro
+    restart: unless-stopped
+
+  ruptur-backend:
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile
+    environment:
+      - RUPTUR_ENV=prod
+      - RUPTUR_HOST=0.0.0.0
+      - RUPTUR_PORT=8000
+      - RUPTUR_DATABASE_URL=postgresql://ruptur:ruptur@ruptur-db:5432/ruptur
+    volumes:
+      - ../../backend/.env:/app/.env:ro
+    depends_on:
+      - ruptur-db
+    restart: unless-stopped
+
+  ruptur-web:
+    build:
+      context: ../../web
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_RUPTUR_API_BASE_URL: https://api.ruptur.cloud
+    restart: unless-stopped
+
+  warmup:
+    build:
+      context: ./warmup
+      dockerfile: Dockerfile
+    environment:
+      - WARMUP_RUNTIME_HOST=0.0.0.0
+      - WARMUP_RUNTIME_PORT=4173
+      - WARMUP_RUNTIME_TICK_INTERVAL_MS=60000
+    volumes:
+      - warmup_runtime_data:/app/runtime-data
+    depends_on:
+      - ruptur-backend
+    restart: unless-stopped
+
+  whisper:
+    build:
+      context: ./whisper
+    environment:
+      - WHISPER_MODEL=base
+      - WHISPER_DEVICE=cpu
+      - WHISPER_COMPUTE_TYPE=int8
+      - WHISPER_LANGUAGE=pt
+      - WHISPER_BEAM_SIZE=5
+      - WHISPER_VAD_FILTER=true
+    volumes:
+      - whisper_models:/root/.cache
+    restart: unless-stopped
+volumes:
+  traefik_letsencrypt:
+  baileys_data:
+  whisper_models:
+  ruptur_db_data:
+  warmup_runtime_data:

@@ -1,21 +1,93 @@
 from __future__ import annotations
 
 from fastapi import FastAPI
+<<<<<<< HEAD
 
+=======
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+import os
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import JSONResponse
+
+from app.settings import settings
+from app.api.crm import router as crm_router
+from app.api.sendflow import router as sendflow_router
+>>>>>>> work
 from app.api.next_step import router as next_step_router
 from app.api.send import router as send_router
 from app.api.health import router as health_router
 from app.api.uazapi_webhook import router as uazapi_webhook_router
 from app.api.uazapi_instance import router as uazapi_instance_router
+<<<<<<< HEAD
+=======
+from app.api.growth import router as growth_router
+from app.api.billing import router as billing_router
+from app.api.baileys_instance import router as baileys_instance_router
+from app.api.jarvis import router as jarvis_router
+from app.api.cfo import router as cfo_router
+from app.api.security import authenticate_request, is_public_path
+>>>>>>> work
 
 
 def create_app() -> FastAPI:
     app = FastAPI(title="Ruptur API", version="0.0.0", docs_url="/docs", redoc_url="/redoc")
+<<<<<<< HEAD
+=======
+
+    origins: list[str]
+    if not settings.cors_origins or settings.cors_origins.strip() == "*":
+        origins = ["*"]
+    else:
+        origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    class AuthMiddleware(BaseHTTPMiddleware):
+        async def dispatch(self, request, call_next):
+            if request.method == "OPTIONS" or is_public_path(request.url.path):
+                return await call_next(request)
+            try:
+                request.state.current_user = await authenticate_request(request)
+            except Exception as exc:
+                from fastapi import HTTPException
+
+                if isinstance(exc, HTTPException):
+                    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+                return JSONResponse(status_code=500, content={"detail": "auth_internal_error"})
+            return await call_next(request)
+
+    app.add_middleware(AuthMiddleware)
+
+    # Criar pasta static se não existir
+    static_path = os.path.join(os.getcwd(), "static")
+    os.makedirs(static_path, exist_ok=True)
+    os.makedirs(os.path.join(static_path, "audio"), exist_ok=True)
+
+    app.mount("/static", StaticFiles(directory=static_path), name="static")
+
+>>>>>>> work
     app.include_router(health_router)
     app.include_router(uazapi_webhook_router)
     app.include_router(send_router)
     app.include_router(next_step_router)
     app.include_router(uazapi_instance_router)
+<<<<<<< HEAD
+=======
+    app.include_router(baileys_instance_router)
+    app.include_router(crm_router)
+    app.include_router(sendflow_router)
+    app.include_router(growth_router)
+    app.include_router(billing_router)
+    app.include_router(jarvis_router)
+    app.include_router(cfo_router)
+>>>>>>> work
     return app
 
 

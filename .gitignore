@@ -3,6 +3,13 @@ __pycache__/
 
 .DS_Store
 
+<<<<<<< HEAD
+=======
+# Audio samples (do not commit)
+*.opus
+/local/
+
+>>>>>>> work
 # Local env / venvs
 .env
 .venv/
@@ -11,3 +18,21 @@ __pycache__/
 backend/.env
 backend/.venv/
 
+<<<<<<< HEAD
+=======
+# Scratch / exports
+/archive/
+
+# Node / web app
+.npm-cache/
+web/node_modules/
+web/.next/
+
+# Screenshots
+Captura de Tela*.png
+
+# Ignored artifacts
+0WbsZjA4yKfY.br/
+backend/uvicorn.log
+
+>>>>>>> work

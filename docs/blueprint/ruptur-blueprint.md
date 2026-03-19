@@ -188,6 +188,7 @@ ruptur/
 
 > Plano operacional detalhado: `docs/jornada/proximos_passos_fase1.md`.
 
+<<<<<<< HEAD
 ## 10.1) Princípios de priorização (aprendizados de vídeos)
 
 Para a Fase 1, a prioridade do Ruptur é reduzir **tempo de resposta** e **tempo até o próximo passo** (o “dinheiro espera” quando o lead está pronto e ninguém responde).
@@ -201,6 +202,8 @@ Frameworks práticos para decidir o que automatizar primeiro:
 
 Resumo e aplicação no Ruptur: `docs/jornada/aprendizados_videos.md`.
 
+=======
+>>>>>>> work
 ## 11) Roadmap
 
 ### Fase 1 — Ruptur Core

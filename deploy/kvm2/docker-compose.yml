@@ -1,0 +1,189 @@
+services:
+  traefik:
+    image: traefik:v3.1
+    profiles: ["edge"]
+    command:
+      - --api.dashboard=true
+      - --providers.file.filename=/etc/traefik/dynamic.yml
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --certificatesresolvers.le.acme.httpchallenge=true
+      - --certificatesresolvers.le.acme.httpchallenge.entrypoint=web
+      - --certificatesresolvers.le.acme.email=${TRAEFIK_ACME_EMAIL}
+      - --certificatesresolvers.le.acme.storage=/letsencrypt/acme.json
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./traefik_dynamic.yml:/etc/traefik/dynamic.yml:ro
+      - traefik_letsencrypt:/letsencrypt
+    restart: unless-stopped
+
+  baileys:
+    profiles: ["channels"]
+    build:
+      context: ../host2/baileys
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.ruptur-baileys.rule=Host(`baileys.ruptur.cloud`)
+      - traefik.http.routers.ruptur-baileys.entrypoints=websecure
+      - traefik.http.routers.ruptur-baileys.tls.certresolver=letsencrypt
+      - traefik.http.services.ruptur-baileys.loadbalancer.server.port=3000
+    environment:
+      PORT: 3000
+      BAILEYS_AUTH_DIR: /data/auth
+      BAILEYS_LOG_LEVEL: ${BAILEYS_LOG_LEVEL:-info}
+      WHISPER_BASE_URL: http://whisper:8001
+      BAILEYS_FORWARD_WEBHOOK_URL: http://ruptur-backend:8000/webhook/uazapi
+      BAILEYS_SENT_MESSAGE_STORE_DIR: /data/sent-messages
+      BAILEYS_SENT_MESSAGE_TTL_MS: ${BAILEYS_SENT_MESSAGE_TTL_MS:-1209600000}
+      BAILEYS_EAGER_START_DEFAULT: ${BAILEYS_EAGER_START_DEFAULT:-false}
+      BAILEYS_LAZY_START_DEFAULT: ${BAILEYS_LAZY_START_DEFAULT:-false}
+      BAILEYS_BOOT_NAMED_INSTANCES: ${BAILEYS_BOOT_NAMED_INSTANCES:-true}
+    volumes:
+      - baileys_data:/data
+    restart: unless-stopped
+
+  ruptur-db:
+    image: postgres:16
+    profiles: ["core"]
+    environment:
+      POSTGRES_DB: ${RUPTUR_POSTGRES_DB}
+      POSTGRES_USER: ${RUPTUR_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${RUPTUR_DB_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${RUPTUR_POSTGRES_USER} -d ${RUPTUR_POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - ruptur_db_data:/var/lib/postgresql/data
+      - ../../backend/db/schema.sql:/docker-entrypoint-initdb.d/001_schema.sql:ro
+    restart: unless-stopped
+
+  ruptur-backend:
+    profiles: ["core"]
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.ruptur-api.rule=Host(`api.ruptur.cloud`) || Host(`webhook.ruptur.cloud`)
+      - traefik.http.routers.ruptur-api.entrypoints=websecure
+      - traefik.http.routers.ruptur-api.tls.certresolver=letsencrypt
+      - traefik.http.services.ruptur-api.loadbalancer.server.port=8000
+    env_file:
+      - ${RUPTUR_BACKEND_ENV_FILE}
+    environment:
+      RUPTUR_ENV: prod
+      RUPTUR_HOST: 0.0.0.0
+      RUPTUR_PORT: 8000
+      RUPTUR_DATABASE_URL: postgresql://${RUPTUR_POSTGRES_USER}:${RUPTUR_DB_PASSWORD}@ruptur-db:5432/${RUPTUR_POSTGRES_DB}
+    depends_on:
+      ruptur-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8000/health >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  ruptur-web:
+    profiles: ["core"]
+    build:
+      context: ../../web
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_RUPTUR_API_BASE_URL: ${NEXT_PUBLIC_RUPTUR_API_BASE_URL}
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY}
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.ruptur-web.rule=Host(`app.ruptur.cloud`) || Host(`studio.ruptur.cloud`) || Host(`showcase.ruptur.cloud`) || Host(`site.ruptur.cloud`) || Host(`lp.ruptur.cloud`) || Host(`web.ruptur.cloud`) || Host(`ruptur.cloud`) || Host(`www.ruptur.cloud`)
+      - traefik.http.routers.ruptur-web.entrypoints=websecure
+      - traefik.http.routers.ruptur-web.tls.certresolver=letsencrypt
+      - traefik.http.services.ruptur-web.loadbalancer.server.port=3000
+    depends_on:
+      ruptur-backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+  warmup:
+    profiles: ["warmup"]
+    build:
+      context: ../host2/warmup
+      dockerfile: Dockerfile
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.ruptur-warmup.rule=Host(`app.ruptur.cloud`) && PathPrefix(`/warmup`)
+      - traefik.http.routers.ruptur-warmup.priority=1000
+      - traefik.http.routers.ruptur-warmup.entrypoints=websecure
+      - traefik.http.routers.ruptur-warmup.tls.certresolver=letsencrypt
+      - traefik.http.routers.ruptur-warmup.middlewares=ruptur-warmup-strip
+      - traefik.http.middlewares.ruptur-warmup-strip.stripprefix.prefixes=/warmup
+      - traefik.http.services.ruptur-warmup.loadbalancer.server.port=4173
+    environment:
+      WARMUP_RUNTIME_HOST: 0.0.0.0
+      WARMUP_RUNTIME_PORT: 4173
+      WARMUP_RUNTIME_TICK_INTERVAL_MS: ${WARMUP_RUNTIME_TICK_INTERVAL_MS:-60000}
+    volumes:
+      - warmup_runtime_data:/app/runtime-data
+    depends_on:
+      ruptur-backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+  node-exporter:
+    image: quay.io/prometheus/node-exporter:v1.10.2
+    profiles: ["observability-agents"]
+    command:
+      - --path.rootfs=/host
+      - --web.listen-address=${KVM2_NODE_EXPORTER_LISTEN_ADDRESS:-127.0.0.1:9100}
+      - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc|run/credentials/.+)($|/)
+      - --collector.netclass.ignored-devices=^(veth.*|docker.*|br-.*|lo)$
+    network_mode: host
+    pid: host
+    volumes:
+      - /:/host:ro,rslave
+    restart: unless-stopped
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.55.1
+    profiles: ["observability-agents"]
+    ports:
+      - "${KVM2_CADVISOR_BIND:-127.0.0.1:8080}:8080"
+    privileged: true
+    devices:
+      - /dev/kmsg:/dev/kmsg
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+      - /dev/disk:/dev/disk:ro
+    restart: unless-stopped
+
+  whisper:
+    profiles: ["channels"]
+    build:
+      context: ../host2/whisper
+    environment:
+      WHISPER_MODEL: ${WHISPER_MODEL:-base}
+      WHISPER_DEVICE: ${WHISPER_DEVICE:-cpu}
+      WHISPER_COMPUTE_TYPE: ${WHISPER_COMPUTE_TYPE:-int8}
+      WHISPER_LANGUAGE: ${WHISPER_LANGUAGE:-pt}
+      WHISPER_BEAM_SIZE: ${WHISPER_BEAM_SIZE:-5}
+      WHISPER_VAD_FILTER: ${WHISPER_VAD_FILTER:-true}
+    volumes:
+      - whisper_models:/root/.cache
+    restart: unless-stopped
+
+volumes:
+  traefik_letsencrypt:
+  baileys_data:
+  whisper_models:
+  ruptur_db_data:
+  warmup_runtime_data:

@@ -1,0 +1,8 @@
+area,item,valor,decisao,acao_recomendada
+produto,playbooks SDR,alto,trazer_agora,converter em backlog funcional do Ruptur
+produto,motions de qualificacao,alto,trazer_agora,absorver como regras de negocio
+workflows,templates n8n de follow-up e agendamento,alto,adaptar_depois,usar como referencia para workflows do Ruptur
+ia,memoria conversacional e RAG,alto,trazer_agora,reforcar modelagem de contexto/agentes no Ruptur
+dados,SQL simples de apoio,baixo,descartar,nao usar como base de schema principal
+automacao,JSONs n8n crus,medio,nao_trazer_agora,avaliar seletivamente apos definir runtime oficial
+referencias,materiais de curso,baixo,descartar,manter apenas como consulta fora da trilha principal
