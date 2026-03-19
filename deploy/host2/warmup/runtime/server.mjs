@@ -112,6 +112,7 @@ function createDefaultState() {
       enabled: false,
       status: "paused",
       round: 0,
+      lastManualAction: undefined,
     },
     summary: {
       totalInstances: 0,
@@ -130,6 +131,7 @@ function createDefaultState() {
     currentPool: createEmptyPoolState(),
     instanceStates: {},
     logs: [],
+    auditTrail: [],
     lastSyncedAt: undefined,
     activityWindowVersion: ACTIVITY_WINDOW_VERSION,
     activityWindowResetAt: undefined,
@@ -239,6 +241,7 @@ async function loadState() {
       },
       instanceStates: parsed.instanceStates ?? {},
       logs: parsed.logs ?? [],
+      auditTrail: parsed.auditTrail ?? [],
       lastSyncedAt: parsed.lastSyncedAt,
       activityWindowVersion: parsed.activityWindowVersion ?? 0,
       activityWindowResetAt: parsed.activityWindowResetAt,
@@ -312,6 +315,15 @@ function addRuntimeLog(entry) {
     ...entry,
   });
   state.logs = state.logs.slice(0, 500);
+}
+
+function addAuditEntry(entry) {
+  state.auditTrail.unshift({
+    id: crypto.randomUUID(),
+    timestamp: new Date().toISOString(),
+    ...entry,
+  });
+  state.auditTrail = state.auditTrail.slice(0, 200);
 }
 
 function extractResolvedNumber(status, instance) {
@@ -1222,6 +1234,7 @@ function buildSnapshot() {
     },
     recentLogs: state.logs.slice(0, 50),
     instanceStates: Object.values(state.instanceStates),
+    auditTrail: state.auditTrail.slice(0, 100),
   };
 }
 
@@ -1494,6 +1507,11 @@ async function serveStatic(req, res) {
   }
 }
 
+function resolveManualActor(payload = {}) {
+  const actor = String(payload.actor ?? "").trim();
+  return actor || "Operador local";
+}
+
 const server = http.createServer(async (req, res) => {
   if (!req.url || !req.method) return createResponse(res, 400, { error: "Requisição inválida" });
 
@@ -1520,40 +1538,154 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === "/api/local/warmup/config") return createResponse(res, 200, buildRuntimeConfigResponse());
     if (url.pathname === "/api/local/warmup/sync") {
       const payload = await parseBody(req);
+      const previousSettings = state.config.settings ?? {};
+      const nextSettings = mergeRuntimeSettings(state.config.settings, payload.settings ?? {});
       state.config = {
-        settings: mergeRuntimeSettings(state.config.settings, payload.settings ?? {}),
+        settings: nextSettings,
         routines: Array.isArray(payload.routines) ? payload.routines : [],
         messages: Array.isArray(payload.messages) ? payload.messages : [],
       };
+      const previousOverride = previousSettings.riskOverride;
+      const nextOverride = nextSettings.riskOverride;
+      if (nextOverride?.active && nextOverride.fingerprint !== previousOverride?.fingerprint) {
+        addAuditEntry({
+          type: "risk_override",
+          actor: nextOverride.acceptedBy || "Operador não identificado",
+          action: "warmup_policy_override_accepted",
+          details: nextOverride.reasons?.join(" | "),
+        });
+        addRuntimeLog({
+          type: "scheduler",
+          status: "info",
+          message: `Override de risco aceito por ${nextOverride.acceptedBy || "operador não identificado"}.`,
+          details: nextOverride.reasons?.join(" | "),
+          instanceName: "Warmup Runtime",
+        });
+      }
+      if (previousOverride?.active && !nextOverride?.active) {
+        addAuditEntry({
+          type: "risk_override",
+          actor: nextSettings.operatorLabel || "Operador não identificado",
+          action: "warmup_policy_override_cleared",
+          details: "Configuração voltou para métricas seguras.",
+        });
+      }
       state.lastSyncedAt = new Date().toISOString();
       await saveState();
       return createResponse(res, 200, buildSnapshot());
     }
     if (url.pathname === "/api/local/warmup/start") {
+      const payload = await parseBody(req);
+      const actor = resolveManualActor(payload);
       state.scheduler.enabled = true;
       state.scheduler.status = "active";
+      state.scheduler.lastManualAction = {
+        action: "start",
+        actor,
+        reason: payload.reason,
+        acceptedAt: new Date().toISOString(),
+      };
+      addAuditEntry({
+        type: "manual_control",
+        actor,
+        action: "warmup_start",
+        details: payload.reason || "Execução manual autorizada",
+      });
+      addRuntimeLog({
+        type: "scheduler",
+        status: "info",
+        message: `Warmup iniciado manualmente por ${actor}.`,
+        details: payload.reason || "Execução manual autorizada",
+        instanceName: "Warmup Runtime",
+      });
       startLoop();
       return createResponse(res, 200, await tick("manual-start"));
     }
     if (url.pathname === "/api/local/warmup/pause") {
+      const payload = await parseBody(req);
+      const actor = resolveManualActor(payload);
       state.scheduler.enabled = false;
       state.scheduler.status = "paused";
+      state.scheduler.lastPausedAt = new Date().toISOString();
+      state.scheduler.lastError = `Warmup pausado manualmente por ${actor}${payload.reason ? ` · ${payload.reason}` : ""}`;
+      state.scheduler.lastManualAction = {
+        action: "pause",
+        actor,
+        reason: payload.reason,
+        acceptedAt: new Date().toISOString(),
+      };
+      addAuditEntry({
+        type: "manual_control",
+        actor,
+        action: "warmup_pause",
+        details: payload.reason || "Pausa manual confirmada",
+      });
+      addRuntimeLog({
+        type: "scheduler",
+        status: "info",
+        message: `Warmup pausado manualmente por ${actor}.`,
+        details: payload.reason || "Pausa manual confirmada",
+        instanceName: "Warmup Runtime",
+      });
       stopLoop();
       clearWarmingFlags();
       await saveState();
       return createResponse(res, 200, buildSnapshot());
     }
     if (url.pathname === "/api/local/warmup/stop") {
+      const payload = await parseBody(req);
+      const actor = resolveManualActor(payload);
       state.scheduler.enabled = false;
       state.scheduler.status = "stopped";
+      state.scheduler.lastError = `Warmup parado manualmente por ${actor}${payload.reason ? ` · ${payload.reason}` : ""}`;
+      state.scheduler.lastManualAction = {
+        action: "stop",
+        actor,
+        reason: payload.reason,
+        acceptedAt: new Date().toISOString(),
+      };
+      addAuditEntry({
+        type: "manual_control",
+        actor,
+        action: "warmup_stop",
+        details: payload.reason || "Parada manual confirmada",
+      });
+      addRuntimeLog({
+        type: "scheduler",
+        status: "info",
+        message: `Warmup parado manualmente por ${actor}.`,
+        details: payload.reason || "Parada manual confirmada",
+        instanceName: "Warmup Runtime",
+      });
       stopLoop();
       clearWarmingFlags();
       await saveState();
       return createResponse(res, 200, buildSnapshot());
     }
     if (url.pathname === "/api/local/warmup/restart") {
+      const payload = await parseBody(req);
+      const actor = resolveManualActor(payload);
       state.scheduler.enabled = true;
       state.scheduler.status = "active";
+      state.scheduler.lastManualAction = {
+        action: "restart",
+        actor,
+        reason: payload.reason,
+        acceptedAt: new Date().toISOString(),
+      };
+      addAuditEntry({
+        type: "manual_control",
+        actor,
+        action: "warmup_restart",
+        details: payload.reason || "Reinício manual solicitado",
+      });
+      addRuntimeLog({
+        type: "scheduler",
+        status: "info",
+        message: `Warmup reiniciado manualmente por ${actor}.`,
+        details: payload.reason || "Reinício manual solicitado",
+        instanceName: "Warmup Runtime",
+      });
       clearWarmingFlags();
       startLoop();
       return createResponse(res, 200, await tick("manual-restart"));
@@ -1573,8 +1705,33 @@ setInterval(() => {
   const now = new Date();
   const maxSilenseMs = TICK_INTERVAL_MS * 2.5;
 
+  if (state.scheduler.enabled && state.scheduler.status === "error") {
+    console.warn("[warmup-watchdog] Runtime em erro. Disparando recuperação automática...");
+    addAuditEntry({
+      type: "auto_recovery",
+      actor: "watchdog",
+      action: "warmup_error_recovery",
+      details: state.scheduler.lastError || "Erro não informado",
+    });
+    addRuntimeLog({
+      type: "scheduler",
+      status: "info",
+      message: "WATCHDOG: recuperação automática acionada após erro do runtime.",
+      details: state.scheduler.lastError,
+      instanceName: "Warmup Runtime",
+    });
+    tick("watchdog-error-recovery");
+    return;
+  }
+
   if (state.scheduler.enabled && lastTick && (now - lastTick > maxSilenseMs)) {
     console.warn(`[warmup-watchdog] Detectada inatividade suspeita (> ${maxSilenseMs}ms). Forçando pulso de recuperação...`);
+    addAuditEntry({
+      type: "auto_recovery",
+      actor: "watchdog",
+      action: "warmup_inactivity_recovery",
+      details: `Inatividade acima de ${maxSilenseMs}ms`,
+    });
     addRuntimeLog({
       type: "scheduler",
       status: "info",
