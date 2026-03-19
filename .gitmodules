@@ -1,0 +1,3 @@
+[submodule "happy-client-messager"]
+	path = happy-client-messager
+	url = https://github.com/tiatendeai/happy-client-messager.git
