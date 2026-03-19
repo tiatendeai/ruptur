@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import logging
 
-from openai import OpenAI
+try:
+    from openai import OpenAI
+except ImportError:  # pragma: no cover - ambiente sem SDK deve cair em modo offline
+    OpenAI = None  # type: ignore[assignment]
 
 from app.settings import settings
-from app.services.jarvis_profiles import JarvisProfile, build_system_prompt
+from app.services.jarvis_profiles import AssistantPersona, JarvisProfile, build_system_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -14,12 +17,18 @@ class AgentService:
     def __init__(self):
         self.api_key = settings.openai_api_key
         self.client = None
-        if self.api_key:
+        if self.api_key and OpenAI is not None:
             self.client = OpenAI(api_key=self.api_key)
         else:
-            logger.warning("OPENAI_API_KEY not found in settings. Agent will work in mirror mode.")
+            logger.warning("OpenAI SDK/API key indisponivel. Agent will work in mirror mode.")
 
-    def _offline_response(self, *, profile: JarvisProfile, user_message: str) -> str:
+    def _offline_response(
+        self,
+        *,
+        profile: JarvisProfile,
+        user_message: str,
+        persona: AssistantPersona = "jarvis",
+    ) -> str:
         if profile == "cfo":
             mode = "vCFO"
         elif profile == "vcvo":
@@ -27,9 +36,16 @@ class AgentService:
         elif profile == "eggs":
             mode = "Eggs"
         else:
-            mode = "Ops"
+            mode = "IAzinha" if persona == "iazinha" else "Ops"
+        prefix = "*IAzinha:*" if persona == "iazinha" else f"*Jarvis ({mode} Offline):*"
+        if persona == "iazinha":
+            return (
+                f"{prefix} "
+                f'Recebi sua mensagem: "{user_message}". '
+                "A inteligência principal ainda não está online, mas eu já estou de prontidão."
+            )
         return (
-            f"*Jarvis ({mode} Offline):*\n"
+            f"{prefix}\n"
             f'Recebi sua mensagem: "{user_message}". '
             "Configure a API Key para ativar minha inteligência plena."
         )
@@ -52,14 +68,15 @@ class AgentService:
         profile: JarvisProfile,
         principal_name: str | None,
         user_message: str,
+        persona: AssistantPersona = "jarvis",
         history: list[dict[str, str]] | None = None,
         context_blocks: list[str] | None = None,
     ) -> str:
         if not self.client:
-            return self._offline_response(profile=profile, user_message=user_message)
+            return self._offline_response(profile=profile, user_message=user_message, persona=persona)
 
         try:
-            system_prompt = build_system_prompt(profile=profile, principal_name=principal_name)
+            system_prompt = build_system_prompt(profile=profile, principal_name=principal_name, persona=persona)
             blocks = [b.strip() for b in (context_blocks or []) if isinstance(b, str) and b.strip()]
             if blocks:
                 system_prompt = f"{system_prompt}\n## EXTRA CONTEXT\n\n" + "\n\n".join(f"- {b}" for b in blocks)
@@ -78,13 +95,15 @@ class AgentService:
             return response.choices[0].message.content or ""
         except Exception as exc:
             logger.error("Error calling OpenAI: %s", exc)
-            return "*Jarvis:* Tive um pequeno curto-circuito ao processar sua resposta. Tente novamente em alguns instantes."
+            prefix = "*IAzinha:*" if persona == "iazinha" else "*Jarvis:*"
+            return f"{prefix} Tive um pequeno curto-circuito ao processar sua resposta. Tente novamente em alguns instantes."
 
     def get_jarvis_response(self, lead_name: str, last_message: str, history: list[dict[str, str]] | None = None) -> str:
         return self.get_response(
             profile="ops",
             principal_name=lead_name,
             user_message=last_message,
+            persona="jarvis",
             history=history,
         )
 
@@ -104,6 +123,7 @@ class AgentService:
             profile="cfo",
             principal_name=principal_name,
             user_message=user_message,
+            persona="jarvis",
             history=history,
             context_blocks=extra,
         )
@@ -120,6 +140,7 @@ class AgentService:
             profile="eggs",
             principal_name=principal_name,
             user_message=user_message,
+            persona="jarvis",
             history=history,
             context_blocks=context_blocks,
         )
@@ -136,6 +157,7 @@ class AgentService:
             profile="vcvo",
             principal_name=principal_name,
             user_message=user_message,
+            persona="jarvis",
             history=history,
             context_blocks=context_blocks,
         )

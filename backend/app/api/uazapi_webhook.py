@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime
 from typing import Any
 
@@ -38,6 +39,17 @@ SESSION_TIMEOUT_SECONDS = 1800
 
 
 JARVIS_PASSWORD = "7"
+AUDIO_REQUEST_PATTERNS = (
+    r"\bme\s+responda\s+em\s+[aá]udio\b",
+    r"\bresponda\s+em\s+[aá]udio\b",
+    r"\bme\s+mande\s+(um\s+)?[aá]udio\b",
+    r"\bmande\s+(a\s+resposta\s+)?em\s+[aá]udio\b",
+    r"\bme\s+responda\s+por\s+voz\b",
+    r"\bresponda\s+por\s+voz\b",
+    r"\bem\s+[aá]udio\b",
+    r"\bpor\s+[aá]udio\b",
+    r"\bem\s+voz\b",
+)
 
 
 def digits_only(value: str | None) -> str:
@@ -143,8 +155,16 @@ def direct_user_jid(value: str | None) -> str | None:
 def is_self_chat(payload: dict[str, Any], chatid: str) -> bool:
     data = _payload_data(payload)
     message_data = _message_data(payload)
-    me_jid = payload.get("meJid") or data.get("meJid") or message_data.get("meJid") or ""
-    sender = str(message_data.get("wa_sender") or message_data.get("sender") or data.get("wa_sender") or data.get("sender") or "")
+    chat = payload.get("chat") if isinstance(payload.get("chat"), dict) else {}
+    owner = str(payload.get("owner") or chat.get("owner") or message_data.get("owner") or "").strip()
+    sender = str(
+        message_data.get("sender_pn")
+        or message_data.get("wa_sender")
+        or message_data.get("sender")
+        or data.get("wa_sender")
+        or data.get("sender")
+        or ""
+    ).strip()
     from_me = message_data.get("fromMe")
     if from_me is None:
         from_me = message_data.get("isFromMe")
@@ -152,15 +172,28 @@ def is_self_chat(payload: dict[str, Any], chatid: str) -> bool:
         from_me = data.get("fromMe")
     if from_me is None:
         from_me = data.get("isFromMe")
+    me_jid = (
+        payload.get("meJid")
+        or data.get("meJid")
+        or message_data.get("meJid")
+        or sender
+        or owner
+    )
     if bool(normalize_target(chatid) and normalize_target(chatid) == normalize_target(me_jid)):
         return True
+    if bool(normalize_target(chatid) and normalize_target(chatid) == normalize_target(owner)):
+        return True
+    if bool(sender and normalize_target(chatid) == normalize_target(sender)):
+        return True
     # WhatsApp desktop/self threads can arrive as @lid chats instead of the phone JID.
-    if chatid.endswith("@lid") and parse_bool(from_me):
+    if chatid.endswith("@lid"):
         me_phone = normalize_target(me_jid)
         sender_phone = normalize_target(sender)
         sender_is_self = bool(sender_phone and sender_phone == me_phone)
+        if sender_is_self or sender == chatid:
+            return True
         sender_is_lid = bool(sender and sender.endswith("@lid"))
-        if sender == chatid or sender_is_self or sender_is_lid or not sender:
+        if parse_bool(from_me) and (sender_is_lid or not sender):
             return True
     return False
 
@@ -178,6 +211,24 @@ def wants_audio_response(body: str | None) -> bool:
     normalized = normalize_command(body)
     triggers = ("audio", "áudio", "em audio", "em áudio", "me responda em audio", "me responda em áudio", "mande audio", "mande áudio", "responda em audio", "responda em áudio", "voz")
     return any(token in normalized for token in triggers)
+
+
+def strip_audio_request_instruction(body: str | None) -> str:
+    text = (body or "").strip()
+    cleaned = text
+    for pattern in AUDIO_REQUEST_PATTERNS:
+        cleaned = re.sub(pattern, " ", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip(" ,.;:-")
+    return cleaned or text
+
+
+def audio_response_context(persona: str) -> list[str]:
+    persona_label = "IAzinha" if persona == "iazinha" else "Jarvis"
+    return [
+        f"O transporte vai converter sua resposta em audio/PTT no WhatsApp para a persona {persona_label}.",
+        "Nunca diga que nao consegue responder em audio, que so consegue texto ou que nao tem voz.",
+        "Responda normalmente ao pedido principal do usuario; a entrega em audio sera cuidada fora do modelo.",
+    ]
 
 
 def apply_persona_prefix(persona: str, text: str | None) -> str:
@@ -204,7 +255,16 @@ def ensure_session_metadata(metadata: dict[str, Any] | None) -> dict[str, Any]:
 def is_managed_cross_chat(payload: dict[str, Any], fields: dict[str, Any], metadata: dict[str, Any]) -> bool:
     data = _payload_data(payload)
     message_data = _message_data(payload)
-    owner = canonical_business_phone(payload.get("meJid") or data.get("meJid") or message_data.get("meJid") or "")
+    chat = payload.get("chat") if isinstance(payload.get("chat"), dict) else {}
+    owner = canonical_business_phone(
+        payload.get("meJid")
+        or data.get("meJid")
+        or message_data.get("meJid")
+        or payload.get("owner")
+        or chat.get("owner")
+        or message_data.get("owner")
+        or ""
+    )
     sender = canonical_business_phone(fields.get("sender") or fields.get("chatid") or "")
     if metadata.get("warmup_mode") is True:
         return False
@@ -220,33 +280,45 @@ def is_managed_cross_chat(payload: dict[str, Any], fields: dict[str, Any], metad
 def resolve_uazapi_instance_id(payload: dict[str, Any]) -> str:
     data = _payload_data(payload)
     message_data = _message_data(payload)
-    explicit = str(payload.get("instance") or data.get("instance") or message_data.get("instance") or "").strip()
+    explicit = str(
+        payload.get("instance")
+        or payload.get("instanceName")
+        or data.get("instance")
+        or data.get("instanceName")
+        or message_data.get("instance")
+        or message_data.get("instanceName")
+        or ""
+    ).strip()
     return explicit
 
 
-def resolve_target_jid(payload: dict[str, Any], lead_phone: str | None = None) -> str:
+def resolve_target_candidates(payload: dict[str, Any], lead_phone: str | None = None) -> list[str]:
     data = _payload_data(payload)
     message_data = _message_data(payload)
-    raw_chatid = str(message_data.get("wa_chatid") or message_data.get("chatid") or data.get("wa_chatid") or data.get("chatid") or "").strip()
+    raw_chatid = str(message_data.get("chatid") or message_data.get("wa_chatid") or data.get("chatid") or data.get("wa_chatid") or "").strip()
     me_jid = str(payload.get("meJid") or data.get("meJid") or message_data.get("meJid") or "").strip()
+    out: list[str] = []
+    seen: set[str] = set()
 
-    # RUP-2026-015: when WhatsApp already gives us a direct user JID/phone,
-    # reply in that exact thread instead of force-inserting the BR 9th digit.
-    for candidate in (raw_chatid, me_jid):
-        direct = direct_user_jid(candidate)
-        if direct:
-            return direct
+    def add_candidate(value: str | None) -> None:
+        candidate = str(value or "").strip()
+        if not candidate or candidate == "status@broadcast" or "@g.us" in candidate or candidate in seen:
+            return
+        seen.add(candidate)
+        out.append(candidate)
 
-    # Lead phone remains a fallback when the transport only exposes @lid.
-    direct = direct_user_jid(lead_phone)
-    if direct:
-        return direct
+    # First try the exact inbound thread, including @lid, so the reply lands in the same channel.
+    add_candidate(raw_chatid)
+
+    # RUP-2026-015 fallback: when we also have a stable direct user JID/phone,
+    # keep it as a retry target without force-inserting the BR 9th digit.
+    for candidate in (me_jid, lead_phone):
+        add_candidate(direct_user_jid(candidate))
 
     if lead_phone:
-        fallback = canonical_jid(lead_phone)
-        if fallback:
-            return fallback
-    return raw_chatid
+        add_candidate(canonical_jid(lead_phone))
+
+    return out
 
 
 def format_session_status(metadata: dict[str, Any], *, self_chat: bool) -> str:
@@ -263,18 +335,34 @@ def format_session_status(metadata: dict[str, Any], *, self_chat: bool) -> str:
 def send_assistant_response_via_uazapi(
     payload: dict[str, Any],
     *,
-    target_jid: str,
+    target_candidates: list[str],
     response_text: str,
     audio_data: bytes | None,
-) -> tuple[str, dict[str, Any]]:
+) -> tuple[str, str, dict[str, Any]]:
     instance_id = resolve_uazapi_instance_id(payload)
-    token = resolve_token(settings, token=None, instance=instance_id or None, admin_token=None)
+    message_data = _message_data(payload)
+    data = _payload_data(payload)
+    token = resolve_token(
+        settings,
+        token=str(payload.get("token") or data.get("token") or message_data.get("token") or "").strip() or None,
+        instance=instance_id or None,
+        admin_token=None,
+    )
     client = build_uazapi_client(settings, token=token)
-    if audio_data:
-        result = client.send_ptt_base64(number=target_jid, audio_data=audio_data)
-    else:
-        result = client.send_text(number=target_jid, text=response_text)
-    return instance_id, result
+    last_error: UazapiError | None = None
+    for target_jid in target_candidates:
+        try:
+            if audio_data:
+                result = client.send_ptt_base64(number=target_jid, audio_data=audio_data)
+            else:
+                result = client.send_text(number=target_jid, text=response_text)
+            return instance_id, target_jid, result
+        except UazapiError as exc:
+            last_error = exc
+            logger.warning("UAZAPI send retry instance=%s target=%s error=%s", instance_id, target_jid, exc)
+    if last_error is not None:
+        raise last_error
+    raise UazapiError("uazapi_missing_target")
 
 
 async def process_ai_response(payload: dict[str, Any], lead_id: str, conversation_id: str, last_msg: str, message_id: str):
@@ -296,7 +384,9 @@ async def process_ai_response(payload: dict[str, Any], lead_id: str, conversatio
             current_msg = last_msg or ""
             msg_lower = normalize_command(current_msg)
             self_chat = is_self_chat(payload, chatid)
-            target_jid = resolve_target_jid(payload, lead_phone)
+            target_candidates = resolve_target_candidates(payload, lead_phone)
+            wants_audio = wants_audio_response(current_msg)
+            effective_user_message = strip_audio_request_instruction(current_msg) if wants_audio else current_msg
 
             history_rows = crm_repo.list_messages(conn, conversation_id=conversation_id, limit=10)
             history = []
@@ -368,16 +458,17 @@ async def process_ai_response(payload: dict[str, Any], lead_id: str, conversatio
                     conn.commit()
                     return
                 persona = metadata.get("active_persona", "iazinha")
-                # RUP-2026-009: AgentService migrated to profile/principal_name/user_message signature.
+                context_blocks = audio_response_context(persona) if wants_audio else None
                 raw_response = agent_service.get_response(
                     profile="ops",
                     principal_name=lead_name or lead_phone or "Cliente",
-                    user_message=current_msg,
+                    user_message=effective_user_message,
+                    persona=persona,
                     history=history,
+                    context_blocks=context_blocks,
                 )
                 response_text = apply_persona_prefix(persona, raw_response)
 
-            wants_audio = wants_audio_response(current_msg)
             audio_data = None
             if wants_audio:
                 audio_text = response_text.replace("*IAzinha:*", "").replace("*Jarvis:*", "").strip()
@@ -392,9 +483,9 @@ async def process_ai_response(payload: dict[str, Any], lead_id: str, conversatio
             )
             crm_repo.update_conversation_metadata(conn, conversation_id=conversation_id, metadata=metadata)
             conn.commit()
-            instance_id, res = send_assistant_response_via_uazapi(
+            instance_id, target_used, res = send_assistant_response_via_uazapi(
                 payload,
-                target_jid=target_jid,
+                target_candidates=target_candidates,
                 response_text=response_text,
                 audio_data=audio_data,
             )
@@ -402,7 +493,7 @@ async def process_ai_response(payload: dict[str, Any], lead_id: str, conversatio
                 "Stored assistant response message id=%s provider=uazapi instance=%s target=%s audio=%s",
                 external_id,
                 instance_id,
-                target_jid,
+                target_used,
                 bool(audio_data),
             )
             logger.warning("UAZAPI response instance=%s result=%s", instance_id, res)

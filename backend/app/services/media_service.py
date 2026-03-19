@@ -3,14 +3,19 @@ import logging
 import os
 from typing import Optional
 import httpx
-from openai import OpenAI
+
+try:
+    from openai import OpenAI
+except ImportError:  # pragma: no cover - ambiente sem SDK deve cair em modo degradado
+    OpenAI = None  # type: ignore[assignment]
+
 from app.settings import settings
 
 logger = logging.getLogger(__name__)
 
 class MediaService:
     def __init__(self):
-        self.openai_client = OpenAI(api_key=settings.openai_api_key) if settings.openai_api_key else None
+        self.openai_client = OpenAI(api_key=settings.openai_api_key) if settings.openai_api_key and OpenAI is not None else None
         self.elevenlabs_api_key = settings.eleven_api_key
 
     def text_to_speech_openai(self, text: str, voice: str = "onyx") -> Optional[bytes]:

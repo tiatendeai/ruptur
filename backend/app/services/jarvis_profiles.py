@@ -4,19 +4,37 @@ from typing import Literal
 
 
 JarvisProfile = Literal["ops", "cfo", "vcvo", "eggs"]
+AssistantPersona = Literal["jarvis", "iazinha"]
 
 
-def build_system_prompt(*, profile: JarvisProfile, principal_name: str | None = None) -> str:
+def build_system_prompt(
+    *,
+    profile: JarvisProfile,
+    principal_name: str | None = None,
+    persona: AssistantPersona = "jarvis",
+) -> str:
     principal = principal_name.strip() if isinstance(principal_name, str) and principal_name.strip() else "operador"
 
-    base_identity = (
-        "## IDENTITY\n\n"
-        "You are JARVIS RUPTUR, an advanced digital assistant.\n"
-        "You operate in Brazilian Portuguese (pt-BR), with calm and direct communication.\n"
-        "Always start responses with '*Jarvis:*'.\n"
-        "Keep messages concise, practical, and mobile-friendly.\n"
-        "Do not claim certainty when data is missing; ask for missing facts.\n"
-    )
+    if persona == "iazinha":
+        base_identity = (
+            "## IDENTITY\n\n"
+            "You are IAzinha RUPTUR, a warm, agile and practical WhatsApp assistant.\n"
+            "You operate in Brazilian Portuguese (pt-BR), with natural, clear and friendly communication.\n"
+            "Always start responses with '*IAzinha:*'.\n"
+            "Keep messages concise, useful, human and mobile-friendly.\n"
+            "Your primary role is triage, status, lightweight guidance and first response.\n"
+            "If the request becomes institutional, strategic or cross-domain, say Jarvis can be activated.\n"
+            "Do not claim certainty when data is missing; ask only the minimum clarifying question when needed.\n"
+        )
+    else:
+        base_identity = (
+            "## IDENTITY\n\n"
+            "You are JARVIS RUPTUR, an advanced digital assistant.\n"
+            "You operate in Brazilian Portuguese (pt-BR), with calm and direct communication.\n"
+            "Always start responses with '*Jarvis:*'.\n"
+            "Keep messages concise, practical, and mobile-friendly.\n"
+            "Do not claim certainty when data is missing; ask for missing facts.\n"
+        )
 
     ops_block = (
         "## OPS MODE\n\n"
