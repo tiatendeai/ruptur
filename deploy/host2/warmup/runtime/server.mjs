@@ -2,12 +2,14 @@ import { createReadStream, existsSync } from "node:fs";
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import http from "node:http";
 import path from "node:path";
+import crypto from "node:crypto";
 
 const HOST = process.env.WARMUP_RUNTIME_HOST || "0.0.0.0";
 const PORT = Number(process.env.WARMUP_RUNTIME_PORT || process.env.PORT || 8787);
 const TICK_INTERVAL_MS = Number(process.env.WARMUP_TICK_INTERVAL_MS || 60_000);
 const DATA_DIR = path.resolve(process.cwd(), "runtime-data");
 const STATE_FILE = path.join(DATA_DIR, "warmup-state.json");
+const DNA_DIR = path.join(DATA_DIR, "instance-dna");
 const DIST_DIR = path.resolve(process.cwd(), "dist");
 const WARMUP_TRACK_SOURCE = "warmup_manager";
 const DEFAULT_WARMUP_24X7_ID = "warmup-default-24x7";
@@ -34,12 +36,30 @@ function getDefaultSettings() {
     adminToken: "",
     defaultDelay: 3000,
     warmupMinIntervalMs: 15 * 60 * 1000,
-    warmupMaxDailyPerInstance: 12,
+    warmupMaxDailyPerInstance: 250,
     warmupCooldownRounds: 1,
     warmupReadChat: false,
     warmupReadMessages: false,
     warmupAsync: true,
+    antiBanMaxPerMinute: 12,
   };
+}
+
+function normalizeSettings(settings = {}) {
+  const next = {
+    ...getDefaultSettings(),
+    ...(settings ?? {}),
+  };
+
+  if (!Number.isFinite(next.warmupMaxDailyPerInstance) || next.warmupMaxDailyPerInstance <= 0 || next.warmupMaxDailyPerInstance === 12) {
+    next.warmupMaxDailyPerInstance = 250;
+  }
+
+  if (!Number.isFinite(next.antiBanMaxPerMinute) || next.antiBanMaxPerMinute < 0) {
+    next.antiBanMaxPerMinute = 12;
+  }
+
+  return next;
 }
 
 function createEmptyPoolState() {
@@ -56,7 +76,7 @@ function createEmptyPoolState() {
 function createDefaultState() {
   return {
     config: {
-      settings: getDefaultSettings(),
+      settings: normalizeSettings(),
       routines: [],
       messages: [],
     },
@@ -64,10 +84,6 @@ function createDefaultState() {
       enabled: false,
       status: "paused",
       round: 0,
-      lastTickAt: undefined,
-      lastStartedAt: undefined,
-      lastPausedAt: undefined,
-      lastError: undefined,
     },
     summary: {
       totalInstances: 0,
@@ -80,6 +96,8 @@ function createDefaultState() {
       sentToday: 0,
       recentErrors: 0,
       activeRoutines: 0,
+      cadenceBpm: 0,
+      isPulsing: false,
     },
     currentPool: createEmptyPoolState(),
     instanceStates: {},
@@ -121,7 +139,7 @@ function buildNextEligibleAt({
   }
 
   if (cooldownRounds > 0) {
-    candidates.push(now.getTime() + cooldownRounds * TICK_INTERVAL_MS);
+    candidates.push(now.getTime() + cooldownRounds * TICK_INTERVAL_MS * 0.1); // Cooldown menor em runtime para rotação
   }
 
   if (dailyLimitReached) {
@@ -150,8 +168,8 @@ function rebaseActivityWindow(nextState, now = new Date()) {
     instanceState.warmingNow = false;
     instanceState.eligibilityReason = "Janela temporal reiniciada";
     instanceState.updatedAt = nowIso;
-    instanceState.heatScore = 0;
-    instanceState.heatStage = "blocked";
+    instanceState.heatScore = instanceState.heatScore ?? 0;
+    instanceState.heatStage = instanceState.heatStage ?? "blocked";
   }
 
   nextState.summary.heatingNow = 0;
@@ -166,16 +184,14 @@ async function loadState() {
   try {
     const raw = await readFile(STATE_FILE, "utf8");
     const parsed = JSON.parse(raw);
+    const normalizedSettings = normalizeSettings(parsed.config?.settings ?? {});
     const nextState = {
       ...createDefaultState(),
       ...parsed,
       config: {
         ...createDefaultState().config,
         ...(parsed.config ?? {}),
-        settings: {
-          ...getDefaultSettings(),
-          ...(parsed.config?.settings ?? {}),
-        },
+        settings: normalizedSettings,
       },
       scheduler: {
         ...createDefaultState().scheduler,
@@ -195,22 +211,18 @@ async function loadState() {
       },
       instanceStates: parsed.instanceStates ?? {},
       logs: parsed.logs ?? [],
+      lastSyncedAt: parsed.lastSyncedAt,
       activityWindowVersion: parsed.activityWindowVersion ?? 0,
       activityWindowResetAt: parsed.activityWindowResetAt,
     };
 
-    if (!nextState.scheduler.enabled) {
-      nextState.summary.heatingNow = 0;
-      nextState.summary.queuedEntries = 0;
-      nextState.summary.subpoolCount = 0;
-      nextState.currentPool.currentRound = undefined;
-      for (const instanceState of Object.values(nextState.instanceStates)) {
-        instanceState.warmingNow = false;
-      }
-    }
+    const shouldPersistMigratedState = JSON.stringify(normalizedSettings) !== JSON.stringify(parsed.config?.settings ?? {});
 
     if ((parsed.activityWindowVersion ?? 0) < ACTIVITY_WINDOW_VERSION) {
       rebaseActivityWindow(nextState, new Date());
+      await mkdir(DATA_DIR, { recursive: true });
+      await writeFile(STATE_FILE, JSON.stringify(nextState, null, 2));
+    } else if (shouldPersistMigratedState) {
       await mkdir(DATA_DIR, { recursive: true });
       await writeFile(STATE_FILE, JSON.stringify(nextState, null, 2));
     }
@@ -222,8 +234,12 @@ async function loadState() {
 }
 
 async function saveState() {
-  await mkdir(DATA_DIR, { recursive: true });
-  await writeFile(STATE_FILE, JSON.stringify(state, null, 2));
+  try {
+    await mkdir(DATA_DIR, { recursive: true });
+    await writeFile(STATE_FILE, JSON.stringify(state, null, 2));
+  } catch (error) {
+    console.error("[warmup-runtime] Falha ao salvar estado", error);
+  }
 }
 
 function createResponse(res, statusCode, payload) {
@@ -234,6 +250,31 @@ function createResponse(res, statusCode, payload) {
     "Content-Type": "application/json; charset=utf-8",
   });
   res.end(JSON.stringify(payload));
+}
+
+async function updateInstanceDna(token, event) {
+  try {
+    await mkdir(DNA_DIR, { recursive: true });
+    const dnaPath = path.join(DNA_DIR, `${token}.json`);
+    let dna = { history: [], firstSeenAt: new Date().toISOString() };
+
+    if (existsSync(dnaPath)) {
+      dna = JSON.parse(await readFile(dnaPath, "utf8"));
+    }
+
+    dna.history.unshift({
+      timestamp: new Date().toISOString(),
+      ...event
+    });
+
+    // Manter últimos 200 eventos por instância
+    dna.history = dna.history.slice(0, 200);
+    dna.lastUpdatedAt = new Date().toISOString();
+
+    await writeFile(dnaPath, JSON.stringify(dna, null, 2));
+  } catch (error) {
+    console.error(`[warmup-runtime] Falha ao atualizar DNA para ${token}`, error);
+  }
 }
 
 function addRuntimeLog(entry) {
@@ -260,11 +301,13 @@ function createDefaultInstanceState(instanceToken, instanceName) {
     instanceToken,
     instanceName,
     sentToday: 0,
+    sendsLog: [],
     nextEligibleAt: undefined,
     cooldownRounds: 0,
     eligibleNow: false,
     warmingNow: false,
     proxyStatus: "unknown",
+    proxy: undefined,
     heatScore: 0,
     heatStage: "blocked",
     updatedAt: new Date(0).toISOString(),
@@ -273,9 +316,9 @@ function createDefaultInstanceState(instanceToken, instanceName) {
 
 function isSameDay(left, right) {
   return (
-    left.getFullYear() === right.getFullYear()
-    && left.getMonth() === right.getMonth()
-    && left.getDate() === right.getDate()
+    left.getFullYear() === right.getFullYear() &&
+    left.getMonth() === right.getMonth() &&
+    left.getDate() === right.getDate()
   );
 }
 
@@ -288,30 +331,71 @@ function getCooldownRemaining(instanceState, round) {
   return Math.max(0, instanceState.cooldownRounds - roundsSinceLastParticipation);
 }
 
-function normalizeInstanceState({ currentState, instance, round, now, resolvedNumber }) {
+function calculateHealthScore(params) {
+  let score = 100;
+
+  if (params.instance.status !== "connected") score -= 50;
+  if (params.instance.isBusiness === false) score -= 10;
+  if (params.state.proxyStatus === "error") score -= 30;
+
+  const usageRatio = params.state.sentToday / params.settings.warmupMaxDailyPerInstance;
+  if (usageRatio >= 0.9) score -= 25;
+  else if (usageRatio >= 0.7) score -= 15;
+
+  if (params.state.cooldownRounds > 0) score -= 5;
+
+  // Penalidade por falhas de conexão no histórico recente
+  if (params.instance.lastDisconnectReason?.toLowerCase().includes("fail")) {
+    score -= 15;
+  }
+
+  // Bônus por estabilidade (tempo conectado) - placeholder para futura implementação
+  // score += Math.min(10, connectedMinutes / 60);
+
+  return Math.max(0, Math.min(100, score));
+}
+
+function normalizeInstanceState({ currentState, instance, round, now, resolvedNumber, instanceData }) {
   const base = currentState ?? createDefaultInstanceState(instance.token, instance.name);
   const next = {
     ...base,
     instanceName: instance.name,
     warmingNow: false,
     resolvedNumber: resolvedNumber ?? base.resolvedNumber,
+    proxy: instanceData?.proxy ?? base.proxy,
+    proxyStatus: instanceData?.proxy
+      ? (typeof instanceData.proxy === "string" ? "custom" : "internal")
+      : "none",
     updatedAt: now.toISOString(),
     nextEligibleAt: undefined,
-    heatScore: base.heatScore ?? 0,
-    heatStage: base.heatStage ?? "blocked",
   };
 
-  if (next.lastSentAt) {
-    const lastSentAt = new Date(next.lastSentAt);
-    if (!isSameDay(lastSentAt, now)) {
-      next.sentToday = 0;
-    }
-  }
+  // Limpeza da janela móvel de 24h
+  const twentyFourHoursAgo = now.getTime() - 24 * 60 * 60 * 1000;
+  next.sendsLog = (next.sendsLog || []).filter(ts => new Date(ts).getTime() > twentyFourHoursAgo);
+  next.sentToday = next.sendsLog.length;
 
   next.cooldownRounds = getCooldownRemaining(next, round);
 
-  const minIntervalMet = !next.lastSentAt
-    || now.getTime() - new Date(next.lastSentAt).getTime() >= state.config.settings.warmupMinIntervalMs;
+  if (instanceData) {
+    next.heatScore = calculateHealthScore({
+      instance: instanceData,
+      state: next,
+      settings: state.config.settings,
+    });
+
+    if (next.heatScore >= 80) next.heatStage = "eligible";
+    else if (next.heatScore >= 40) next.heatStage = "waiting";
+    else next.heatStage = "blocked";
+
+    // Auto-restauração: Se estava bloqueada mas a saúde subiu acima de 40%, removemos o bloqueio do Kill Switch
+    if (next.heatScore > 40 && next.eligibilityReason?.includes("KILL SWITCH")) {
+      next.eligibilityReason = "Saúde restabelecida (>40%). Saindo do Kill Switch.";
+    }
+  }
+
+  const minIntervalMet = !next.lastSentAt ||
+    now.getTime() - new Date(next.lastSentAt).getTime() >= state.config.settings.warmupMinIntervalMs;
   const dailyLimitMet = next.sentToday < state.config.settings.warmupMaxDailyPerInstance;
 
   if (instance.status !== "connected") {
@@ -380,9 +464,12 @@ function markInstanceSent(instanceState, round, now) {
     cooldownRounds: state.config.settings.warmupCooldownRounds,
   });
 
+  const updatedLog = [...(instanceState.sendsLog || []), now.toISOString()];
+
   return {
     ...instanceState,
-    sentToday: instanceState.sentToday + 1,
+    sendsLog: updatedLog,
+    sentToday: updatedLog.length,
     lastSentAt: now.toISOString(),
     nextEligibleAt,
     cooldownRounds: state.config.settings.warmupCooldownRounds,
@@ -393,6 +480,7 @@ function markInstanceSent(instanceState, round, now) {
       ? `Último disparo em ${now.toLocaleString("pt-BR")} · próximo ciclo após ${new Date(nextEligibleAt).toLocaleString("pt-BR")}`
       : `Mensagem enviada na rodada ${round}`,
     updatedAt: now.toISOString(),
+    heatStage: "waiting",
   };
 }
 
@@ -539,7 +627,7 @@ async function fetchJson(url, init, fallbackMessage) {
       if (typeof payload?.error === "string") {
         message = payload.error;
       }
-    } catch {}
+    } catch { }
     throw new Error(message);
   }
 
@@ -547,6 +635,10 @@ async function fetchJson(url, init, fallbackMessage) {
 }
 
 async function fetchAllInstances() {
+  if (!state.config.settings.adminToken?.trim()) {
+    throw new Error("Admin token não configurado no runtime.");
+  }
+
   return fetchJson(`${state.config.settings.serverUrl}/instance/all`, {
     headers: {
       admintoken: state.config.settings.adminToken,
@@ -570,7 +662,40 @@ async function sendText(token, payload) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify(payload),
-  }, "Erro ao enviar warmup");
+  }, "Erro ao enviar warmup (texto)");
+}
+
+async function sendAudio(token, payload) {
+  return fetchJson(`${state.config.settings.serverUrl}/send/audio`, {
+    method: "POST",
+    headers: {
+      token,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  }, "Erro ao enviar warmup (áudio)");
+}
+
+async function sendPresence(token, payload) {
+  return fetchJson(`${state.config.settings.serverUrl}/message/presence`, {
+    method: "POST",
+    headers: {
+      token,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  }, "Erro ao simular presença");
+}
+
+async function setInstancePresence(token, presence) {
+  return fetchJson(`${state.config.settings.serverUrl}/instance/presence`, {
+    method: "POST",
+    headers: {
+      token,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ presence }),
+  }, "Erro ao alterar presença da instância");
 }
 
 function buildPersistentPool(instances, tickStartedAt) {
@@ -777,36 +902,14 @@ function deriveHeatStage(instanceState, queuedTokens) {
 
   const normalizedReason = String(instanceState.eligibilityReason ?? "").toLowerCase();
   if (
-    normalizedReason.includes("intervalo mínimo")
-    || normalizedReason.includes("cooldown")
-    || normalizedReason.includes("limite diário")
+    normalizedReason.includes("intervalo mínimo") ||
+    normalizedReason.includes("cooldown") ||
+    normalizedReason.includes("limite diário")
   ) {
     return "waiting";
   }
 
   return "blocked";
-}
-
-function computeHeatScore(instanceState, stage) {
-  const dailyLimit = Math.max(0, state.config.settings.warmupMaxDailyPerInstance);
-  const dailyPercent = dailyLimit > 0
-    ? Math.round((instanceState.sentToday / dailyLimit) * 100)
-    : 0;
-  const normalizedReason = String(instanceState.eligibilityReason ?? "").toLowerCase();
-
-  if (normalizedReason.includes("limite diário")) {
-    return 100;
-  }
-
-  const stageScores = {
-    queued: 94,
-    eligible: 82,
-    waiting: 54,
-    blocked: 20,
-  };
-
-  const stageScore = stageScores[stage] ?? 20;
-  return Math.min(100, Math.max(stageScore, dailyPercent));
 }
 
 function refreshInstanceHeatProfiles(currentRoundPool) {
@@ -815,30 +918,24 @@ function refreshInstanceHeatProfiles(currentRoundPool) {
   for (const instanceState of Object.values(state.instanceStates)) {
     const stage = deriveHeatStage(instanceState, queuedTokens);
     instanceState.heatStage = stage;
-    instanceState.heatScore = computeHeatScore(instanceState, stage);
   }
 }
 
 function buildCurrentRoundPool(routines, instancesByToken, round, tickStartedAt) {
-  const entries = [];
+  const roundPool = {
+    round,
+    createdAt: tickStartedAt.toISOString(),
+    queuedSenders: [],
+    queuedEntries: 0,
+    subpools: [],
+    entries: [],
+  };
 
-  for (const routine of routines.filter((entry) => entry.isActive)) {
-    const dispatchPlan = buildDispatchPlan(routine);
+  const queuedSenders = new Set();
 
-    if (!dispatchPlan.length) {
-      addRuntimeLog({
-        type: "warmup",
-        instanceName: "runtime",
-        message: `Rotina ${routine.name} sem pares elegíveis para o modo ${routine.mode}`,
-        status: "info",
-        routineId: routine.id,
-        routineName: routine.name,
-        mode: routine.mode,
-      });
-      continue;
-    }
-
-    for (const dispatch of dispatchPlan) {
+  for (const routine of routines) {
+    const plan = buildDispatchPlan(routine);
+    for (const dispatch of plan) {
       const entry = createPoolEntry({
         routine,
         dispatch,
@@ -848,23 +945,16 @@ function buildCurrentRoundPool(routines, instancesByToken, round, tickStartedAt)
       });
 
       if (entry) {
-        entries.push(entry);
+        roundPool.entries.push(entry);
+        roundPool.queuedEntries += 1;
+        queuedSenders.add(entry.senderToken);
       }
     }
   }
 
-  if (!entries.length) {
-    return undefined;
-  }
-
-  return {
-    round,
-    createdAt: tickStartedAt.toISOString(),
-    queuedSenders: Array.from(new Set(entries.map((entry) => entry.senderToken))),
-    queuedEntries: entries.length,
-    subpools: summarizeRoundSubpools(entries),
-    entries,
-  };
+  roundPool.queuedSenders = Array.from(queuedSenders);
+  roundPool.subpools = summarizeRoundSubpools(roundPool.entries);
+  return roundPool;
 }
 
 async function executePoolEntry(entry, instancesByToken, round) {
@@ -885,10 +975,33 @@ async function executePoolEntry(entry, instancesByToken, round) {
     return { sentCount: 0 };
   }
 
-  if (entry.activityKind === "group") {
+
+
+  try {
+    const receiverNumber = entry.activityKind === "group" ? entry.receiverNumber : state.instanceStates[entry.receiverToken]?.resolvedNumber;
+
+    const presenceType = message.contentType === "audio" ? "recording" : "composing";
     try {
+      await sendPresence(entry.senderToken, { number: receiverNumber, presence: presenceType, delay: 1000 });
+      await new Promise(r => setTimeout(r, 1500));
+    } catch (err) {
+      console.error(`[warmup] Erro ao simular presença (${presenceType}) para ${receiverNumber}`);
+    }
+
+    if (message.contentType === "audio" && message.audioUrl) {
+      await sendAudio(entry.senderToken, {
+        number: receiverNumber,
+        audio: message.audioUrl,
+        delay: entry.delayMs,
+        readchat: state.config.settings.warmupReadChat,
+        readmessages: state.config.settings.warmupReadMessages,
+        track_source: WARMUP_TRACK_SOURCE,
+        track_id: entry.trackId,
+        async: state.config.settings.warmupAsync,
+      });
+    } else {
       await sendText(entry.senderToken, {
-        number: entry.receiverNumber,
+        number: receiverNumber,
         text: message.text,
         delay: entry.delayMs,
         readchat: state.config.settings.warmupReadChat,
@@ -897,75 +1010,7 @@ async function executePoolEntry(entry, instancesByToken, round) {
         track_id: entry.trackId,
         async: state.config.settings.warmupAsync,
       });
-
-      state.instanceStates[entry.senderToken] = markInstanceSent(senderState, round, now);
-      sender.lastWarmupAt = now.toISOString();
-      entry.status = "sent";
-      entry.updatedAt = now.toISOString();
-
-      addRuntimeLog({
-        type: "send",
-        instanceName: sender.name,
-        message: `Warmup em grupo enviado para ${entry.receiverNumber}`,
-        status: "success",
-        routineId: entry.routineId,
-        routineName: entry.routineName,
-        originToken: entry.senderToken,
-        destinationNumber: entry.receiverNumber,
-        delayMs: entry.delayMs,
-        trackId: entry.trackId,
-        trackSource: WARMUP_TRACK_SOURCE,
-        isAsync: state.config.settings.warmupAsync,
-        details: message.text,
-      });
-
-      return { sentCount: 1 };
-    } catch (error) {
-      entry.status = "error";
-      entry.error = error instanceof Error ? error.message : "Erro desconhecido";
-      entry.updatedAt = now.toISOString();
-
-      addRuntimeLog({
-        type: "error",
-        instanceName: sender.name,
-        message: `Erro no warmup em grupo para ${entry.receiverNumber}`,
-        status: "error",
-        routineId: entry.routineId,
-        routineName: entry.routineName,
-        originToken: entry.senderToken,
-        destinationNumber: entry.receiverNumber,
-        delayMs: entry.delayMs,
-        trackId: entry.trackId,
-        trackSource: WARMUP_TRACK_SOURCE,
-        isAsync: state.config.settings.warmupAsync,
-        error: entry.error,
-        details: message.text,
-      });
-
-      return { sentCount: 0 };
     }
-  }
-
-  const receiver = entry.receiverToken ? instancesByToken.get(entry.receiverToken) : null;
-  const receiverState = entry.receiverToken ? state.instanceStates[entry.receiverToken] : null;
-
-  if (!receiver || !receiverState?.resolvedNumber) {
-    entry.status = "skipped";
-    entry.updatedAt = now.toISOString();
-    return { sentCount: 0 };
-  }
-
-  try {
-    await sendText(entry.senderToken, {
-      number: receiverState.resolvedNumber,
-      text: message.text,
-      delay: entry.delayMs,
-      readchat: state.config.settings.warmupReadChat,
-      readmessages: state.config.settings.warmupReadMessages,
-      track_source: WARMUP_TRACK_SOURCE,
-      track_id: entry.trackId,
-      async: state.config.settings.warmupAsync,
-    });
 
     state.instanceStates[entry.senderToken] = markInstanceSent(senderState, round, now);
     sender.lastWarmupAt = now.toISOString();
@@ -975,14 +1020,12 @@ async function executePoolEntry(entry, instancesByToken, round) {
     addRuntimeLog({
       type: "send",
       instanceName: sender.name,
-      message: `Warmup [${entry.activityLabel}] enviado para ${receiver.name}`,
+      message: `Warmup [${entry.activityLabel}] enviado para ${entry.receiverName || entry.receiverNumber}`,
       status: "success",
       routineId: entry.routineId,
       routineName: entry.routineName,
       originToken: entry.senderToken,
-      destinationToken: entry.receiverToken,
-      destinationName: receiver.name,
-      destinationNumber: receiverState.resolvedNumber,
+      destinationNumber: receiverNumber,
       delayMs: entry.delayMs,
       trackId: entry.trackId,
       trackSource: WARMUP_TRACK_SOURCE,
@@ -999,27 +1042,24 @@ async function executePoolEntry(entry, instancesByToken, round) {
     addRuntimeLog({
       type: "error",
       instanceName: sender.name,
-      message: `Erro ao enviar warmup para ${receiver.name}`,
+      message: `Erro ao enviar warmup: ${entry.error}`,
       status: "error",
       routineId: entry.routineId,
       routineName: entry.routineName,
       originToken: entry.senderToken,
-      destinationToken: entry.receiverToken,
-      destinationName: receiver.name,
-      destinationNumber: receiverState.resolvedNumber,
+      destinationNumber: entry.receiverNumber,
       delayMs: entry.delayMs,
       trackId: entry.trackId,
       trackSource: WARMUP_TRACK_SOURCE,
       isAsync: state.config.settings.warmupAsync,
       error: entry.error,
-      details: message.text,
     });
 
     return { sentCount: 0 };
   }
 }
 
-async function executeRoundPool(roundPool, instancesByToken, round) {
+async function executeRoundPool(roundPool, instancesByToken, round, maxExecutionsAllowed = MAX_QUEUE_EXECUTIONS_PER_TICK) {
   const groupedQueues = Array.from(
     roundPool.entries.reduce((groups, entry) => {
       const key = `${entry.activityKind}:${entry.activityLabel}`;
@@ -1033,28 +1073,24 @@ async function executeRoundPool(roundPool, instancesByToken, round) {
   let sentCount = 0;
   let executedCount = 0;
 
-  while (executedCount < MAX_QUEUE_EXECUTIONS_PER_TICK) {
+  const executionLimit = Math.min(MAX_QUEUE_EXECUTIONS_PER_TICK, Math.max(0, maxExecutionsAllowed));
+
+  while (executedCount < executionLimit) {
     let progressed = false;
 
     for (const queue of groupedQueues) {
       const entry = queue.shift();
-      if (!entry) {
-        continue;
-      }
+      if (!entry) continue;
 
       const result = await executePoolEntry(entry, instancesByToken, round);
       sentCount += result.sentCount;
       executedCount += 1;
       progressed = true;
 
-      if (executedCount >= MAX_QUEUE_EXECUTIONS_PER_TICK) {
-        break;
-      }
+      if (executedCount >= executionLimit) break;
     }
 
-    if (!progressed) {
-      break;
-    }
+    if (!progressed) break;
   }
 
   roundPool.subpools = summarizeRoundSubpools(roundPool.entries);
@@ -1070,46 +1106,11 @@ async function executeRoundPool(roundPool, instancesByToken, round) {
   };
 }
 
-function buildSnapshot() {
-  refreshInstanceHeatProfiles(state.currentPool.currentRound);
-  return {
-    scheduler: {
-      ...state.scheduler,
-      tickIntervalMs: TICK_INTERVAL_MS,
-      runtimeAvailable: true,
-    },
-    summary: {
-      ...state.summary,
-      heatingNow: state.scheduler.enabled ? state.summary.heatingNow : 0,
-      queuedEntries: state.scheduler.enabled ? state.summary.queuedEntries : 0,
-      subpoolCount: state.scheduler.enabled ? state.summary.subpoolCount : 0,
-    },
-    activityMeta: {
-      windowStartedAt: state.activityWindowResetAt,
-      windowVersion: state.activityWindowVersion,
-    },
-    currentPool: {
-      ...state.currentPool,
-      currentRound: state.scheduler.enabled ? state.currentPool.currentRound : undefined,
-    },
-    configMeta: {
-      routinesCount: state.config.routines.length,
-      messagesCount: state.config.messages.length,
-      lastSyncedAt: state.lastSyncedAt,
-    },
-    recentLogs: state.logs.slice(0, 50),
-    instanceStates: Object.values(state.instanceStates),
-  };
-}
-
 function summarizeEligibilityReasons(instanceStates) {
   const reasonCounts = new Map();
 
   for (const instanceState of instanceStates) {
-    if (instanceState.eligibleNow || !instanceState.eligibilityReason) {
-      continue;
-    }
-
+    if (instanceState.eligibleNow || !instanceState.eligibilityReason) continue;
     reasonCounts.set(
       instanceState.eligibilityReason,
       (reasonCounts.get(instanceState.eligibilityReason) ?? 0) + 1,
@@ -1124,21 +1125,10 @@ function summarizeEligibilityReasons(instanceStates) {
 }
 
 function buildNoEligibleReason() {
-  if (!state.config.routines.length) {
-    return "Não há rotinas cadastradas no runtime.";
-  }
-
-  if (!state.config.routines.some((routine) => routine.isActive)) {
-    return "Há rotinas cadastradas, mas nenhuma está ativa.";
-  }
-
-  if (state.summary.totalInstances === 0) {
-    return "A UAZAPI não retornou instâncias para o scheduler.";
-  }
-
-  if (state.summary.connected === 0) {
-    return "Nenhuma instância está conectada no momento.";
-  }
+  if (!state.config.routines.length) return "Não há rotinas cadastradas no runtime.";
+  if (!state.config.routines.some((routine) => routine.isActive)) return "Há rotinas cadastradas, mas nenhuma está ativa.";
+  if (state.summary.totalInstances === 0) return "A UAZAPI não retornou instâncias para o scheduler.";
+  if (state.summary.connected === 0) return "Nenhuma instância está conectada no momento.";
 
   if (state.summary.eligible === 0) {
     const summary = summarizeEligibilityReasons(Object.values(state.instanceStates));
@@ -1147,17 +1137,43 @@ function buildNoEligibleReason() {
       : "Nenhuma instância passou nas regras locais de elegibilidade.";
   }
 
-  return "Existem instâncias conectadas, mas nenhuma combinação válida de origem e destino foi encontrada nesta rodada.";
+  return "Nenhuma combinação válida de origem e destino foi encontrada nesta rodada.";
+}
+
+function buildSnapshot() {
+  refreshInstanceHeatProfiles(state.currentPool.currentRound);
+  return {
+    scheduler: {
+      ...state.scheduler,
+      tickIntervalMs: TICK_INTERVAL_MS,
+      runtimeAvailable: true,
+    },
+    summary: {
+      ...state.summary,
+      heatingNow: state.scheduler.enabled ? state.summary.heatingNow : 0,
+      queuedEntries: state.scheduler.enabled ? state.summary.queuedEntries : 0,
+    },
+    currentPool: {
+      ...state.currentPool,
+      currentRound: state.scheduler.enabled ? state.currentPool.currentRound : undefined,
+    },
+    activityMeta: {
+      windowStartedAt: state.activityWindowResetAt,
+      windowVersion: state.activityWindowVersion,
+    },
+    configMeta: {
+      routinesCount: state.config.routines.length,
+      messagesCount: state.config.messages.length,
+      lastSyncedAt: state.lastSyncedAt,
+    },
+    recentLogs: state.logs.slice(0, 50),
+    instanceStates: Object.values(state.instanceStates),
+  };
 }
 
 async function tick(reason = "interval") {
-  if (tickInFlight) {
-    return tickInFlight;
-  }
-
-  if (!state.scheduler.enabled) {
-    return buildSnapshot();
-  }
+  if (tickInFlight) return tickInFlight;
+  if (!state.scheduler.enabled) return buildSnapshot();
 
   tickInFlight = (async () => {
     const tickStartedAt = new Date();
@@ -1165,57 +1181,77 @@ async function tick(reason = "interval") {
     state.scheduler.round += 1;
     state.scheduler.lastTickAt = tickStartedAt.toISOString();
     state.scheduler.lastError = undefined;
+    state.summary.isPulsing = true;
+    state.scheduler.lastTickAt = tickStartedAt.toISOString();
 
     try {
       const instances = await fetchAllInstances();
       ensureDefaultRoutine(instances);
-      const instancesByToken = new Map(instances.map((instance) => [instance.token, instance]));
-      const trackedTokens = Array.from(new Set(instances.map((instance) => instance.token)));
+      const instancesByToken = new Map(instances.map((i) => [i.token, i]));
       const round = state.scheduler.round;
 
       await Promise.all(
-        trackedTokens.map(async (token) => {
-          const instance = instancesByToken.get(token);
-          if (!instance) {
-            return;
-          }
-
+        instances.map(async (instance) => {
           try {
-            const status = await fetchInstanceStatus(token);
-            state.instanceStates[token] = normalizeInstanceState({
-              currentState: state.instanceStates[token],
+            const status = await fetchInstanceStatus(instance.token);
+            state.instanceStates[instance.token] = normalizeInstanceState({
+              currentState: state.instanceStates[instance.token],
               instance,
               round,
               now: tickStartedAt,
               resolvedNumber: extractResolvedNumber(status, instance),
+              instanceData: instance,
             });
-          } catch (error) {
-            state.instanceStates[token] = normalizeInstanceState({
-              currentState: state.instanceStates[token],
+          } catch {
+            state.instanceStates[instance.token] = normalizeInstanceState({
+              currentState: state.instanceStates[instance.token],
               instance,
               round,
               now: tickStartedAt,
               resolvedNumber: extractResolvedNumber(null, instance),
-            });
-
-            addRuntimeLog({
-              type: "error",
-              instanceName: instance.name,
-              message: "Falha ao resolver /instance/status no runtime",
-              status: "error",
-              originToken: token,
-              error: error instanceof Error ? error.message : "Erro desconhecido",
+              instanceData: instance,
             });
           }
-        }),
+        })
       );
+
+      // DNA & Kill Switch (Registro e Monitoramento)
+      instances.forEach(instance => {
+        const istate = state.instanceStates[instance.token];
+        if (!istate) return;
+
+        // Registrar pulso no DNA (Registro longo prazo)
+        if (round % 10 === 0) {
+          updateInstanceDna(instance.token, {
+            type: "pulse",
+            heatScore: istate.heatScore,
+            status: instance.status,
+            sentToday: istate.sentToday
+          });
+        }
+
+        // Matriz de Risco & Kill Switch (Proteção Ativa)
+        // Se a saúde cair abaixo de 30%, ativamos o Kill Switch para esta instância
+        if (istate.heatScore < 30 && !istate.eligibilityReason?.includes("KILL SWITCH")) {
+          istate.eligibleNow = false;
+          istate.eligibilityReason = "RISCO CRÍTICO: KILL SWITCH ATIVADO (<30% Saúde)";
+
+          addRuntimeLog({
+            type: "scheduler",
+            status: "error",
+            message: `KILL SWITCH: Instância ${instance.name || instance.token} pausada por risco crítico de banimento.`,
+            instanceName: instance.name,
+            originToken: instance.token
+          });
+        }
+      });
 
       const persistentPool = buildPersistentPool(instances, tickStartedAt);
       const currentRoundPool = buildCurrentRoundPool(
-        state.config.routines.filter((entry) => entry.isActive),
+        state.config.routines.filter((r) => r.isActive),
         instancesByToken,
         round,
-        tickStartedAt,
+        tickStartedAt
       );
 
       state.currentPool = {
@@ -1223,63 +1259,58 @@ async function tick(reason = "interval") {
         currentRound: currentRoundPool,
       };
 
-      const executionResult = currentRoundPool
-        ? await executeRoundPool(currentRoundPool, instancesByToken, round)
-        : { sentCount: 0, heatingNow: 0 };
+      // Cálculo de contenção antiBanMaxPerMinute
+      const oneMinuteAgo = new Date(tickStartedAt.getTime() - 60 * 1000);
+      const sendsLastMinute = state.logs.filter(l => l.type === 'send' && l.status === 'success' && new Date(l.timestamp) > oneMinuteAgo).length;
+      const antiBanLimit = state.config.settings.antiBanMaxPerMinute || 12;
+      const allowedThisTick = Math.max(0, antiBanLimit - sendsLastMinute);
+
+      let executionResult = { sentCount: 0, heatingNow: 0 };
+      if (currentRoundPool && currentRoundPool.queuedEntries > 0) {
+        if (allowedThisTick > 0) {
+          executionResult = await executeRoundPool(currentRoundPool, instancesByToken, round, allowedThisTick);
+        } else {
+          addRuntimeLog({
+            type: "scheduler",
+            status: "info",
+            message: `Contenção Anti-Ban: Limite de ${antiBanLimit} envios/min atingido (${sendsLastMinute} envios recentes). Execução adiada.`
+          });
+          state.scheduler.lastError = `Contenção Anti-Ban: Teto de ${antiBanLimit}/min alcançado. Aguardando.`;
+          executionResult = { sentCount: 0, heatingNow: currentRoundPool.queuedEntries };
+        }
+      }
+
       const sentCount = executionResult.sentCount;
       const heatingNow = executionResult.heatingNow;
 
-      const instanceStates = Object.values(state.instanceStates);
       state.summary = {
+        ...state.summary,
         totalInstances: instances.length,
-        connected: instances.filter((instance) => instance.status === "connected").length,
+        connected: instances.filter((i) => i.status === "connected").length,
         eligible: persistentPool.readyTokens.length,
         heatingNow,
-        queuedEntries: currentRoundPool?.queuedEntries ?? 0,
         persistentPoolSize: persistentPool.healthyTokens.length,
         subpoolCount: currentRoundPool?.subpools.length ?? 0,
-        sentToday: instanceStates.reduce((total, instanceState) => total + instanceState.sentToday, 0),
-        recentErrors: state.logs.filter((entry) => entry.status === "error").slice(0, 20).length,
-        activeRoutines: state.config.routines.filter((entry) => entry.isActive).length,
+        queuedEntries: currentRoundPool?.queuedEntries ?? 0,
+        sentToday: Object.values(state.instanceStates).reduce((total, s) => total + s.sentToday, 0),
+        recentErrors: state.logs.filter((entry) => entry.status === "error").length,
+        activeRoutines: state.config.routines.filter((r) => r.isActive).length,
       };
 
-      refreshInstanceHeatProfiles(currentRoundPool);
+      // BPM lúdico
+      const windowStart = new Date(tickStartedAt.getTime() - 5 * 60 * 1000);
+      const recentSends = state.logs.filter(l => l.type === 'send' && l.status === 'success' && new Date(l.timestamp) > windowStart).length;
+      state.summary.cadenceBpm = Math.round((recentSends / 5) * 10) / 10 || (state.summary.eligible > 0 ? 0.5 : 0);
 
-      if (sentCount === 0 && currentRoundPool?.queuedEntries) {
-        state.scheduler.status = "active";
-        state.scheduler.lastError = undefined;
-      } else if (sentCount === 0) {
+      if (sentCount === 0) {
         state.scheduler.lastError = buildNoEligibleReason();
-        state.scheduler.status = state.summary.activeRoutines > 0 && state.summary.eligible === 0
-          ? "no-eligible"
-          : "active";
-      } else {
-        state.scheduler.status = "active";
-        state.scheduler.lastError = undefined;
       }
 
-      addRuntimeLog({
-        type: "scheduler",
-        instanceName: "runtime",
-        message: `Tick ${reason} concluído`,
-        status: sentCount > 0 ? "success" : "info",
-        details: JSON.stringify({
-          round,
-          sentCount,
-          heatingNow,
-        }),
-      });
     } catch (error) {
       state.scheduler.status = "error";
-      state.scheduler.lastError = error instanceof Error ? error.message : "Erro desconhecido";
-      addRuntimeLog({
-        type: "error",
-        instanceName: "runtime",
-        message: "Falha no scheduler 24/7",
-        status: "error",
-        error: state.scheduler.lastError,
-      });
+      state.scheduler.lastError = error instanceof Error ? error.message : "Erro desconhecido no runtime";
     } finally {
+      state.summary.isPulsing = false;
       await saveState();
     }
 
@@ -1292,100 +1323,110 @@ async function tick(reason = "interval") {
 }
 
 function startLoop() {
-  if (tickTimer) {
-    return;
-  }
-
+  if (tickTimer) return;
   tickTimer = setInterval(() => {
-    tick("interval").catch((error) => {
-      console.error("[warmup-runtime] tick failed", error);
-    });
+    tick("interval").catch(console.error);
   }, TICK_INTERVAL_MS);
 }
 
 function stopLoop() {
-  if (!tickTimer) {
-    return;
-  }
-
+  if (!tickTimer) return;
   clearInterval(tickTimer);
   tickTimer = null;
 }
 
-if (state.scheduler.enabled) {
-  startLoop();
+if (state.scheduler.enabled) startLoop();
+
+function processWebhookPayload(payload) {
+  try {
+    const { event, instance, data } = payload;
+    if (!event || !instance) return;
+
+    const istate = Object.values(state.instanceStates).find(s => s.instanceName === instance);
+    if (!istate) return;
+
+    if (event === "connection.update" && data?.state === "close") {
+      const statusCode = data?.statusCode || data?.reason || 500;
+      if (statusCode === 401 || statusCode === 403) {
+        istate.heatScore = Math.max(0, istate.heatScore - 50);
+        istate.eligibilityReason = `Banimento/Deslogado detectado via Webhook (Code ${statusCode})`;
+        istate.heatStage = "blocked";
+        istate.eligibleNow = false;
+
+        addRuntimeLog({
+          type: "scheduler",
+          status: "error",
+          message: `🚨 ALERTA VERMELHO: Instância ${instance} caiu com erro ${statusCode} (Possível Ban).`,
+          instanceName: instance,
+          originToken: istate.instanceToken
+        });
+      }
+    }
+
+    if (event === "messages.update" || event === "messages.upsert" || event === "message.receipt") {
+      istate.heatScore = Math.min(100, istate.heatScore + 0.5);
+
+      if (istate.heatScore > 50 && istate.heatStage === "blocked") {
+        istate.heatStage = "eligible";
+        istate.eligibleNow = true;
+        istate.eligibilityReason = "Saúde restabelecida via telemetria";
+      }
+
+      updateInstanceDna(istate.instanceToken, {
+        type: "webhook_receipt",
+        summary: `Evento ${event} da rede (Saúde ++)`
+      });
+    }
+  } catch (error) {
+    console.error("[warmup-webhook] Erro ao processar payload", error);
+  }
+}
+
+function buildRuntimeConfigResponse() {
+  return {
+    settings: state.config.settings,
+    routines: state.config.routines,
+    messages: state.config.messages,
+    lastSyncedAt: state.lastSyncedAt,
+    scheduler: {
+      enabled: state.scheduler.enabled,
+      status: state.scheduler.status,
+    },
+  };
 }
 
 async function parseBody(req) {
   const chunks = [];
-  for await (const chunk of req) {
-    chunks.push(chunk);
-  }
-
-  if (!chunks.length) {
-    return {};
-  }
-
+  for await (const chunk of req) chunks.push(chunk);
+  if (!chunks.length) return {};
   const raw = Buffer.concat(chunks).toString("utf8");
-  if (!raw) {
-    return {};
-  }
-
-  return JSON.parse(raw);
+  return raw ? JSON.parse(raw) : {};
 }
 
 async function serveStatic(req, res) {
-  if (!existsSync(DIST_DIR)) {
-    return false;
-  }
-
+  if (!existsSync(DIST_DIR)) return false;
   const requestUrl = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
-  const sanitizedPath = path
-    .normalize(decodeURIComponent(requestUrl.pathname))
-    .replace(/^(\.\.[/\\])+/, "")
-    .replace(/^[/\\]+/, "");
+  const sanitizedPath = path.normalize(decodeURIComponent(requestUrl.pathname)).replace(/^(\.\.[/\\])+/, "").replace(/^[/\\]+/, "");
   let filePath = path.join(DIST_DIR, sanitizedPath === "" ? "index.html" : sanitizedPath);
-
-  if (!path.extname(filePath)) {
-    filePath = path.join(DIST_DIR, "index.html");
-  }
+  if (!path.extname(filePath)) filePath = path.join(DIST_DIR, "index.html");
 
   try {
     const fileStat = await stat(filePath);
-    if (!fileStat.isFile()) {
-      throw new Error("not a file");
-    }
-
-    const extension = path.extname(filePath);
-    res.writeHead(200, {
-      "Content-Type": MIME_TYPES[extension] ?? "application/octet-stream",
-    });
+    if (!fileStat.isFile()) throw new Error("not a file");
+    res.writeHead(200, { "Content-Type": MIME_TYPES[path.extname(filePath)] ?? "application/octet-stream" });
     createReadStream(filePath).pipe(res);
     return true;
   } catch {
     try {
       const fallbackPath = path.join(DIST_DIR, "index.html");
-      const fallbackStat = await stat(fallbackPath);
-      if (!fallbackStat.isFile()) {
-        return false;
-      }
-
-      res.writeHead(200, {
-        "Content-Type": "text/html; charset=utf-8",
-      });
       createReadStream(fallbackPath).pipe(res);
       return true;
-    } catch {
-      return false;
-    }
+    } catch { return false; }
   }
 }
 
 const server = http.createServer(async (req, res) => {
-  if (!req.url || !req.method) {
-    createResponse(res, 400, { error: "Requisição inválida" });
-    return;
-  }
+  if (!req.url || !req.method) return createResponse(res, 400, { error: "Requisição inválida" });
 
   if (req.method === "OPTIONS") {
     res.writeHead(204, {
@@ -1397,119 +1438,81 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  const requestUrl = new URL(req.url, `http://${req.headers.host ?? "localhost"}`);
-
+  const url = new URL(req.url, `http://${req.headers.host ?? "localhost"}`);
   try {
-    if (req.method === "GET" && requestUrl.pathname === "/api/local/health") {
-      createResponse(res, 200, {
-        ok: true,
-        port: PORT,
-        tickIntervalMs: TICK_INTERVAL_MS,
-        scheduler: state.scheduler,
-      });
-      return;
-    }
-
-    if (req.method === "GET" && requestUrl.pathname === "/api/local/app/config") {
-      createResponse(res, 200, {
-        settings: state.config.settings,
-      });
-      return;
-    }
-
-    if (req.method === "GET" && requestUrl.pathname === "/api/local/warmup/state") {
-      createResponse(res, 200, buildSnapshot());
-      return;
-    }
-
-    if (req.method === "POST" && requestUrl.pathname === "/api/local/warmup/sync") {
+    if (url.pathname === "/api/local/health") return createResponse(res, 200, { ok: true, port: PORT, scheduler: state.scheduler });
+    if (url.pathname === "/api/local/app/config") return createResponse(res, 200, { settings: state.config.settings });
+    if (url.pathname === "/api/local/warmup/webhook" && req.method === "POST") {
       const payload = await parseBody(req);
-      const nextRoutines = Array.isArray(payload.routines) ? jsonClone(payload.routines) : [];
-      const protectedRoutines = state.config.routines
-        .filter((routine) => isProtectedRoutine(routine))
-        .filter((routine) => !nextRoutines.some((entry) => entry.id === routine.id))
-        .map((routine) => jsonClone(routine));
-
+      processWebhookPayload(payload);
+      return createResponse(res, 200, { received: true });
+    }
+    if (url.pathname === "/api/local/warmup/state") return createResponse(res, 200, buildSnapshot());
+    if (url.pathname === "/api/local/warmup/config") return createResponse(res, 200, buildRuntimeConfigResponse());
+    if (url.pathname === "/api/local/warmup/sync") {
+      const payload = await parseBody(req);
       state.config = {
-        settings: {
-          ...getDefaultSettings(),
-          ...(payload.settings ?? {}),
-        },
-        routines: [...protectedRoutines, ...nextRoutines],
-        messages: Array.isArray(payload.messages) ? jsonClone(payload.messages) : [],
+        settings: normalizeSettings(payload.settings ?? {}),
+        routines: Array.isArray(payload.routines) ? payload.routines : [],
+        messages: Array.isArray(payload.messages) ? payload.messages : [],
       };
       state.lastSyncedAt = new Date().toISOString();
-      state.summary.activeRoutines = state.config.routines.filter((entry) => entry.isActive).length;
       await saveState();
-      createResponse(res, 200, buildSnapshot());
-      return;
+      return createResponse(res, 200, buildSnapshot());
     }
-
-    if (req.method === "POST" && requestUrl.pathname === "/api/local/warmup/start") {
+    if (url.pathname === "/api/local/warmup/start") {
       state.scheduler.enabled = true;
       state.scheduler.status = "active";
-      state.scheduler.lastStartedAt = new Date().toISOString();
-      state.scheduler.lastError = undefined;
       startLoop();
-      const snapshot = await tick("manual-start");
-      createResponse(res, 200, snapshot);
-      return;
+      return createResponse(res, 200, await tick("manual-start"));
     }
-
-    if (req.method === "POST" && requestUrl.pathname === "/api/local/warmup/pause") {
+    if (url.pathname === "/api/local/warmup/pause") {
       state.scheduler.enabled = false;
       state.scheduler.status = "paused";
-      state.scheduler.lastPausedAt = new Date().toISOString();
-      clearWarmingFlags();
       stopLoop();
+      clearWarmingFlags();
       await saveState();
-      createResponse(res, 200, buildSnapshot());
-      return;
+      return createResponse(res, 200, buildSnapshot());
     }
-
-    if (req.method === "POST" && requestUrl.pathname === "/api/local/warmup/stop") {
+    if (url.pathname === "/api/local/warmup/stop") {
       state.scheduler.enabled = false;
       state.scheduler.status = "stopped";
-      state.scheduler.lastPausedAt = new Date().toISOString();
-      state.scheduler.lastError = undefined;
+      stopLoop();
       clearWarmingFlags();
-      stopLoop();
       await saveState();
-      createResponse(res, 200, buildSnapshot());
-      return;
+      return createResponse(res, 200, buildSnapshot());
     }
-
-    if (req.method === "POST" && requestUrl.pathname === "/api/local/warmup/restart") {
-      stopLoop();
+    if (url.pathname === "/api/local/warmup/restart") {
       state.scheduler.enabled = true;
       state.scheduler.status = "active";
-      state.scheduler.lastStartedAt = new Date().toISOString();
-      state.scheduler.lastError = undefined;
+      clearWarmingFlags();
       startLoop();
-      const snapshot = await tick("manual-restart");
-      createResponse(res, 200, snapshot);
-      return;
+      return createResponse(res, 200, await tick("manual-restart"));
     }
+    if (url.pathname === "/api/local/warmup/tick") return createResponse(res, 200, await tick("manual"));
 
-    if (req.method === "POST" && requestUrl.pathname === "/api/local/warmup/tick") {
-      const snapshot = await tick("manual");
-      createResponse(res, 200, snapshot);
-      return;
-    }
-
-    const served = await serveStatic(req, res);
-    if (served) {
-      return;
-    }
-
-    createResponse(res, 404, { error: "Rota não encontrada" });
-  } catch (error) {
-    createResponse(res, 500, {
-      error: error instanceof Error ? error.message : "Erro interno",
-    });
+    if (await serveStatic(req, res)) return;
+    createResponse(res, 404, { error: "Não encontrado" });
+  } catch (err) {
+    createResponse(res, 500, { error: err.message });
   }
 });
 
-server.listen(PORT, HOST, () => {
-  console.log(`[warmup-runtime] listening on http://${HOST}:${PORT}`);
-});
+// Watchdog: Garante que o motor continue batendo (Self-Healing)
+setInterval(() => {
+  const lastTick = state.scheduler.lastTickAt ? new Date(state.scheduler.lastTickAt) : null;
+  const now = new Date();
+  const maxSilenseMs = TICK_INTERVAL_MS * 2.5;
+
+  if (state.scheduler.enabled && lastTick && (now - lastTick > maxSilenseMs)) {
+    console.warn(`[warmup-watchdog] Detectada inatividade suspeita (> ${maxSilenseMs}ms). Forçando pulso de recuperação...`);
+    addRuntimeLog({
+      type: "scheduler",
+      status: "info",
+      message: "WATCHDOG: Reiniciando motor rítmico após inatividade detectada."
+    });
+    tick(); // Force restart pulse
+  }
+}, TICK_INTERVAL_MS * 2);
+
+server.listen(PORT, HOST, () => console.log(`[warmup-runtime] listening on http://${HOST}:${PORT}`));
