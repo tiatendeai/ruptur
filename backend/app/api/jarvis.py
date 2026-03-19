@@ -10,6 +10,7 @@ from app.api.security import require_jarvis_access
 from app.db import DatabaseNotConfiguredError, connect
 from app.repositories import jarvis_ops_repo
 from app.services.agent_service import agent_service
+from app.services.jarvis_daily_brief_service import build_executive_daily_brief
 from app.services.jarvis_skill_runtime import SkillContext, get_skill
 
 # garante registro da skill no runtime
@@ -543,6 +544,55 @@ def list_delivery_news(limit: int = Query(default=20, ge=1, le=200)) -> dict[str
         return {"ok": True, "items": [], "reason": "database_not_configured"}
     except Exception:
         return {"ok": True, "items": [], "reason": "database_unavailable"}
+
+
+@router.get("/brief/executive-daily")
+def executive_daily_brief(
+    limit: int = Query(default=5, ge=1, le=20),
+    principal_name: str = Query(default="Diego", min_length=1),
+    include_ai: bool = Query(default=True),
+) -> dict[str, Any]:
+    try:
+        with connect() as conn:
+            snapshot = jarvis_ops_repo.mission_snapshot(conn)
+            blocked = jarvis_ops_repo.list_missions(conn, limit=limit, status="blocked")
+            critical_in_progress = jarvis_ops_repo.list_missions(conn, limit=limit, status="in_progress", priority="p0")
+            critical_planned = jarvis_ops_repo.list_missions(conn, limit=limit, status="planned", priority="p0")
+            delivery_news = jarvis_ops_repo.list_delivery_news(conn, limit=limit)
+        return build_executive_daily_brief(
+            principal_name=principal_name,
+            reference_date=date.today(),
+            snapshot=snapshot,
+            blocked=[b.__dict__ for b in blocked],
+            critical_in_progress=[m.__dict__ for m in critical_in_progress],
+            critical_planned=[m.__dict__ for m in critical_planned],
+            delivery_news=[d.__dict__ for d in delivery_news],
+            include_ai=include_ai,
+        )
+    except DatabaseNotConfiguredError:
+        return build_executive_daily_brief(
+            principal_name=principal_name,
+            reference_date=date.today(),
+            snapshot=None,
+            blocked=[],
+            critical_in_progress=[],
+            critical_planned=[],
+            delivery_news=[],
+            reason="database_not_configured",
+            include_ai=include_ai,
+        )
+    except Exception:
+        return build_executive_daily_brief(
+            principal_name=principal_name,
+            reference_date=date.today(),
+            snapshot=None,
+            blocked=[],
+            critical_in_progress=[],
+            critical_planned=[],
+            delivery_news=[],
+            reason="database_unavailable",
+            include_ai=include_ai,
+        )
 
 
 @router.get("/brief/daily")

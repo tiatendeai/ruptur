@@ -1,0 +1,36 @@
+name: Jarvis Daily Executive Brief
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "15 11 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jarvis-daily-executive
+  cancel-in-progress: false
+
+jobs:
+  brief:
+    name: Gerar daily executiva
+    runs-on: ubuntu-latest
+    env:
+      RUPTUR_API_BASE_URL: ${{ vars.RUPTUR_API_BASE_URL }}
+      RUPTUR_JARVIS_ADMIN_TOKEN: ${{ secrets.RUPTUR_JARVIS_ADMIN_TOKEN }}
+      RUPTUR_JARVIS_PRINCIPAL_NAME: ${{ vars.RUPTUR_JARVIS_PRINCIPAL_NAME || 'Diego' }}
+      RUPTUR_JARVIS_DAILY_LIMIT: ${{ vars.RUPTUR_JARVIS_DAILY_LIMIT || '5' }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_ALLOWED_USER_IDS: ${{ vars.TELEGRAM_ALLOWED_USER_IDS }}
+    steps:
+      - name: Baixar codigo
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Gerar e publicar resumo executivo
+        run: python ops/jarvis/executive_daily_brief.py
