@@ -15,6 +15,8 @@ const WARMUP_TRACK_SOURCE = "warmup_manager";
 const DEFAULT_WARMUP_24X7_ID = "warmup-default-24x7";
 const ACTIVITY_WINDOW_VERSION = 1;
 const MAX_QUEUE_EXECUTIONS_PER_TICK = 6;
+const MAX_REGENERATION_ENTRIES_PER_ROUND = 2;
+const REGENERATION_RECEIVE_INTERVAL_MS = 2 * 60 * 60 * 1000;
 const MIME_TYPES = {
   ".css": "text/css; charset=utf-8",
   ".html": "text/html; charset=utf-8",
@@ -119,6 +121,7 @@ function createDefaultState() {
       connected: 0,
       eligible: 0,
       heatingNow: 0,
+      regenerating: 0,
       queuedEntries: 0,
       persistentPoolSize: 0,
       subpoolCount: 0,
@@ -343,6 +346,8 @@ function createDefaultInstanceState(instanceToken, instanceName) {
     sentToday: 0,
     sendsLog: [],
     nextEligibleAt: undefined,
+    lastRegenerationAt: undefined,
+    nextRegenerationAt: undefined,
     cooldownRounds: 0,
     eligibleNow: false,
     warmingNow: false,
@@ -393,6 +398,31 @@ function calculateHealthScore(params) {
   // score += Math.min(10, connectedMinutes / 60);
 
   return Math.max(0, Math.min(100, score));
+}
+
+function isRegeneratingCandidate(instance, instanceState) {
+  if (!instanceState) return false;
+  if (instance?.status !== "connected") return false;
+  if (!instanceState.resolvedNumber) return false;
+
+  const normalizedReason = String(instanceState.eligibilityReason ?? "").toLowerCase();
+  if (
+    normalizedReason.includes("desconectada")
+    || normalizedReason.includes("número não resolvido")
+    || instanceState.proxyStatus === "error"
+  ) {
+    return false;
+  }
+
+  return Number(instanceState.heatScore ?? 100) < 40;
+}
+
+function buildNextRegenerationAt(now, lastRegenerationAt) {
+  const baseTime = lastRegenerationAt
+    ? new Date(lastRegenerationAt).getTime()
+    : now.getTime();
+
+  return new Date(baseTime + REGENERATION_RECEIVE_INTERVAL_MS).toISOString();
 }
 
 function normalizeInstanceState({ currentState, instance, round, now, resolvedNumber, instanceData }) {
@@ -460,6 +490,16 @@ function normalizeInstanceState({ currentState, instance, round, now, resolvedNu
   if (!next.resolvedNumber) {
     next.eligibleNow = false;
     next.eligibilityReason = "Número não resolvido";
+    return next;
+  }
+
+  if (isRegeneratingCandidate(instance, next)) {
+    next.eligibleNow = false;
+    next.heatStage = "regenerating";
+    next.nextEligibleAt = buildNextRegenerationAt(now, next.lastRegenerationAt);
+    next.eligibilityReason = next.nextEligibleAt
+      ? `Auto-regeneração ativa até ${new Date(next.nextEligibleAt).toLocaleString("pt-BR")}`
+      : "Auto-regeneração ativa";
     return next;
   }
 
@@ -534,6 +574,17 @@ function markInstanceSent(instanceState, round, now) {
       : `Mensagem enviada na rodada ${round}`,
     updatedAt: now.toISOString(),
     heatStage: "waiting",
+  };
+}
+
+function markInstanceRegeneration(receiverState, now) {
+  return {
+    ...receiverState,
+    lastRegenerationAt: now.toISOString(),
+    nextRegenerationAt: buildNextRegenerationAt(now, now.toISOString()),
+    eligibilityReason: `Auto-regeneração assistida em ${now.toLocaleString("pt-BR")}`,
+    updatedAt: now.toISOString(),
+    heatStage: "regenerating",
   };
 }
 
@@ -849,7 +900,89 @@ function buildDispatchPlan(routine) {
   return plan;
 }
 
-function createPoolEntry({ routine, dispatch, instancesByToken, round, tickStartedAt }) {
+function pickRegenerationMessage(routine) {
+  const directMessages = state.config.messages.filter((message) => {
+    if (!routine.messages.includes(message.id)) return false;
+    return String(message.category ?? "").trim().toLowerCase() !== "grupo";
+  });
+
+  if (directMessages.length) {
+    return directMessages[Math.floor(Math.random() * directMessages.length)];
+  }
+
+  return state.config.messages.find((message) => String(message.category ?? "").trim().toLowerCase() !== "grupo");
+}
+
+function buildRegenerationEntries({ routines, instancesByToken, round, tickStartedAt, roundPool }) {
+  const activeDirectRoutine = routines.find((routine) => routine.mode !== "group");
+  if (!activeDirectRoutine) {
+    return [];
+  }
+
+  const regenerationMessage = pickRegenerationMessage(activeDirectRoutine);
+  if (!regenerationMessage) {
+    return [];
+  }
+
+  const alreadyQueuedSenders = new Set(roundPool.entries.map((entry) => entry.senderToken));
+  const senderCandidates = shuffle(activeDirectRoutine.senderInstances)
+    .filter((token) => {
+      const instance = instancesByToken.get(token);
+      const instanceState = state.instanceStates[token];
+      return Boolean(
+        instance
+        && instanceState?.eligibleNow
+        && !isRegeneratingCandidate(instance, instanceState)
+        && !alreadyQueuedSenders.has(token)
+      );
+    });
+
+  const regenerationReceivers = shuffle(activeDirectRoutine.receiverInstances)
+    .filter((token) => {
+      const instance = instancesByToken.get(token);
+      const instanceState = state.instanceStates[token];
+      if (!instance || !isRegeneratingCandidate(instance, instanceState)) {
+        return false;
+      }
+
+      if (!instanceState.nextRegenerationAt) {
+        return true;
+      }
+
+      return new Date(instanceState.nextRegenerationAt).getTime() <= tickStartedAt.getTime();
+    })
+    .slice(0, MAX_REGENERATION_ENTRIES_PER_ROUND);
+
+  const entries = [];
+
+  for (let index = 0; index < regenerationReceivers.length; index += 1) {
+    const senderToken = senderCandidates[index % senderCandidates.length];
+    const receiverToken = regenerationReceivers[index];
+
+    if (!senderToken || !receiverToken || senderToken === receiverToken) {
+      continue;
+    }
+
+    const entry = createPoolEntry({
+      routine: activeDirectRoutine,
+      dispatch: { senderToken, receiverToken },
+      instancesByToken,
+      round,
+      tickStartedAt,
+      queueType: "regeneration",
+      activityLabelOverride: "Auto-Regeneração",
+      messageOverride: regenerationMessage,
+    });
+
+    if (entry) {
+      entries.push(entry);
+    }
+  }
+
+  return entries;
+}
+
+function createPoolEntry({ routine, dispatch, instancesByToken, round, tickStartedAt, queueType = "standard", activityLabelOverride, messageOverride }) {
   const sender = instancesByToken.get(dispatch.senderToken);
   if (!sender) {
     return null;
@@ -857,7 +990,7 @@ function createPoolEntry({ routine, dispatch, instancesByToken, round, tickStart
 
   const createdAt = tickStartedAt.toISOString();
   const delayMs = getRandomDelayMs(routine);
-  const message = pickRoutineMessage(routine, {
+  const message = messageOverride ?? pickRoutineMessage(routine, {
     allowGroup: Boolean(dispatch.isGroup),
   });
 
@@ -875,10 +1008,11 @@ function createPoolEntry({ routine, dispatch, instancesByToken, round, tickStart
       receiverToken: dispatch.receiverToken,
       receiverNumber: dispatch.receiverToken,
       activityKind: "group",
-      activityLabel: normalizeActivityLabel(message.category, "Grupo"),
+      activityLabel: activityLabelOverride ?? normalizeActivityLabel(message.category, "Grupo"),
       messageId: message.id,
       messageText: message.text,
       messageCategory: normalizeActivityLabel(message.category, "Grupo"),
+      queueType,
       delayMs,
       trackId: createTrackId(routine.id, round, dispatch.senderToken, dispatch.receiverToken),
       status: "queued",
@@ -903,10 +1037,11 @@ function createPoolEntry({ routine, dispatch, instancesByToken, round, tickStart
     receiverName: receiver.name,
     receiverNumber: receiverState.resolvedNumber,
     activityKind: "message",
-    activityLabel: normalizeActivityLabel(message.category, "Mensagem"),
+    activityLabel: activityLabelOverride ?? normalizeActivityLabel(message.category, "Mensagem"),
     messageId: message.id,
     messageText: message.text,
     messageCategory: normalizeActivityLabel(message.category, "Mensagem"),
+    queueType,
     delayMs,
     trackId: createTrackId(routine.id, round, dispatch.senderToken, dispatch.receiverToken),
     status: "queued",
@@ -919,12 +1054,14 @@ function summarizeRoundSubpools(entries) {
   const buckets = new Map();
 
   for (const entry of entries) {
-    const key = `${entry.activityKind}:${entry.activityLabel}`;
+    const queueType = entry.queueType ?? "standard";
+    const key = `${queueType}:${entry.activityKind}:${entry.activityLabel}`;
     if (!buckets.has(key)) {
       buckets.set(key, {
         key,
         label: entry.activityLabel,
         activityKind: entry.activityKind,
+        queueType,
         queuedEntries: 0,
         processedEntries: 0,
         errorEntries: 0,
@@ -962,6 +1099,9 @@ function deriveHeatStage(instanceState, queuedTokens) {
   }
 
   const normalizedReason = String(instanceState.eligibilityReason ?? "").toLowerCase();
+  if (normalizedReason.includes("auto-regeneração") || normalizedReason.includes("regenera")) {
+    return "regenerating";
+  }
   if (
     normalizedReason.includes("intervalo mínimo") ||
     normalizedReason.includes("cooldown") ||
@@ -1011,6 +1151,20 @@ function buildCurrentRoundPool(routines, instancesByToken, round, tickStartedAt)
         queuedSenders.add(entry.senderToken);
       }
     }
+  }
+
+  const regenerationEntries = buildRegenerationEntries({
+    routines,
+    instancesByToken,
+    round,
+    tickStartedAt,
+    roundPool,
+  });
+
+  for (const entry of regenerationEntries) {
+    roundPool.entries.push(entry);
+    roundPool.queuedEntries += 1;
+    queuedSenders.add(entry.senderToken);
   }
 
   roundPool.queuedSenders = Array.from(queuedSenders);
@@ -1075,6 +1229,9 @@ async function executePoolEntry(entry, instancesByToken, round) {
     }
 
     state.instanceStates[entry.senderToken] = markInstanceSent(senderState, round, now);
+    if (entry.queueType === "regeneration" && entry.receiverToken && state.instanceStates[entry.receiverToken]) {
+      state.instanceStates[entry.receiverToken] = markInstanceRegeneration(state.instanceStates[entry.receiverToken], now);
+    }
     sender.lastWarmupAt = now.toISOString();
     entry.status = "sent";
     entry.updatedAt = now.toISOString();
@@ -1092,7 +1249,9 @@ async function executePoolEntry(entry, instancesByToken, round) {
       trackId: entry.trackId,
       trackSource: WARMUP_TRACK_SOURCE,
       isAsync: state.config.settings.warmupAsync,
-      details: message.text,
+      details: entry.queueType === "regeneration"
+        ? `Fila protegida de auto-regeneração · ${message.text}`
+        : message.text,
     });
 
     return { sentCount: 1 };
@@ -1364,6 +1523,7 @@ async function tick(reason = "interval") {
         connected: instances.filter((i) => i.status === "connected").length,
         eligible: persistentPool.readyTokens.length,
         heatingNow,
+        regenerating: Object.values(state.instanceStates).filter((instanceState) => instanceState.heatStage === "regenerating").length,
         persistentPoolSize: persistentPool.healthyTokens.length,
         subpoolCount: currentRoundPool?.subpools.length ?? 0,
         queuedEntries: currentRoundPool?.queuedEntries ?? 0,
