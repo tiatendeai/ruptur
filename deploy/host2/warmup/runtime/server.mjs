@@ -45,6 +45,12 @@ function getDefaultSettings() {
   };
 }
 
+function getReachableMinIntervalMs(maxDailyPerInstance) {
+  const target = Math.max(1, Math.round(Number(maxDailyPerInstance) || 0));
+  if (!target) return 0;
+  return Math.ceil(86_400_000 / target);
+}
+
 function normalizeSettings(settings = {}) {
   const next = {
     ...getDefaultSettings(),
@@ -57,6 +63,16 @@ function normalizeSettings(settings = {}) {
 
   if (!Number.isFinite(next.antiBanMaxPerMinute) || next.antiBanMaxPerMinute < 0) {
     next.antiBanMaxPerMinute = 12;
+  }
+
+  const reachableMinIntervalMs = getReachableMinIntervalMs(next.warmupMaxDailyPerInstance);
+  if (
+    Number.isFinite(reachableMinIntervalMs)
+    && reachableMinIntervalMs > 0
+    && Number.isFinite(next.warmupMinIntervalMs)
+    && next.warmupMinIntervalMs > reachableMinIntervalMs
+  ) {
+    next.warmupMinIntervalMs = reachableMinIntervalMs;
   }
 
   return next;
