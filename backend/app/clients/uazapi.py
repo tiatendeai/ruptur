@@ -277,6 +277,52 @@ class UazapiClient:
             return {"raw": resp.text}
         return data if isinstance(data, dict) else {"raw": data}
 
+    def download_message(
+        self,
+        *,
+        message_id: str,
+        return_base64: bool = False,
+        generate_mp3: bool = True,
+        return_link: bool = False,
+        transcribe: bool = False,
+        openai_apikey: str | None = None,
+        download_quoted: bool = False,
+    ) -> dict[str, Any]:
+        url = f"{self.base_url.rstrip('/')}/message/download"
+        payload: dict[str, Any] = {
+            "id": message_id,
+            "return_base64": return_base64,
+            "generate_mp3": generate_mp3,
+            "return_link": return_link,
+            "transcribe": transcribe,
+            "download_quoted": download_quoted,
+        }
+        if openai_apikey:
+            payload["openai_apikey"] = openai_apikey
+
+        try:
+            with httpx.Client(timeout=60) as client:
+                resp = client.post(url, json=payload, headers=self._headers())
+        except httpx.TimeoutException as exc:
+            raise UazapiError("uazapi_timeout", url=url) from exc
+        except httpx.RequestError as exc:
+            raise UazapiError("uazapi_request_error", url=url) from exc
+
+        if resp.is_error:
+            body = (resp.text or "")[:2000]
+            raise UazapiError(
+                "uazapi_http_error",
+                status_code=resp.status_code,
+                body=body,
+                url=str(resp.request.url),
+            )
+
+        try:
+            data = resp.json()
+        except Exception:
+            return {"raw": resp.text}
+        return data if isinstance(data, dict) else {"raw": data}
+
     def instance_status(self) -> dict[str, Any]:
         url = f"{self.base_url.rstrip('/')}/instance/status"
         try:

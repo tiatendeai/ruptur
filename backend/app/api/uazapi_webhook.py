@@ -228,6 +228,36 @@ def wants_audio_response(body: str | None) -> bool:
     return any(token in normalized for token in triggers)
 
 
+def extract_transcribed_audio_text(body: str | None) -> str | None:
+    text = (body or "").strip()
+    if not text:
+        return None
+    prefix_pattern = r"^\[\s*[aá]udio\s+transcrito\s*\]\s*:\s*"
+    if re.match(prefix_pattern, text, flags=re.IGNORECASE):
+        cleaned = re.sub(prefix_pattern, "", text, flags=re.IGNORECASE).strip()
+        return cleaned or None
+    return None
+
+
+def is_audio_message_payload(payload: dict[str, Any]) -> bool:
+    data = _payload_data(payload)
+    message_data = _message_data(payload)
+    signature = " ".join(
+        str(value or "").lower()
+        for value in (
+            message_data.get("messageType"),
+            message_data.get("type"),
+            message_data.get("mediaType"),
+            message_data.get("mimeType"),
+            data.get("messageType"),
+            data.get("type"),
+            data.get("mediaType"),
+            data.get("mimeType"),
+        )
+    )
+    return any(token in signature for token in ("audio", "voice", "ptt", "myaudio"))
+
+
 def strip_audio_request_instruction(body: str | None) -> str:
     text = (body or "").strip()
     cleaned = text
@@ -313,6 +343,42 @@ def apply_persona_prefix(persona: str, text: str | None) -> str:
         return normalized
     prefix = "*Jarvis:*" if persona == "jarvis" else "*IAzinha:*"
     return f"{prefix} {normalized}"
+
+
+def transcribe_inbound_audio_via_uazapi(payload: dict[str, Any], message_external_id: str | None) -> str | None:
+    if not message_external_id or not settings.openai_api_key:
+        return None
+
+    instance_id = resolve_uazapi_instance_id(payload)
+    message_data = _message_data(payload)
+    data = _payload_data(payload)
+    token = resolve_token(
+        settings,
+        token=str(payload.get("token") or data.get("token") or message_data.get("token") or "").strip() or None,
+        instance=instance_id or None,
+        admin_token=None,
+    )
+    client = build_uazapi_client(settings, token=token)
+    try:
+        result = client.download_message(
+            message_id=message_external_id,
+            transcribe=True,
+            generate_mp3=True,
+            return_link=False,
+            openai_apikey=settings.openai_api_key,
+        )
+    except UazapiError as exc:
+        logger.warning(
+            "UAZAPI transcribe fallback falhou instance=%s message=%s error=%s",
+            instance_id,
+            message_external_id,
+            exc,
+        )
+        return None
+    transcription = result.get("transcription") if isinstance(result, dict) else None
+    if isinstance(transcription, str) and transcription.strip():
+        return transcription.strip()
+    return None
 
 
 def ensure_session_metadata(metadata: dict[str, Any] | None) -> dict[str, Any]:
@@ -455,6 +521,16 @@ async def process_ai_response(payload: dict[str, Any], lead_id: str, conversatio
             fields = extract_message_fields(payload)
             chatid = fields.get("chatid") or ""
             current_msg = last_msg or ""
+            transcribed_body = extract_transcribed_audio_text(current_msg)
+            if transcribed_body:
+                current_msg = transcribed_body
+            elif is_audio_message_payload(payload):
+                fallback_transcription = transcribe_inbound_audio_via_uazapi(
+                    payload,
+                    fields.get("message_external_id"),
+                )
+                if fallback_transcription:
+                    current_msg = fallback_transcription
             msg_lower = normalize_command(current_msg)
             self_chat = is_self_chat(payload, chatid)
             target_candidates = resolve_target_candidates(payload, lead_phone)

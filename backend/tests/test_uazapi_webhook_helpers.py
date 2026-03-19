@@ -4,7 +4,9 @@ import unittest
 
 from app.api.uazapi_webhook import (
     extract_inline_persona_request,
+    extract_transcribed_audio_text,
     is_iazinha_activation_attempt,
+    is_audio_message_payload,
     is_operational_brief_request,
     is_self_chat,
     resolve_target_candidates,
@@ -30,6 +32,23 @@ class UazapiWebhookHelpersTest(unittest.TestCase):
             strip_audio_request_instruction("Me responda em áudio: qual o status da sessão?"),
             "qual o status da sessão?",
         )
+
+    def test_extract_transcribed_audio_text_strips_prefix(self) -> None:
+        self.assertEqual(
+            extract_transcribed_audio_text("[Áudio Transcrito]: preciso de um resumo executivo"),
+            "preciso de um resumo executivo",
+        )
+
+    def test_is_audio_message_payload_detects_audio_type(self) -> None:
+        payload = {
+            "data": {
+                "message": {
+                    "messageType": "audio",
+                    "id": "ABC123",
+                }
+            }
+        }
+        self.assertTrue(is_audio_message_payload(payload))
 
     def test_operational_brief_detection_hits_on_exec_summary_requests(self) -> None:
         self.assertTrue(
