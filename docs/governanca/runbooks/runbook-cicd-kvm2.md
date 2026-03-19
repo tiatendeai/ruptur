@@ -111,6 +111,64 @@ Exemplo:
   previous -> /opt/ruptur/releases/<release_id_anterior>
 ```
 
+## Modelo de borda no KVM2
+
+Existem dois cenarios validos:
+
+### Cenario A — Traefik embarcado na stack do Ruptur
+
+- o proprio `deploy/kvm2/docker-compose.yml` sobe um `traefik`
+- esse modo serve para ambiente dedicado ao Ruptur
+
+### Cenario B — Traefik ja existente no host
+
+- o host ja tem um `Traefik` principal rodando fora da stack Ruptur
+- o `Ruptur` publica apenas `labels` Docker nos servicos
+- nesse caso, o profile `edge` do compose do Ruptur **nao** deve ser ligado
+
+No momento atual do `kvm2`, o cenario correto e:
+
+- **Traefik principal do host**
+- `Ruptur` sem Traefik embarcado no profile `core`
+- `n8n` e `Ruptur` compartilhando a mesma borda do host
+
+## Observabilidade recomendada para o KVM2
+
+A estrategia recomendada hoje e:
+
+- `node-exporter` no proprio `kvm2`
+- `cadvisor` no proprio `kvm2`
+- `Prometheus + Grafana` fora do `kvm2`
+
+Motivo:
+
+- o `kvm2` continua enxuto
+- a observabilidade nao cai junto com a aplicacao
+- o custo fica mais previsivel
+
+### Profile de exporters
+
+No compose do `kvm2`, a observabilidade leve entra pelo profile:
+
+- `observability-agents`
+
+Os workflows de deploy e rollback ja consideram esse profile por padrao.
+
+### Exposicao segura
+
+Os exporters ficam com bind local por padrao:
+
+- `node-exporter` em `127.0.0.1:9100`
+- `cadvisor` em `127.0.0.1:8080`
+
+Se o `Prometheus` externo precisar coletar essas metricas, o caminho recomendado e:
+
+- rede privada/VPN
+- tunel SSH
+- ou liberacao controlada por firewall para IPs especificos
+
+Nao expor essas portas publicamente sem camada de controle.
+
 ## Arquivos que precisam existir no KVM2
 
 ### 1. Arquivo compartilhado do compose
@@ -206,6 +264,12 @@ set -a
 source /opt/ruptur/shared/kvm2.env
 set +a
 docker compose --project-name ruptur-kvm2 up -d --build
+```
+
+Se o host ja tiver Traefik proprio, subir apenas os profiles de aplicacao, por exemplo:
+
+```bash
+docker compose --project-name ruptur-kvm2 --profile core up -d --build --remove-orphans
 ```
 
 ## Gates minimos antes de apertar deploy

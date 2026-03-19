@@ -134,6 +134,32 @@ E validar:
 
 ---
 
+### 8. Observabilidade leve no KVM2
+
+Subir junto com a primeira release:
+
+- `node-exporter`
+- `cadvisor`
+
+Validar:
+
+- `curl http://127.0.0.1:9100/metrics`
+- `curl http://127.0.0.1:8080/metrics`
+
+### 9. Observabilidade fora da caixa
+
+Preparar fora do `kvm2`:
+
+- `Prometheus`
+- `Grafana`
+
+A coleta deve usar:
+
+- VPN
+- tunel SSH
+- ou firewall com allowlist
+
+
 ## Gap real entre Host2 atual e KVM2 esperado
 
 ## Variáveis do compose do KVM2 que ainda não aparecem no Host2 atual

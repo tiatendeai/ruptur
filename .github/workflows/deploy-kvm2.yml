@@ -11,7 +11,7 @@ on:
       deploy_profiles:
         description: "Perfis do compose separados por virgula"
         required: true
-        default: "core,channels,warmup"
+        default: "core,channels,warmup,observability-agents"
         type: string
       skip_smoke:
         description: "Pular smoke test remoto/publico"
