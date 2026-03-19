@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 import textwrap
 import urllib.error
@@ -78,26 +79,95 @@ def persist_local_copy(markdown: str) -> str | None:
     return str(target)
 
 
-def send_telegram(markdown: str) -> list[str]:
-    bot_token = _env("TELEGRAM_BOT_TOKEN")
-    user_ids = [item.strip() for item in _env("TELEGRAM_ALLOWED_USER_IDS").split(",") if item.strip()]
-    if not bot_token or not user_ids:
+def _telegram_api_json(bot_token: str, method: str, payload: dict[str, str] | None = None) -> dict:
+    endpoint = f"https://api.telegram.org/bot{bot_token}/{method}"
+    data = None
+    headers: dict[str, str] = {}
+    if payload:
+        data = urllib.parse.urlencode(payload).encode("utf-8")
+        headers["Content-Type"] = "application/x-www-form-urlencoded"
+    req = urllib.request.Request(endpoint, data=data, headers=headers)
+    with urllib.request.urlopen(req, timeout=30) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+def _telegram_bot_username(bot_token: str) -> str | None:
+    try:
+        payload = _telegram_api_json(bot_token, "getMe")
+    except Exception:
+        return None
+    result = payload.get("result") or {}
+    username = (result.get("username") or "").strip()
+    return username or None
+
+
+def _discover_private_chat_ids(bot_token: str) -> list[str]:
+    try:
+        payload = _telegram_api_json(bot_token, "getUpdates")
+    except Exception:
         return []
 
+    chat_ids: list[str] = []
+    seen: set[str] = set()
+    for item in reversed(payload.get("result") or []):
+        message = item.get("message") or item.get("edited_message") or item.get("channel_post") or {}
+        chat = message.get("chat") or {}
+        chat_type = (chat.get("type") or "").strip()
+        chat_id = str(chat.get("id") or "").strip()
+        if chat_type != "private" or not chat_id or chat_id in seen:
+            continue
+        seen.add(chat_id)
+        chat_ids.append(chat_id)
+    return list(reversed(chat_ids))
+
+
+def _resolve_telegram_chat_ids(bot_token: str) -> tuple[list[str], list[str]]:
+    raw_targets = [item.strip() for item in _env("TELEGRAM_ALLOWED_USER_IDS").split(",") if item.strip()]
+    numeric_targets = [item for item in raw_targets if re.fullmatch(r"-?\d+", item)]
     warnings: list[str] = []
-    endpoint = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+
+    if numeric_targets:
+        return numeric_targets, warnings
+
+    if raw_targets:
+        username = _telegram_bot_username(bot_token) or "bot"
+        warnings.append(
+            "telegram:destino_nao_numerico:"
+            + ",".join(raw_targets)
+            + f":env precisa de chat_id numerico; envie /start para @{username} para auto-descoberta"
+        )
+
+    discovered = _discover_private_chat_ids(bot_token)
+    if discovered:
+        return discovered, warnings
+
+    if not raw_targets:
+        username = _telegram_bot_username(bot_token) or "bot"
+        warnings.append(f"telegram:sem_destino:env vazio; envie /start para @{username} para registrar o chat privado")
+
+    return [], warnings
+
+
+def send_telegram(markdown: str) -> list[str]:
+    bot_token = _env("TELEGRAM_BOT_TOKEN")
+    if not bot_token:
+        return []
+
+    user_ids, warnings = _resolve_telegram_chat_ids(bot_token)
+    if not user_ids:
+        return warnings
+
     for chat_id in user_ids:
-        payload = urllib.parse.urlencode(
-            {
-                "chat_id": chat_id,
-                "text": markdown[:3900],
-                "disable_web_page_preview": "true",
-            }
-        ).encode("utf-8")
-        req = urllib.request.Request(endpoint, data=payload, headers={"Content-Type": "application/x-www-form-urlencoded"})
         try:
-            with urllib.request.urlopen(req, timeout=30):
-                pass
+            _telegram_api_json(
+                bot_token,
+                "sendMessage",
+                {
+                    "chat_id": chat_id,
+                    "text": markdown[:3900],
+                    "disable_web_page_preview": "true",
+                },
+            )
         except Exception as exc:  # pragma: no cover - depende de credencial/canal real
             warnings.append(f"telegram:{chat_id}:{exc}")
     return warnings
