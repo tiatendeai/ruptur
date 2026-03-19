@@ -17,7 +17,7 @@ retry_curl() {
   local sleep_seconds="${4:-5}"
 
   for ((i = 1; i <= attempts; i++)); do
-    if curl -fsS --max-time 10 "$url" >/dev/null; then
+    if curl -fk -sS --max-time 10 "$url" >/dev/null; then
       echo "Smoke ok: $label"
       return 0
     fi
