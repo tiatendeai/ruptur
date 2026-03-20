@@ -1,0 +1,34 @@
+{
+  "last_updated": "2026-03-20T18:16:00-03:00",
+  "operator": "diego",
+  "active_sessions": [],
+  "tasks": {
+    "em_progresso": [
+      {
+        "id": "TASK-001",
+        "titulo": "Erro 400 Server Action em producao",
+        "responsavel": "gabriel",
+        "env": "production",
+        "url": "https://app.ruptur.cloud",
+        "nota": "NextJS Server Action desatualizado — investigado por Jarvis-GPT em 2026-03-20"
+      }
+    ],
+    "pendente": [
+      {
+        "id": "TASK-002",
+        "titulo": "Scaffold AGR — Agent Genome Registry",
+        "responsavel": "jarvis",
+        "nota": "Criar estrutura .agent/ completa no repo"
+      }
+    ],
+    "bloqueado": [],
+    "concluido": []
+  },
+  "agents_active": [],
+  "infra": {
+    "servidor": "167.234.228.71",
+    "app": "https://app.ruptur.cloud",
+    "status_app": "online",
+    "ultimo_incidente": "erro-400-server-action"
+  }
+}
