@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-import { isSupabaseConfigured } from "@/lib/config";
+import { isSupabaseConfigured, siteUrl } from "@/lib/config";
 import { getBrowserSupabaseClient } from "@/lib/supabase/browser";
 
 export default function LoginForm() {
@@ -16,6 +16,7 @@ export default function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [view, setView] = useState<"email" | "password" | "signup" | "forgot" | "forgot_success">("email");
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -26,22 +27,53 @@ export default function LoginForm() {
       return;
     }
 
+    if (view === "email") {
+      if (!email.trim()) {
+        setError("Por favor, insira um e-mail.");
+        return;
+      }
+      setView("password");
+      return;
+    }
+
     setLoading(true);
     try {
       const supabase = getBrowserSupabaseClient();
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
-      });
+      
+      if (view === "password") {
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password,
+        });
 
-      if (signInError) {
-        throw signInError;
+        if (signInError) throw signInError;
+
+        router.replace(nextPath);
+        router.refresh();
+      } else if (view === "signup") {
+        const { error: signUpError } = await supabase.auth.signUp({
+          email: email.trim(),
+          password,
+          options: {
+            emailRedirectTo: `${siteUrl()}/auth/callback?next=/inbox`,
+          }
+        });
+
+        if (signUpError) throw signUpError;
+        
+        setError("Conta criada com sucesso! Verifique seu e-mail ou faca o login.");
+        setView("password");
+      } else if (view === "forgot") {
+        const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+          redirectTo: `${siteUrl()}/auth/callback?next=/update-password`,
+        });
+        
+        if (resetError) throw resetError;
+        
+        setView("forgot_success");
       }
-
-      router.replace(nextPath);
-      router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Nao foi possivel entrar agora.");
+      setError(err instanceof Error ? err.message : "Nao foi possivel processar a solicitacao agora.");
     } finally {
       setLoading(false);
     }
@@ -74,61 +106,177 @@ export default function LoginForm() {
           </section>
 
           <section className="rounded-[28px] border border-white/10 bg-[#11100f] p-6 lg:p-8">
-            <div className="text-[11px] uppercase tracking-[0.32em] text-[#d39e84]">Login</div>
-            <div className="mt-3 text-2xl font-semibold tracking-[-0.05em] text-white">Acesso por email e senha</div>
-
-            <form onSubmit={handleSubmit} className="mt-8 space-y-4">
-              <label className="block space-y-2">
-                <span className="text-sm text-[#dcc8bb]">Email</span>
-                <input
-                  type="email"
-                  autoComplete="email"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  className="w-full rounded-[18px] border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none transition focus:border-[#d39e84]/60"
-                  placeholder="voce@empresa.com"
-                  required
-                />
-              </label>
-
-              <label className="block space-y-2">
-                <span className="text-sm text-[#dcc8bb]">Senha</span>
-                <div className="relative">
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    autoComplete="current-password"
-                    value={password}
-                    onChange={(event) => setPassword(event.target.value)}
-                    className="w-full rounded-[18px] border border-white/10 bg-black/20 px-4 py-3 pr-24 text-sm text-white outline-none transition focus:border-[#d39e84]/60"
-                    placeholder="Sua senha"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((current) => !current)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-[#f2dfd4] transition hover:bg-white/10"
-                    aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
-                    aria-pressed={showPassword}
-                  >
-                    {showPassword ? "Ocultar" : "Mostrar"}
-                  </button>
-                </div>
-              </label>
-
-              {error ? <div className="rounded-[18px] border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</div> : null}
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full rounded-full border border-[#d39e84]/30 bg-[#9d4e31] px-4 py-3 text-sm font-medium text-white transition hover:bg-[#b25c39] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {loading ? "Entrando..." : "Entrar"}
-              </button>
-            </form>
-
-            <div className="mt-6 rounded-[20px] border border-white/10 bg-black/20 px-4 py-4 text-sm text-[#cbb8ad]">
-              Se a base de autenticacao ainda nao estiver ligada, esta tela vai avisar e bloquear o acesso.
+            <div className="text-[11px] uppercase tracking-[0.32em] text-[#d39e84]">
+              {view === "signup" ? "Cadastro" : view === "forgot" || view === "forgot_success" ? "Recuperacao" : "Login"}
             </div>
+            <div className="mt-3 text-2xl font-semibold tracking-[-0.05em] text-white">
+              {view === "email" 
+                ? "Acesse sua conta" 
+                : view === "password"
+                ? "Digite sua senha"
+                : view === "signup"
+                ? "Crie sua conta"
+                : view === "forgot" 
+                ? "Recuperar senha" 
+                : "Email enviado"}
+            </div>
+
+            {view === "forgot_success" ? (
+              <div className="mt-8 space-y-4">
+                <p className="text-sm text-[#f2dfd4]/80">
+                  Se este e-mail estiver cadastrado, voce recebera um link para redefinir sua senha.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setView("login")}
+                  className="w-full rounded-full border border-white/10 bg-black/20 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/10"
+                >
+                  Voltar para o login
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmit} className="mt-8 space-y-4">
+                {(view === "email" || view === "signup" || view === "forgot") && (
+                  <label className="block space-y-2">
+                    <span className="text-sm text-[#dcc8bb]">Email</span>
+                    <input
+                      type="email"
+                      autoComplete="email"
+                      value={email}
+                      onChange={(event) => setEmail(event.target.value)}
+                      className="w-full rounded-[18px] border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none transition focus:border-[#d39e84]/60"
+                      placeholder="voce@empresa.com"
+                      required
+                    />
+                  </label>
+                )}
+
+                {view === "password" && (
+                  <div className="space-y-4">
+                    <div className="rounded-[18px] border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/70 flex justify-between items-center">
+                      <span>{email}</span>
+                      <button type="button" onClick={() => setView("email")} className="text-xs text-[#d39e84] hover:underline">Editar</button>
+                    </div>
+                    
+                    <label className="block space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-[#dcc8bb]">Senha</span>
+                        <button
+                          type="button"
+                          onClick={() => setView("forgot")}
+                          className="text-xs text-[#d39e84] hover:underline"
+                        >
+                          Esqueceu a senha?
+                        </button>
+                      </div>
+                      <div className="relative">
+                        <input
+                          type={showPassword ? "text" : "password"}
+                          autoComplete="current-password"
+                          value={password}
+                          onChange={(event) => setPassword(event.target.value)}
+                          className="w-full rounded-[18px] border border-white/10 bg-black/20 px-4 py-3 pr-24 text-sm text-white outline-none transition focus:border-[#d39e84]/60"
+                          placeholder="Sua senha"
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword((current) => !current)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-[#f2dfd4] transition hover:bg-white/10"
+                          aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                          aria-pressed={showPassword}
+                        >
+                          {showPassword ? "Ocultar" : "Mostrar"}
+                        </button>
+                      </div>
+                    </label>
+                  </div>
+                )}
+
+                {view === "signup" && (
+                  <label className="block space-y-2 mt-4">
+                    <span className="text-sm text-[#dcc8bb]">Criar Senha</span>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        autoComplete="new-password"
+                        value={password}
+                        onChange={(event) => setPassword(event.target.value)}
+                        className="w-full rounded-[18px] border border-white/10 bg-black/20 px-4 py-3 pr-24 text-sm text-white outline-none transition focus:border-[#d39e84]/60"
+                        placeholder="Sua senha"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((current) => !current)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-[#f2dfd4] transition hover:bg-white/10"
+                        aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                        aria-pressed={showPassword}
+                      >
+                        {showPassword ? "Ocultar" : "Mostrar"}
+                      </button>
+                    </div>
+                  </label>
+                )}
+
+                {error ? <div className="rounded-[18px] border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</div> : null}
+
+                <div className="space-y-3 pt-2">
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full rounded-full border border-[#d39e84]/30 bg-[#9d4e31] px-4 py-3 text-sm font-medium text-white transition hover:bg-[#b25c39] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {loading 
+                      ? "Processando..." 
+                      : view === "email" 
+                      ? "Continuar" 
+                      : view === "password"
+                      ? "Entrar"
+                      : view === "signup"
+                      ? "Cadastrar"
+                      : "Enviar validacao"}
+                  </button>
+
+                  {view === "email" && (
+                    <button
+                      type="button"
+                      disabled={loading}
+                      onClick={() => setView("signup")}
+                      className="w-full text-center text-sm font-medium text-[#dcc8bb] transition hover:text-white mt-2"
+                    >
+                      Nao tem uma conta? Cadastre-se
+                    </button>
+                  )}
+                  
+                  {view === "signup" && (
+                    <button
+                      type="button"
+                      disabled={loading}
+                      onClick={() => setView("email")}
+                      className="w-full text-center text-sm font-medium text-[#dcc8bb] transition hover:text-white mt-2"
+                    >
+                      Ja tem uma conta? Fazer login
+                    </button>
+                  )}
+
+                  {view === "forgot" && (
+                    <button
+                      type="button"
+                      disabled={loading}
+                      onClick={() => {
+                        setError(null);
+                        setView("email");
+                      }}
+                      className="w-full text-center text-sm font-medium text-[#dcc8bb] transition hover:text-white"
+                    >
+                      Voltar para o login
+                    </button>
+                  )}
+                </div>
+              </form>
+            )}
+
           </section>
         </div>
       </div>
