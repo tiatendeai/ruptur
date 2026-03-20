@@ -36,6 +36,8 @@ function getDefaultSettings() {
   return {
     serverUrl: "https://tiatendeai.uazapi.com",
     adminToken: "",
+    supabaseUrl: process.env.VITE_SUPABASE_URL || "https://axrwlboyowoskdxeogba.supabase.co",
+    supabaseKey: process.env.VITE_SUPABASE_PUBLISHABLE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4cndsYm95b3dvc2tkeGVvZ2JhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5MzkzNTYsImV4cCI6MjA4OTUxNTM1Nn0.jrVy7OzLgidDYlK2rFuF1NX2SRP0EVmQycx3d_s7vV8",
     defaultDelay: 3000,
     warmupMinIntervalMs: 15 * 60 * 1000,
     warmupMaxDailyPerInstance: 250,
@@ -1657,19 +1659,43 @@ async function parseBody(req) {
 async function serveStatic(req, res) {
   if (!existsSync(DIST_DIR)) return false;
   const requestUrl = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
-  const sanitizedPath = path.normalize(decodeURIComponent(requestUrl.pathname)).replace(/^(\.\.[/\\])+/, "").replace(/^[/\\]+/, "");
+  let pathname = requestUrl.pathname;
+  
+  // Suporte ao prefixo /warmup usado pelo Traefik/Browser
+  if (pathname.startsWith("/warmup/")) {
+    pathname = pathname.replace("/warmup/", "/");
+  } else if (pathname === "/warmup") {
+    pathname = "/";
+  }
+
+  // Previne que reqs para a API caiam no fallback SPA (retornando HTML e gerando erro de JSON Parse)
+  if (pathname.startsWith("/api/")) {
+    return false;
+  }
+
+  const sanitizedPath = path.normalize(decodeURIComponent(pathname)).replace(/^(\.\.[/\\])+/, "").replace(/^[/\\]+/, "");
   let filePath = path.join(DIST_DIR, sanitizedPath === "" ? "index.html" : sanitizedPath);
+  
+  // Se for um diretório ou não tiver extensão, assume index.html (SPA routing)
   if (!path.extname(filePath)) filePath = path.join(DIST_DIR, "index.html");
 
   try {
     const fileStat = await stat(filePath);
     if (!fileStat.isFile()) throw new Error("not a file");
-    res.writeHead(200, { "Content-Type": MIME_TYPES[path.extname(filePath)] ?? "application/octet-stream" });
+    const ext = path.extname(filePath).toLowerCase();
+    res.writeHead(200, { 
+      "Content-Type": MIME_TYPES[ext] ?? "application/octet-stream",
+      "Access-Control-Allow-Origin": "*" 
+    });
     createReadStream(filePath).pipe(res);
     return true;
   } catch {
     try {
       const fallbackPath = path.join(DIST_DIR, "index.html");
+      res.writeHead(200, { 
+        "Content-Type": "text/html; charset=utf-8",
+        "Access-Control-Allow-Origin": "*"
+      });
       createReadStream(fallbackPath).pipe(res);
       return true;
     } catch { return false; }
@@ -1692,6 +1718,12 @@ const server = http.createServer(async (req, res) => {
     });
     res.end();
     return;
+  }
+
+  if (req.url.startsWith("/warmup/")) {
+    req.url = req.url.replace("/warmup/", "/");
+  } else if (req.url === "/warmup") {
+    req.url = "/";
   }
 
   const url = new URL(req.url, `http://${req.headers.host ?? "localhost"}`);
