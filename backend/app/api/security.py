@@ -9,8 +9,8 @@ from fastapi import Depends, Header, HTTPException, Request
 from app.settings import settings
 
 
-PUBLIC_PATHS = {"/health"}
-PUBLIC_PREFIXES = ("/webhook/", "/billing/webhook/", "/static/")
+PUBLIC_PATHS = {"/health", "/favicon.ico", "/docs", "/openapi.json", "/redoc"}
+PUBLIC_PREFIXES = ("/webhook/", "/billing/webhook/", "/static/", "/docs/", "/redoc/")
 
 
 @dataclass
