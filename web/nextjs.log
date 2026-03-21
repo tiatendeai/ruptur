@@ -1,6 +1,6 @@
 
 > web@0.1.0 dev
-> next dev
+> next dev -p 3333
 
 ⚠ Warning: Next.js inferred your workspace root, but it may not be correct.
  We detected multiple lockfiles and selected the directory of /Users/diego/package-lock.json as the root directory.
@@ -8,15 +8,19 @@
    See https://nextjs.org/docs/app/api-reference/config/next-config-js/turbopack#root-directory for more information.
  Detected additional lockfiles: 
    * /Users/diego/Documents/GitHub/codex/ruptur/web/package-lock.json
+   * /Users/diego/Documents/GitHub/codex/ruptur/package-lock.json
 
 ▲ Next.js 16.1.6 (Turbopack)
-- Local:         http://localhost:3000
-- Network:       http://192.168.18.24:3000
+- Local:         http://localhost:3333
+- Network:       http://192.168.18.209:3333
 
 ✓ Starting...
-✓ Ready in 1895ms
-○ Compiling / ...
- GET / 200 in 7.1s (compile: 5.6s, proxy.ts: 654ms, render: 832ms)
- GET / 200 in 269ms (compile: 100ms, proxy.ts: 13ms, render: 155ms)
- GET /showcase 200 in 1439ms (compile: 1107ms, proxy.ts: 101ms, render: 230ms)
- GET /login?next=%2Finbox 200 in 918ms (compile: 796ms, proxy.ts: 6ms, render: 116ms)
+Creating turbopack project {
+  dir: '/Users/diego/Documents/GitHub/codex/ruptur/web',
+  testMode: true
+}
+✓ Ready in 3.9s
+○ Compiling /_not-found/page ...
+ HEAD /login 404 in 4.9s (compile: 4.6s, render: 306ms)
+ HEAD / 200 in 1179ms (compile: 911ms, proxy.ts: 191ms, render: 76ms)
+  Reload env: .env.local
