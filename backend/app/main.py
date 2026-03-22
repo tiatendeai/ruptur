@@ -33,7 +33,7 @@ def create_app() -> FastAPI:
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=origins,
+        allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:8787", "*"],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -47,10 +47,17 @@ def create_app() -> FastAPI:
                 request.state.current_user = await authenticate_request(request)
             except Exception as exc:
                 from fastapi import HTTPException
-
+                status_code = 500
+                detail = "auth_internal_error"
                 if isinstance(exc, HTTPException):
-                    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
-                return JSONResponse(status_code=500, content={"detail": "auth_internal_error"})
+                    status_code = exc.status_code
+                    detail = exc.detail
+                
+                response = JSONResponse(status_code=status_code, content={"detail": detail})
+                # Injetar headers de CORS manualmente se o middleware falhar em capturar o erro
+                response.headers["Access-Control-Allow-Origin"] = request.headers.get("origin", "*")
+                response.headers["Access-Control-Allow-Credentials"] = "true"
+                return response
             return await call_next(request)
 
     app.add_middleware(AuthMiddleware)

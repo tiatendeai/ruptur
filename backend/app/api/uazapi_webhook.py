@@ -1,20 +1,5 @@
 from __future__ import annotations
 
-<<<<<<< HEAD
-from typing import Any
-
-from fastapi import APIRouter, HTTPException, Request
-
-from app.db import DatabaseNotConfiguredError, connect
-from app.services.uazapi_ingest import ingest_uazapi_webhook
-
-
-router = APIRouter(prefix="/webhook", tags=["webhook"])
-
-
-@router.post("/uazapi")
-async def uazapi_webhook(request: Request) -> dict[str, Any]:
-=======
 import logging
 import re
 from datetime import date, datetime
@@ -697,23 +682,16 @@ async def process_ai_response(payload: dict[str, Any], lead_id: str, conversatio
 
 @router.post("/uazapi")
 async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks) -> dict[str, Any]:
->>>>>>> work
     payload = await request.json()
     if not isinstance(payload, dict):
         raise HTTPException(status_code=400, detail="payload must be a JSON object")
 
-<<<<<<< HEAD
-=======
     raw_data = _payload_data(payload)
     message_data = _message_data(payload)
-
->>>>>>> work
     try:
         with connect() as conn:
             result = ingest_uazapi_webhook(conn, payload)
             conn.commit()
-<<<<<<< HEAD
-=======
             if result.stored and result.lead_id and result.conversation_id:
                 fields = extract_message_fields(payload)
                 chatid = fields.get("chatid") or ""
@@ -756,7 +734,6 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks) ->
                 )
                 if should_respond:
                     background_tasks.add_task(process_ai_response, payload, result.lead_id, result.conversation_id, body, result.message_id)
->>>>>>> work
             return {
                 "ok": True,
                 "stored": result.stored,
@@ -764,12 +741,6 @@ async def uazapi_webhook(request: Request, background_tasks: BackgroundTasks) ->
                 "conversation_id": result.conversation_id,
                 "message_id": result.message_id,
             }
-<<<<<<< HEAD
-    except DatabaseNotConfiguredError:
-        return {"ok": True, "stored": False, "reason": "database_not_configured"}
-
-=======
     except Exception as exc:
         logger.exception("Webhook failure: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc))
->>>>>>> work

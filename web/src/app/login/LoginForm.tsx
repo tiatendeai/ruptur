@@ -11,15 +11,18 @@ export default function LoginForm() {
   const searchParams = useSearchParams();
   const nextPath = useMemo(() => searchParams.get("next") || "/inbox", [searchParams]);
 
+  const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+    setMessage(null);
 
     if (!isSupabaseConfigured()) {
       setError("Supabase ainda nao foi configurado no web.");
@@ -29,19 +32,29 @@ export default function LoginForm() {
     setLoading(true);
     try {
       const supabase = getBrowserSupabaseClient();
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
-      });
-
-      if (signInError) {
-        throw signInError;
+      
+      if (isSignUp) {
+        const { error: signUpError } = await supabase.auth.signUp({
+          email: email.trim(),
+          password,
+          options: {
+            emailRedirectTo: window.location.origin,
+          }
+        });
+        if (signUpError) throw signUpError;
+        setMessage("Conta criada! Verifique seu email para confirmar o acesso (ou tente entrar se a confirmacao estiver desligada).");
+        setIsSignUp(false);
+      } else {
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password,
+        });
+        if (signInError) throw signInError;
+        router.replace(nextPath);
+        router.refresh();
       }
-
-      router.replace(nextPath);
-      router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Nao foi possivel entrar agora.");
+      setError(err instanceof Error ? err.message : "Nao foi possivel processar agora.");
     } finally {
       setLoading(false);
     }
@@ -54,7 +67,7 @@ export default function LoginForm() {
           <section className="rounded-[28px] border border-white/10 bg-[linear-gradient(135deg,rgba(157,78,49,0.35),rgba(10,9,8,0.95))] p-6 lg:p-8">
             <div className="text-[11px] uppercase tracking-[0.36em] text-[#ffd9c9]/75">Ruptur Access</div>
             <h1 className="mt-4 max-w-xl text-4xl font-semibold tracking-[-0.07em] text-white">
-              Entrar com conta segura para abrir o Control Deck.
+              {isSignUp ? "Crie sua conta para acessar o Control Deck." : "Entrar com conta segura para abrir o Control Deck."}
             </h1>
             <p className="mt-4 max-w-xl text-sm leading-6 text-[#f2dfd4]/80">
               Aqui entram as areas protegidas do Inbox, CRM, conexoes, billing, warmup, Studio, Jarvis e CFO.
@@ -74,8 +87,10 @@ export default function LoginForm() {
           </section>
 
           <section className="rounded-[28px] border border-white/10 bg-[#11100f] p-6 lg:p-8">
-            <div className="text-[11px] uppercase tracking-[0.32em] text-[#d39e84]">Login</div>
-            <div className="mt-3 text-2xl font-semibold tracking-[-0.05em] text-white">Acesso por email e senha</div>
+            <div className="text-[11px] uppercase tracking-[0.32em] text-[#d39e84]">{isSignUp ? "Cadastro" : "Login"}</div>
+            <div className="mt-3 text-2xl font-semibold tracking-[-0.05em] text-white">
+              {isSignUp ? "Criar novo perfil" : "Acesso por email e senha"}
+            </div>
 
             <form onSubmit={handleSubmit} className="mt-8 space-y-4">
               <label className="block space-y-2">
@@ -116,18 +131,33 @@ export default function LoginForm() {
               </label>
 
               {error ? <div className="rounded-[18px] border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</div> : null}
+              {message ? <div className="rounded-[18px] border border-emerald-400/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">{message}</div> : null}
 
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full rounded-full border border-[#d39e84]/30 bg-[#9d4e31] px-4 py-3 text-sm font-medium text-white transition hover:bg-[#b25c39] disabled:cursor-not-allowed disabled:opacity-60"
+                className="w-full rounded-full border border-[#d39e84]/30 bg-[#9d4e31] px-4 py-3 text-sm font-medium text-white shadow-lg transition hover:bg-[#b25c39] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {loading ? "Entrando..." : "Entrar"}
+                {loading ? (isSignUp ? "Criando conta..." : "Entrando...") : (isSignUp ? "CONFIRMAR CADASTRO" : "ENTRAR NO SISTEMA")}
               </button>
+
+              <div className="flex items-center justify-center pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSignUp(!isSignUp);
+                    setError(null);
+                    setMessage(null);
+                  }}
+                  className="text-xs font-semibold uppercase tracking-wider text-[#d39e84] underline decoration-[#d39e84]/30 underline-offset-4 transition hover:text-white"
+                >
+                  {isSignUp ? "← Voltar para o Login" : "Nao tem conta? Cadastre-se aqui e agora."}
+                </button>
+              </div>
             </form>
 
-            <div className="mt-6 rounded-[20px] border border-white/10 bg-black/20 px-4 py-4 text-sm text-[#cbb8ad]">
-              Se a base de autenticacao ainda nao estiver ligada, esta tela vai avisar e bloquear o acesso.
+            <div className="mt-6 rounded-[20px] border border-white/10 bg-black/40 px-4 py-4 text-[10px] uppercase tracking-widest text-[#cbb8ad]/60">
+              Ambiente: {isSignUp ? "Novo Cadastro" : "Painel de Acesso"} | KVM2-STABLE
             </div>
           </section>
         </div>
