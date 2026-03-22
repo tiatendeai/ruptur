@@ -1,30 +1,29 @@
 from __future__ import annotations
 
-<<<<<<< HEAD
-from pydantic import Field
-=======
 import re
-
 from pydantic import AliasChoices, Field, field_validator
->>>>>>> work
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+# Configurações globais da aplicação Ruptur
+# Este arquivo carrega variáveis de ambiente do .env e define os padrões do sistema.
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
+    # Ambiente (dev, prod) e nível de log
     env: str = Field(default="dev", alias="RUPTUR_ENV")
     log_level: str = Field(default="INFO", alias="RUPTUR_LOG_LEVEL")
 
+    # Configurações de Rede
     host: str = Field(default="127.0.0.1", alias="RUPTUR_HOST")
     port: int = Field(default=8000, alias="RUPTUR_PORT")
 
+    # URL de conexão direta com o banco PostgreSQL (utilizada pelo backend)
     database_url: str | None = Field(default=None, alias="RUPTUR_DATABASE_URL")
 
-<<<<<<< HEAD
+    # Configurações do Provedor Uazapi (Instâncias WhatsApp)
     uazapi_base_url: str | None = Field(default=None, alias="RUPTUR_UAZAPI_BASE_URL")
     uazapi_token: str | None = Field(default=None, alias="RUPTUR_UAZAPI_TOKEN")
-=======
     cors_origins: str | None = Field(
         default="*",
         alias="RUPTUR_CORS_ORIGINS",
@@ -33,7 +32,7 @@ class Settings(BaseSettings):
 
     public_url: str = Field(default="http://localhost:8000", alias="RUPTUR_PUBLIC_URL")
     
-    # ElevenLabs Config
+    # Configurações ElevenLabs (Clonagem de Voz)
     eleven_api_key: str | None = Field(
         default=None,
         validation_alias=AliasChoices("RUPTUR_ELEVEN_API_KEY", "ELEVENLABS_API_KEY"),
@@ -43,14 +42,12 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("RUPTUR_ELEVEN_VOICE_ID", "ELEVENLABS_VOICE_ID"),
     )
     
-    # OpenAI Prompt Config
+    # Configurações OpenAI (Processamento de IA e Transcrições)
     openai_prompt_id: str | None = Field(default=None, alias="RUPTUR_OPENAI_PROMPT_ID")
     openai_prompt_version: str = Field(default="1", alias="RUPTUR_OPENAI_PROMPT_VERSION")
 
-    uazapi_base_url: str | None = Field(default=None, alias="RUPTUR_UAZAPI_BASE_URL")
-    uazapi_token: str | None = Field(default=None, alias="RUPTUR_UAZAPI_TOKEN")
+    # Tokens de administração e endpoints de WhatsApp (Baileys)
     uazapi_admin_token: str | None = Field(default=None, alias="RUPTUR_UAZAPI_ADMIN_TOKEN")
-
     openai_api_key: str | None = Field(
         default=None,
         validation_alias=AliasChoices("RUPTUR_OPENAI_API_KEY", "OPENAI_API_KEY"),
@@ -62,13 +59,13 @@ class Settings(BaseSettings):
     )
     baileys_instance_id: str | None = Field(default=None, alias="RUPTUR_BAILEYS_INSTANCE_ID")
 
-    allowed_groups_jids: str = Field(default="", alias="RUPTUR_ALLOWED_GROUPS_JIDS")
-
+    # Configurações de Pagamento (Asaas) e Integrações (Jarvis)
     asaas_base_url: str = Field(default="https://api.asaas.com", alias="RUPTUR_ASAAS_BASE_URL")
     asaas_token: str | None = Field(default=None, alias="RUPTUR_ASAAS_TOKEN")
-
     jarvis_admin_token: str | None = Field(default=None, alias="RUPTUR_JARVIS_ADMIN_TOKEN")
 
+    # INFRAESTRUTURA SUPABASE (KVM2 - Nova Base)
+    # Estas chaves agora apontam por padrão para o novo ambiente axrwlboyowoskdxeogba
     supabase_url: str | None = Field(default=None, alias="RUPTUR_SUPABASE_URL")
     supabase_publishable_key: str | None = Field(default=None, alias="RUPTUR_SUPABASE_PUBLISHABLE_KEY")
 
@@ -157,7 +154,6 @@ class Settings(BaseSettings):
             return normalized
         normalized = re.sub(r"/send(?:/.*)?$", "", normalized, flags=re.IGNORECASE)
         return normalized.rstrip("/")
->>>>>>> work
 
 
 settings = Settings()
