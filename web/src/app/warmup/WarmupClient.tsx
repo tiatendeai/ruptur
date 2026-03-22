@@ -18,6 +18,10 @@ function laneFor(item: RupturChannelHealth) {
   return "unknown";
 }
 
+// Botão do front agora abre diretamente o Warmup Manager real (o SPA em deploy/host2/warmup),
+// que também pode ser apontado via NEXT_PUBLIC_WARMUP_MANAGER_URL em ambientes diferentes.
+const WARMUP_MANAGER_URL = process.env.NEXT_PUBLIC_WARMUP_MANAGER_URL ?? "http://localhost:8787/warmup";
+
 export default function WarmupClient() {
   const [items, setItems] = useState<RupturChannelHealth[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -58,13 +62,23 @@ export default function WarmupClient() {
               zona de risco para intervencao.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={refresh}
-            className="rounded-full border border-white/10 px-4 py-2 text-sm text-zinc-200 hover:bg-white/5"
-          >
-            Atualizar
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={refresh}
+              className="rounded-full border border-white/10 px-4 py-2 text-sm text-zinc-200 hover:bg-white/5"
+            >
+              Atualizar
+            </button>
+            <a
+              href={WARMUP_MANAGER_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-full border border-emerald-300/70 bg-emerald-500/80 px-4 py-2 text-sm font-semibold text-white shadow-[0_15px_30px_rgba(16,185,129,0.4)] transition hover:bg-emerald-500"
+            >
+              Warmup Manager
+            </a>
+          </div>
         </div>
       </section>
 
