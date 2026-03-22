@@ -16,6 +16,7 @@
 - **Smoke test automatizado:** mantenha um script rápido que verifique `/api/local/health` e `/warmup`. Anote em CI para verificar antes de deploy.
 - **Equipe e agentes:** envolva a IAzinha para validar o front (rotas e link), Jarvis para confirmar health/telemetria e o time de skills que monitora `deploy/host2/warmup`. No planejamento, defina quem revisa o README e quem roda smoke tests antes de subir.
 - **Próximo passo:** publicar `deploy/host2/warmup` no VPS (traefik + container) com `npm run build` e redeploy do Traefik/stack; depois, apontar `NEXT_PUBLIC_WARMUP_MANAGER_URL` para a URL da produção.
+- **Script de smoke:** use `scripts/smoke-warmup.sh` para verificar Postgres, `/api/local/health` e `/warmup`. Execute após cada deploy/migração e inclua no Jarvis/CI como métrica de sucesso e tempo de resposta.
 
 ## Testes realizados (smoke)
 - `curl http://127.0.0.1:8787/api/local/health` → ok
@@ -27,3 +28,4 @@
 2. Incluir no checklist (Jarvis) uma verificação de endpoint `/api/local/health` pós-deploy.
 3. Validar com IAzinha se o botão precisa mostrar badge de ambiente (dev vs prod).
 4. Reunir o time do warmup (Jarvis + IAzinha + skills) para homologar que o dashboard corresponde ao que a UAZAPI está registrando.
+5. Registrar o plano de recuperação/rollback: manter backup do schema antigo, script `scripts/smoke-warmup.sh`, e instruções para `rm/touch` em caso de erro na montagem do volume.
