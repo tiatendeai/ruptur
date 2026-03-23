@@ -20,7 +20,7 @@ function laneFor(item: RupturChannelHealth) {
 
 // Botão do front agora abre diretamente o Warmup Manager real (o SPA em deploy/host2/warmup),
 // que também pode ser apontado via NEXT_PUBLIC_WARMUP_MANAGER_URL em ambientes diferentes.
-const WARMUP_MANAGER_URL = process.env.NEXT_PUBLIC_WARMUP_MANAGER_URL ?? "http://localhost:8787/warmup";
+const WARMUP_MANAGER_URL = process.env.NEXT_PUBLIC_WARMUP_MANAGER_URL ?? "/warmup";
 
 export default function WarmupClient() {
   const [items, setItems] = useState<RupturChannelHealth[]>([]);

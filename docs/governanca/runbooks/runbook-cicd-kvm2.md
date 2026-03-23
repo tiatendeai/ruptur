@@ -183,6 +183,12 @@ Base:
 
 - `deploy/kvm2/.env.example`
 
+Campos obrigatorios para o ciclo Warmup Manager:
+
+- `NEXT_PUBLIC_WARMUP_MANAGER_URL=/warmup`
+- `WARMUP_TICK_INTERVAL_MS=60000`
+- `RUPTUR_COMPOSE_PROJECT_NAME=kvm2` enquanto a migracao estiver absorvendo a stack legada ja publicada com esse nome
+
 ### 2. Arquivo real de ambiente do backend
 
 Exemplo:
@@ -272,6 +278,8 @@ Se o host ja tiver Traefik proprio, subir apenas os profiles de aplicacao, por e
 docker compose --project-name ruptur-kvm2 --profile core up -d --build --remove-orphans
 ```
 
+> **Ajuste operacional validado em 23/03/2026:** se o host ainda estiver rodando a stack antiga com project name `kvm2`, use temporariamente `RUPTUR_COMPOSE_PROJECT_NAME=kvm2` no env compartilhado para que o deploy canônico absorva os containers existentes em vez de criar uma segunda stack paralela.
+
 ## Gates minimos antes de apertar deploy
 
 - CI verde
@@ -281,6 +289,15 @@ docker compose --project-name ruptur-kvm2 --profile core up -d --build --remove-
 - arquivo `backend.env` presente
 - DNS/dominios apontando corretamente
 - rollback conhecido
+
+## Sinais de drift que bloqueiam go-live
+
+- `docker compose ls` apontando para `/tmp/ruptur-clone/...` em vez de `/opt/ruptur/current/...`
+- `app.ruptur.cloud/` retornando `404`
+- `app.ruptur.cloud/warmup` respondendo com `x-powered-by: Next.js`
+- `warmup` ausente em `docker ps`
+
+Esses sinais indicam migracao incompleta ou runtime fora da release canônica.
 
 ## Observacao de seguranca
 

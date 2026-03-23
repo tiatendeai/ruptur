@@ -217,6 +217,16 @@ Leia este arquivo primeiro. Se a tarefa tocar OpenAI ou Baileys, consulte tambem
 - O script `scripts/export-to-ruptur.sh` prepara o bundle local (`npm run build` + cópia de `dist/`, `runtime/`, `package*.json`) e sincroniza para `deploy/host2/warmup`; ele exige que esse diretório exista no VPS e alerta caso precise ser criado manualmente.
 - Essa estrutura mantém o Warmup Manager isolado (fora do console Next), mas documentado e alinhado com backend, Traefik e Baileys.
 
+### Estado validado em 2026-03-23
+
+- `host2` segue com o Warmup Manager real ativo (`host2-warmup-1`) e health interno ok.
+- `app.ruptur.cloud` esta caindo na `KVM2`, nao no `host2`.
+- Na `KVM2`, a rota publica `/warmup` estava sendo servida pelo `Next.js`, o que prova ausencia do runtime standalone publicado nesse host.
+- Na `KVM2`, a stack ativa observada vinha de `/tmp/ruptur-clone/deploy/kvm2/docker-compose.yml`, caracterizando drift em relacao ao fluxo canônico `/opt/ruptur/current`.
+- Para takeover seguro da stack atual na KVM2, o env compartilhado precisa manter `RUPTUR_COMPOSE_PROJECT_NAME=kvm2` ate a migracao absorver os containers legados.
+- Para o console abrir o Warmup Manager correto em producao, o build do web precisa receber `NEXT_PUBLIC_WARMUP_MANAGER_URL=/warmup` ou override equivalente.
+- O runtime do Warmup deve padronizar `WARMUP_TICK_INTERVAL_MS`; durante a transicao, o servidor ainda aceita `WARMUP_RUNTIME_TICK_INTERVAL_MS` por compatibilidade retroativa.
+
 ## Fontes oficiais obrigatorias
 
 - OpenAI Responses vs Chat Completions:

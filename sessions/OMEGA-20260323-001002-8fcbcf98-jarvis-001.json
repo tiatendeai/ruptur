@@ -88,6 +88,11 @@
       "type": "full_mode_activation_note",
       "path": "sessions/OMEGA-20260323-001002-8fcbcf98-jarvis-001-full-mode-warmup-kvm2.md",
       "status": "materializado"
+    },
+    {
+      "type": "oracle_kvm2_warmup_findings",
+      "path": "sessions/OMEGA-20260323-001002-8fcbcf98-jarvis-001-oracle-kvm2-warmup-findings.md",
+      "status": "materializado"
     }
   ],
   "validated_in_production": false,
@@ -199,6 +204,6 @@
       ]
     }
   },
-  "last_activity_at": "2026-03-23T02:29:39-03:00",
-  "last_heartbeat_at": "2026-03-23T02:29:39-03:00"
+  "last_activity_at": "2026-03-23T08:38:07-03:00",
+  "last_heartbeat_at": "2026-03-23T08:38:07-03:00"
 }

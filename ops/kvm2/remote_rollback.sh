@@ -65,6 +65,16 @@ set -a
 source "$shared_env_file"
 set +a
 
+if [[ -z "${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:-}" && -n "${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}" ]]; then
+  export NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="${NEXT_PUBLIC_SUPABASE_ANON_KEY}"
+fi
+
+export NEXT_PUBLIC_WARMUP_MANAGER_URL="${NEXT_PUBLIC_WARMUP_MANAGER_URL:-/warmup}"
+
+if [[ -z "${WARMUP_TICK_INTERVAL_MS:-}" && -n "${WARMUP_RUNTIME_TICK_INTERVAL_MS:-}" ]]; then
+  export WARMUP_TICK_INTERVAL_MS="${WARMUP_RUNTIME_TICK_INTERVAL_MS}"
+fi
+
 if [[ ! -x "${target_dir}/ops/kvm2/validate_shared_env.sh" ]]; then
   echo "Validador de env nao encontrado na release alvo" >&2
   exit 1

@@ -70,6 +70,7 @@ jobs:
           NEXT_PUBLIC_RUPTUR_API_BASE_URL: https://api.ruptur.cloud
           NEXT_PUBLIC_SUPABASE_URL: https://project-ref.supabase.co
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_placeholder
+          NEXT_PUBLIC_WARMUP_MANAGER_URL: /warmup
         run: npm run build
 
   deploy-assets-check:
@@ -103,4 +104,5 @@ jobs:
             --build-arg NEXT_PUBLIC_RUPTUR_API_BASE_URL=https://api.ruptur.cloud \
             --build-arg NEXT_PUBLIC_SUPABASE_URL=https://project-ref.supabase.co \
             --build-arg NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_placeholder \
+            --build-arg NEXT_PUBLIC_WARMUP_MANAGER_URL=/warmup \
             -f web/Dockerfile web

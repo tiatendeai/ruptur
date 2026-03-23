@@ -33,7 +33,9 @@ retry_curl "$api_url" "API"
 retry_curl "$web_url" "WEB"
 
 if [[ -n "$warmup_url" ]]; then
-  retry_curl "$warmup_url" "WARMUP"
+  warmup_base="${warmup_url%/}"
+  retry_curl "$warmup_base" "WARMUP_HTML"
+  retry_curl "${warmup_base}/api/local/health" "WARMUP_HEALTH"
 fi
 
 echo "Smoke do kvm2 finalizado com sucesso."

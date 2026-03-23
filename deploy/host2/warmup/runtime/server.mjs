@@ -6,7 +6,11 @@ import crypto from "node:crypto";
 
 const HOST = process.env.WARMUP_RUNTIME_HOST || "0.0.0.0";
 const PORT = Number(process.env.WARMUP_RUNTIME_PORT || process.env.PORT || 8787);
-const TICK_INTERVAL_MS = Number(process.env.WARMUP_TICK_INTERVAL_MS || 60_000);
+const TICK_INTERVAL_MS = Number(
+  process.env.WARMUP_TICK_INTERVAL_MS
+  || process.env.WARMUP_RUNTIME_TICK_INTERVAL_MS
+  || 60_000,
+);
 const DATA_DIR = path.resolve(process.cwd(), "runtime-data");
 const STATE_FILE = path.join(DATA_DIR, "warmup-state.json");
 const DNA_DIR = path.join(DATA_DIR, "instance-dna");
