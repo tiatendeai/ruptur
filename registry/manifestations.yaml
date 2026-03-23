@@ -1,0 +1,55 @@
+# Espelho local gerado por scripts/jarvis/sync_state_duality.py.
+# Fonte canônica: ../state/registry/manifestations.yaml
+# Não edite manualmente aqui sem promover no STATE.
+
+version: 1
+audited_at: 2026-03-22
+
+principles:
+  - cada_manifestacao_tem_responsavel_explicito
+  - autoridade_e_definida_por_escopo
+  - sessoes_efemeras_nao_sao_manifestacoes_canonicas
+  - conflito_entre_manifestacoes_vira_decisao_ou_debito
+
+manifestations:
+  - id: jarvis.canonical
+    entity: jarvis
+    class: canonical_identity
+    repository: state
+    status: active
+    authority_scope:
+      - governanca
+      - identidade
+      - guardrails
+      - memoria_curada
+      - backlog_de_consolidacao
+    source_refs:
+      - README.md
+      - constitution/jarvis.guardrails.md
+      - constitution/ruptur.sources-and-queries.md
+      - memory/jarvis.state-model.md
+      - playbooks/jarvis.abort-policy.md
+    sync_contract:
+      - Diretrizes duráveis do Jarvis devem nascer no STATE ou ser promovidas para o STATE.
+      - Nenhuma manifestação operacional pode sobrescrever esta camada fora do seu escopo técnico.
+
+  - id: jarvis.ruptur.control_plane
+    entity: jarvis
+    class: execution_manifestation
+    repository: codex/ruptur
+    status: active
+    authority_scope:
+      - orquestracao
+      - coordenacao
+      - execucao_tecnica
+      - connectome_operacional
+      - automacoes_ops
+    source_refs:
+      - JARVIS.md
+      - .agent/agents/jarvis.md
+      - ops/jarvis/
+      - connectome/
+    parent_manifestation: jarvis.canonical
+    sync_contract:
+      - Implementa o Jarvis no tronco operacional sem redefinir a governança canônica.
+      - Divergências com o STATE devem ser registradas como decisão ou débito antes de harmonização.
