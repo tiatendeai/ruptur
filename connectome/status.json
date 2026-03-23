@@ -1,5 +1,5 @@
 {
-  "last_updated": "2026-03-20T18:16:00-03:00",
+  "last_updated": "2026-03-22T21:20:20-03:00",
   "operator": "diego",
   "active_sessions": [],
   "tasks": {
@@ -13,16 +13,16 @@
         "nota": "NextJS Server Action desatualizado — investigado por Jarvis-GPT em 2026-03-20"
       }
     ],
-    "pendente": [
+    "pendente": [],
+    "bloqueado": [],
+    "concluido": [
       {
         "id": "TASK-002",
         "titulo": "Scaffold AGR — Agent Genome Registry",
         "responsavel": "jarvis",
-        "nota": "Criar estrutura .agent/ completa no repo"
+        "nota": "Dualidade local concluída com espelhos do STATE, registry/entities.yaml, genome público, alpha template e scripts scripts/jarvis/{sync_state_duality,check_duality}.py."
       }
-    ],
-    "bloqueado": [],
-    "concluido": []
+    ]
   },
   "agents_active": [],
   "infra": {
