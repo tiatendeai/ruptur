@@ -168,8 +168,8 @@
       "review_reason": "full_mode_reaffirmed_for_warmup_kvm2_audit"
     },
     "liveness": {
-      "last_checked_at": "2026-03-23T01:38:47-03:00",
-      "last_connectome_sync_at": "2026-03-23T01:38:47-03:00",
+      "last_checked_at": "2026-03-23T12:11:41.108444+00:00",
+      "last_connectome_sync_at": "2026-03-23T09:11:40-03:00",
       "protection_signals": {
         "connectome_active": true,
         "task_in_progress": true,
@@ -179,7 +179,10 @@
       "auto_close_eligible": false,
       "auto_close_exempt_reason": "sessao_em_uso_real",
       "policy_ref": "../../omega/configs/session-liveness-policy.json",
-      "script_ref": "../../omega/scripts/session_liveness_guard.py"
+      "script_ref": "../../omega/scripts/session_liveness_guard.py",
+      "last_decision": "keep_active",
+      "last_decision_reason": "protected_by_liveness_signals",
+      "last_decision_minutes_since_signal": 0
     },
     "current_focus": {
       "context": "warmup_manager_kvm2_audit",
@@ -202,7 +205,36 @@
         "registro local efetuado no Ruptur",
         "espelhos fora do repositório podem exigir sincronização posterior se desejado"
       ]
-    }
+    },
+    "sync_contract": {
+      "authoritative_layer_for_lifecycle": "omega",
+      "mirror_repository": "codex/ruptur",
+      "authoritative_fields": [
+        "session_id",
+        "status",
+        "created_at",
+        "lifecycle_stage",
+        "agents_involved",
+        "tasks",
+        "last_activity_at",
+        "last_heartbeat_at",
+        "stale_at",
+        "closed_at",
+        "closure_reason"
+      ],
+      "deliverables_policy": "tipos_e_status_devem_falar_a_mesma_lingua_mesmo_quando_os_paths_sao_repo_locais",
+      "local_extension_fields": [
+        "deliverables",
+        "metadata.current_focus",
+        "metadata.performance_activation",
+        "metadata.liveness",
+        "connectome.active_sessions"
+      ],
+      "omega_session_ref": "../../omega/sessions/OMEGA-20260323-001002-8fcbcf98-jarvis-001.json",
+      "ruptur_session_ref": "../../codex/ruptur/sessions/OMEGA-20260323-001002-8fcbcf98-jarvis-001.json",
+      "last_semantic_reconciled_at": "2026-03-23T09:11:40-03:00"
+    },
+    "session_id_rule_ref": "../../omega/protocol/session/session-id-rule.md"
   },
   "last_activity_at": "2026-03-23T08:38:07-03:00",
   "last_heartbeat_at": "2026-03-23T08:38:07-03:00"

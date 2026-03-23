@@ -1,5 +1,5 @@
 {
-  "last_updated": "2026-03-23T02:29:39-03:00",
+  "last_updated": "2026-03-23T09:11:40-03:00",
   "operator": "diego",
   "activation_menu_ref": "../../state/knowledge/jarvis-activation-menu.md",
   "active_sessions": [
@@ -54,12 +54,19 @@
         "before_suspension",
         "before_closure"
       ],
-      "last_activity_at": "2026-03-23T02:29:39-03:00",
-      "last_heartbeat_at": "2026-03-23T02:29:39-03:00",
+      "last_activity_at": "2026-03-23T08:38:07-03:00",
+      "last_heartbeat_at": "2026-03-23T08:38:07-03:00",
       "liveness_policy_ref": "../../omega/configs/session-liveness-policy.json",
       "liveness_script_ref": "../../omega/scripts/session_liveness_guard.py",
       "protected_from_auto_close": true,
-      "protection_reason": "sessao_em_uso_real"
+      "protection_reason": "sessao_em_uso_real",
+      "sync_contract": {
+        "authoritative_layer_for_lifecycle": "omega",
+        "last_semantic_reconciled_at": "2026-03-23T09:11:40-03:00"
+      },
+      "liveness_last_checked_at": "2026-03-23T12:11:41.108444+00:00",
+      "liveness_last_decision": "keep_active",
+      "liveness_last_decision_reason": "protected_by_liveness_signals"
     }
   ],
   "tasks": {
