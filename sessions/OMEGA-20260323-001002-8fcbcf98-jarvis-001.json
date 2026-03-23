@@ -1,0 +1,151 @@
+{
+  "session_id": "OMEGA-20260323-001002-8fcbcf98-jarvis-001",
+  "status": "active",
+  "created_at": "2026-03-23T00:10:02-03:00",
+  "lifecycle_stage": "GENESIS",
+  "agents_involved": [
+    "Maestro",
+    "Status",
+    "Docs"
+  ],
+  "tasks": [
+    {
+      "id": "SESSION-RECONCILE-001",
+      "title": "Desbloquear materialização protocolar da sessão atual",
+      "status": "in_progress",
+      "operational_state": "contextualizando"
+    },
+    {
+      "id": "SESSION-PERFORMANCE-002",
+      "title": "Ativar capacidades já disponíveis do Jarvis para performance desta sessão",
+      "status": "done",
+      "operational_state": "performance_mode_elevated"
+    },
+    {
+      "id": "SESSION-PERFORMANCE-003",
+      "title": "Institucionalizar performance default e revisão contínua para próximas sessões",
+      "status": "done",
+      "operational_state": "performance_governance_enabled"
+    }
+  ],
+  "deliverables": [
+    {
+      "type": "ruptur_session_mirror",
+      "path": "sessions/OMEGA-20260323-001002-8fcbcf98-jarvis-001.json",
+      "status": "materializado"
+    },
+    {
+      "type": "next_session_handoff",
+      "path": "sessions/HANDOFF.proxima-sessao.md",
+      "status": "materializado"
+    },
+    {
+      "type": "omega_session_artifact",
+      "path": "../../omega/sessions/OMEGA-20260323-001002-8fcbcf98-jarvis-001.json",
+      "status": "materializado"
+    },
+    {
+      "type": "state_backlog_reference",
+      "path": "../../state/knowledge/2026-03-23-jarvis-backlog-autonomia-automacao.md",
+      "status": "materializado"
+    },
+    {
+      "type": "state_master_plan_reference",
+      "path": "../../state/knowledge/2026-03-23-plano-mestre-jarvis-autonomia.md",
+      "status": "materializado"
+    },
+    {
+      "type": "state_performance_activation_reference",
+      "path": "../../state/knowledge/2026-03-23-jarvis-performance-activation-current-session.md",
+      "status": "materializado"
+    },
+    {
+      "type": "github_projects_publication",
+      "path": "../../state/knowledge/2026-03-23-jarvis-backlog-autonomia-automacao.md#7-publicacao-em-github-projects",
+      "status": "materializado"
+    },
+    {
+      "type": "omega_performance_review_loop",
+      "path": "../../omega/protocol/workflow/performance-review-loop.md",
+      "status": "materializado"
+    },
+    {
+      "type": "state_performance_default_playbook",
+      "path": "../../state/playbooks/jarvis.performance-default.md",
+      "status": "materializado"
+    }
+  ],
+  "validated_in_production": false,
+  "metadata": {
+    "reconciliation_mode": "controlled",
+    "entity_id": "entity:jarvis",
+    "uid": "jarvis-root-001",
+    "soulid_public": "SOUL-JARVIS-0001",
+    "manifestation_id": "jarvis.ruptur.control_plane",
+    "agent_id": "RUPTUR-AGENT-0001",
+    "operator": "diego",
+    "alpha_canonical_ref": "../../alpha/GENESIS.yaml",
+    "alpha_local_mirror_ref": "../alpha/GENESIS.yaml",
+    "state_manifestations_ref": "../../state/registry/manifestations.yaml",
+    "omega_schema_ref": "../../omega/protocol/session/session-schema.json",
+    "omega_session_ref": "../../omega/sessions/OMEGA-20260323-001002-8fcbcf98-jarvis-001.json",
+    "session_id_rule": {
+      "status": "provisoria_local_pendente_de_formalizacao",
+      "hash8_algorithm": "primeiros 8 hex de sha256(entity_id|uid|manifestation_id|agent_id|YYYYMMDD-HHMMSS)",
+      "manifestation_tag_rule": "jarvis-001 para a manifestação operacional principal atual"
+    },
+    "performance_activation": {
+      "status": "active",
+      "activated_at": "2026-03-23T01:10:29-03:00",
+      "goal": "elevar a performance, rastreabilidade e capitalização da sessão atual sem inventar runtime novo",
+      "source_ref": "../../state/knowledge/2026-03-23-jarvis-performance-activation-current-session.md",
+      "backlog_ref": "../../state/knowledge/2026-03-23-jarvis-backlog-autonomia-automacao.md",
+      "master_plan_ref": "../../state/knowledge/2026-03-23-plano-mestre-jarvis-autonomia.md",
+      "projects": {
+        "omega_lifecycle_board": "PVT_kwHODOO6r84BSQul",
+        "ruptur_delivery_os": "PVT_kwHODOO6r84BRgVS"
+      },
+      "capabilities_active": [
+        "maestro_orchestration",
+        "multi_agent_debate_guided",
+        "profile_ops",
+        "profile_vcfo",
+        "profile_vcvo",
+        "profile_eggs",
+        "state_capitalization_required",
+        "rag_context7_reference_required",
+        "documentation_and_comment_coverage_required",
+        "session_telemetry_basic",
+        "github_projects_backlog_linkage"
+      ],
+      "capabilities_pending": [
+        "omega_auto_session_closure",
+        "session_git_issue_project_bridge_automatic",
+        "skill_telemetry_full",
+        "state_auto_increment_with_gate",
+        "backup_restore_point_automation",
+        "formal_vops_profile",
+        "pairs_registry",
+        "matusas_conselho_governance",
+        "rag_context7_refresh_automatic"
+      ],
+      "review_policy": {
+        "default_for_future_sessions": true,
+        "review_required": true,
+        "checkpoints": [
+          "activation",
+          "major_scope_change",
+          "risk_or_priority_change",
+          "before_handoff",
+          "before_suspension",
+          "before_closure"
+        ],
+        "may_add_remove_or_downgrade_capabilities": true,
+        "rule_ref_state": "../../state/playbooks/jarvis.performance-default.md",
+        "rule_ref_omega": "../../omega/protocol/workflow/performance-review-loop.md"
+      },
+      "last_reviewed_at": "2026-03-23T01:17:18-03:00",
+      "review_reason": "default_future_sessions_and_continuous_review_enabled"
+    }
+  }
+}

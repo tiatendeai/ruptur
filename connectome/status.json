@@ -1,12 +1,58 @@
 {
-  "last_updated": "2026-03-22T21:20:20-03:00",
+  "last_updated": "2026-03-23T01:17:18-03:00",
   "operator": "diego",
   "active_sessions": [
     {
+      "session_id": "OMEGA-20260323-001002-8fcbcf98-jarvis-001",
       "soul_id": "RUPTUR-AGENT-0001",
       "agent": "jarvis",
+      "status": "active",
       "state": "contextualizando",
-      "started_at": "2026-03-22T21:55:00-03:00"
+      "lifecycle_stage": "GENESIS",
+      "mode": "reconciliacao_controlada",
+      "started_at": "2026-03-23T00:10:02-03:00",
+      "local_session_ref": "sessions/OMEGA-20260323-001002-8fcbcf98-jarvis-001.json",
+      "omega_session_ref": "../../omega/sessions/OMEGA-20260323-001002-8fcbcf98-jarvis-001.json",
+      "performance_profile": "elevated",
+      "state_activation_ref": "../../state/knowledge/2026-03-23-jarvis-performance-activation-current-session.md",
+      "capabilities_active": [
+        "maestro_orchestration",
+        "multi_agent_debate_guided",
+        "profile_ops",
+        "profile_vcfo",
+        "profile_vcvo",
+        "profile_eggs",
+        "state_capitalization_required",
+        "rag_context7_reference_required",
+        "documentation_and_comment_coverage_required",
+        "session_telemetry_basic",
+        "github_projects_backlog_linkage"
+      ],
+      "capabilities_pending": [
+        "omega_auto_session_closure",
+        "session_git_issue_project_bridge_automatic",
+        "skill_telemetry_full",
+        "state_auto_increment_with_gate",
+        "backup_restore_point_automation",
+        "formal_vops_profile",
+        "pairs_registry",
+        "matusas_conselho_governance",
+        "rag_context7_refresh_automatic"
+      ],
+      "projects_refs": [
+        "PVT_kwHODOO6r84BSQul",
+        "PVT_kwHODOO6r84BRgVS"
+      ],
+      "performance_default_for_future_sessions": true,
+      "performance_review_required": true,
+      "performance_review_checkpoints": [
+        "activation",
+        "major_scope_change",
+        "risk_or_priority_change",
+        "before_handoff",
+        "before_suspension",
+        "before_closure"
+      ]
     }
   ],
   "tasks": {
@@ -18,6 +64,13 @@
         "env": "production",
         "url": "https://app.ruptur.cloud",
         "nota": "NextJS Server Action desatualizado — investigado por Jarvis-GPT em 2026-03-20"
+      },
+      {
+        "id": "TASK-003",
+        "titulo": "Reconciliação protocolar da sessão Jarvis",
+        "responsavel": "jarvis",
+        "env": "local",
+        "nota": "Materializar sessão no Omega e no Ruptur, corrigir trilha viva e classificar drifts de path/espelho."
       }
     ],
     "pendente": [],
@@ -28,10 +81,26 @@
         "titulo": "Scaffold AGR — Agent Genome Registry",
         "responsavel": "jarvis",
         "nota": "Dualidade local concluída com espelhos do STATE, registry/entities.yaml, genome público, alpha template e scripts scripts/jarvis/{sync_state_duality,check_duality}.py."
+      },
+      {
+        "id": "TASK-004",
+        "titulo": "Ativação de capacidades de performance da sessão Jarvis",
+        "responsavel": "jarvis",
+        "env": "local",
+        "nota": "Maestro, multi-agent guided, perfis ops/vcfo/vcvo/eggs, backlog em GitHub Projects, capitalização no State e telemetria básica passaram a valer como política da sessão atual."
+      },
+      {
+        "id": "TASK-005",
+        "titulo": "Default de performance institucionalizado para próximas sessões",
+        "responsavel": "jarvis",
+        "env": "local",
+        "nota": "Próximas sessões passam a subir com baseline default de performance e revisão frequente durante a execução, com possibilidade explícita de adição, remoção ou rebaixamento de capacidades."
       }
     ]
   },
-  "agents_active": ["jarvis"],
+  "agents_active": [
+    "jarvis"
+  ],
   "infra": {
     "servidor": "167.234.228.71",
     "app": "https://app.ruptur.cloud",
