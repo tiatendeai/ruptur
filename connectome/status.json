@@ -1,5 +1,5 @@
 {
-  "last_updated": "2026-03-23T01:17:18-03:00",
+  "last_updated": "2026-03-23T01:38:47-03:00",
   "operator": "diego",
   "active_sessions": [
     {
@@ -52,7 +52,13 @@
         "before_handoff",
         "before_suspension",
         "before_closure"
-      ]
+      ],
+      "last_activity_at": "2026-03-23T01:38:47-03:00",
+      "last_heartbeat_at": "2026-03-23T01:38:47-03:00",
+      "liveness_policy_ref": "../../omega/configs/session-liveness-policy.json",
+      "liveness_script_ref": "../../omega/scripts/session_liveness_guard.py",
+      "protected_from_auto_close": true,
+      "protection_reason": "sessao_em_uso_real"
     }
   ],
   "tasks": {
