@@ -1,15 +1,16 @@
 {
-  "last_updated": "2026-03-23T01:38:47-03:00",
+  "last_updated": "2026-03-23T02:29:39-03:00",
   "operator": "diego",
+  "activation_menu_ref": "../../state/knowledge/jarvis-activation-menu.md",
   "active_sessions": [
     {
       "session_id": "OMEGA-20260323-001002-8fcbcf98-jarvis-001",
       "soul_id": "RUPTUR-AGENT-0001",
       "agent": "jarvis",
       "status": "active",
-      "state": "contextualizando",
-      "lifecycle_stage": "GENESIS",
-      "mode": "reconciliacao_controlada",
+      "state": "full_mode_ativo",
+      "lifecycle_stage": "ORCHESTRATION",
+      "mode": "full_performance_audit",
       "started_at": "2026-03-23T00:10:02-03:00",
       "local_session_ref": "sessions/OMEGA-20260323-001002-8fcbcf98-jarvis-001.json",
       "omega_session_ref": "../../omega/sessions/OMEGA-20260323-001002-8fcbcf98-jarvis-001.json",
@@ -53,8 +54,8 @@
         "before_suspension",
         "before_closure"
       ],
-      "last_activity_at": "2026-03-23T01:38:47-03:00",
-      "last_heartbeat_at": "2026-03-23T01:38:47-03:00",
+      "last_activity_at": "2026-03-23T02:29:39-03:00",
+      "last_heartbeat_at": "2026-03-23T02:29:39-03:00",
       "liveness_policy_ref": "../../omega/configs/session-liveness-policy.json",
       "liveness_script_ref": "../../omega/scripts/session_liveness_guard.py",
       "protected_from_auto_close": true,
@@ -77,6 +78,13 @@
         "responsavel": "jarvis",
         "env": "local",
         "nota": "Materializar sessão no Omega e no Ruptur, corrigir trilha viva e classificar drifts de path/espelho."
+      },
+      {
+        "id": "TASK-006",
+        "titulo": "Auditoria full mode do Warmup Manager e da migração KVM2",
+        "responsavel": "jarvis",
+        "env": "local",
+        "nota": "Análise operacional, técnica, documental e de backlog usando as capacidades full mode ativas na sessão."
       }
     ],
     "pendente": [],

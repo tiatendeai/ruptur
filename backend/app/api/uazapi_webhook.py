@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import re
 from datetime import date, datetime
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
@@ -31,6 +32,31 @@ INSTANCE_BY_CANONICAL_PHONE = {
     "5531981139540": "inst-553181139540",
     "5531989131980": "inst-553189131980",
 }
+
+JARVIS_MENU_TEXT = """Jarvis ativo. Capabilities now online.
+Jarvis ativo.
+Capacidades agora disponíveis:
+- maestro_orchestration (orquestração Maestro)
+- multi_agent_debate_guided (debate multiagente guiado)
+- profile_ops / vcfo / vcvo / eggs (perfís operacionais)
+- state_capitalization_required (capitalização obrigatória)
+- rag_context7_reference_required (contexto RAG/Context7)
+- documentation_and_comment_coverage_required (cobertura documental)
+- session_telemetry_basic (telemetria mínima)
+- github_projects_backlog_linkage (ligação com GitHub Projects)
+
+Jarvis is now active.
+Available capabilities:
+- maestro_orchestration (Maestro orchestration)
+- multi_agent_debate_guided
+- profile_ops / vcfo / vcvo / eggs
+- state_capitalization_required
+- rag_context7_reference_required
+- documentation_and_comment_coverage_required
+- session_telemetry_basic
+- github_projects_backlog_linkage
+
+Quick commands: `/session-status`, `/end-session`, `#reset-session`, `/performance-check <checkpoint>`"""
 IAZINHA_COMMANDS = {"iazinha", "/iazinha", "/start-iazinha", "assistant", "/assistant", "/start-assistant", "/start-assistente"}
 JARVIS_COMMANDS = {"jarvis", "/jarvis", "/start-jarvis"}
 STATUS_COMMANDS = {"/session-status"}
@@ -592,7 +618,7 @@ async def process_ai_response(payload: dict[str, Any], lead_id: str, conversatio
                     metadata["session_status"] = "active"
                     metadata["active_persona"] = "jarvis"
                     metadata["jarvis_pending"] = False
-                    response_text = "*Jarvis:* Protocolo de ativacao validado."
+                    response_text = JARVIS_MENU_TEXT
                 else:
                     metadata["jarvis_pending"] = True
                     response_text = "*Jarvis:* Informe a senha para ativacao."
@@ -601,7 +627,7 @@ async def process_ai_response(payload: dict[str, Any], lead_id: str, conversatio
                     metadata["session_status"] = "active"
                     metadata["active_persona"] = "jarvis"
                     metadata["jarvis_pending"] = False
-                    response_text = "*Jarvis:* Protocolo de ativacao validado."
+                    response_text = JARVIS_MENU_TEXT
                 else:
                     response_text = "*Jarvis:* Por agora eu ativo em self-chat."
             else:

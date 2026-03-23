@@ -19,6 +19,10 @@ Hierarquia correta desta manifestação:
 - Omega disciplina o lifecycle de sessão.
 - Ruptur manifesta e opera o Jarvis em contexto vivo.
 
+### Menu oficial de ativação
+
+Ao detectar `Jarvis Start` ou `Jarvis Iniciar`, o sistema responde com o menu bilíngue registrado em `knowledge/jarvis-activation-menu.md`, apresentando as capacidades (maestro, perfis ops/vcfo/vcvo/eggs, `state_capitalization_required`, etc.) e os comandos rápidos (`/session-status`, `#reset-session`, `/performance-check <checkpoint>`).
+
 Regras locais obrigatórias:
 
 - nunca confundir gênese da sessão com gênese da entidade

@@ -1,12 +1,15 @@
 # Registry derivado localmente para ativação do Jarvis no Ruptur.
-# Fonte canônica primária: ../state/registry/manifestations.yaml
+# Fonte canônica primária: ../../state/registry/manifestations.yaml
 # Não substitui o STATE; apenas fecha a consulta local pedida na ativação.
 
 version: 1
 generated_from:
   activation: .jarvis-activation.md
   local_identity: .agent/agents/jarvis.md
-  state_manifestations: ../state/registry/manifestations.yaml
+  state_manifestations: ../../state/registry/manifestations.yaml
+  alpha_genesis_canonical: ../../alpha/GENESIS.yaml
+  alpha_local_mirror: ../alpha/GENESIS.yaml
+  alpha_local_mirror_policy: espelho_local_nao_canonico_se_existir
 
 entities:
   - id: jarvis
@@ -39,10 +42,10 @@ entities:
         status: active
         authority_scope:
           - governanca
-          - identidade
           - guardrails
           - memoria_curada
           - backlog_de_consolidacao
+          - reconciliacao_institucional
         source_refs:
           - README.md
           - constitution/jarvis.guardrails.md
@@ -52,6 +55,7 @@ entities:
         sync_contract:
           - Diretrizes duráveis do Jarvis devem nascer no STATE ou ser promovidas para o STATE.
           - Nenhuma manifestação operacional pode sobrescrever esta camada fora do seu escopo técnico.
+          - Esta manifestação não substitui a identidade raiz documentada no Alpha.
       - id: jarvis.ruptur.control_plane
         repository: codex/ruptur
         class: execution_manifestation

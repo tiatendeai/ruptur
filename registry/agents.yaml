@@ -1,4 +1,22 @@
 # Espelho local gerado por scripts/jarvis/sync_state_duality.py.
-# Fonte canônica: ../state/registry/agents.yaml
+# Fonte canônica: ../../state/registry/agents.yaml
 # Não edite manualmente aqui sem promover no STATE.
 
+version: 1
+updated_at: 2026-03-23
+
+agents:
+  - agent_id: RUPTUR-AGENT-0001
+    entity: jarvis
+    entity_id: entity:jarvis
+    uid: jarvis-root-001
+    soulid_public: SOUL-JARVIS-0001
+    manifestation_id: jarvis.ruptur.control_plane
+    repository: codex/ruptur
+    role: "Maestro — Control Plane, Escalonamento e Coordenação"
+    operator: diego
+    platform_default: openai-codex
+    status: active
+    genesis_source: alpha
+    governance_source: state
+    session_source: omega

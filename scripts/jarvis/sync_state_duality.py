@@ -37,21 +37,20 @@ def read_text(path: Path) -> str:
 def discover_mirror_paths() -> list[Path]:
     discovered: list[Path] = []
     for directory_name in SYNC_DIRS:
-        local_dir = REPO_ROOT / directory_name
-        if not local_dir.exists():
+        state_dir = STATE_ROOT / directory_name
+        if not state_dir.exists():
             continue
-        for path in sorted(candidate for candidate in local_dir.rglob("*") if candidate.is_file()):
-            rel = path.relative_to(REPO_ROOT)
+        for path in sorted(candidate for candidate in state_dir.rglob("*") if candidate.is_file()):
+            rel = path.relative_to(STATE_ROOT)
             if rel.as_posix() == "registry/entities.yaml":
                 continue
-            if (STATE_ROOT / rel).exists():
-                discovered.append(rel)
+            discovered.append(rel)
     return discovered
 
 
 def render_mirror(rel_path: Path) -> str:
     source = read_text(STATE_ROOT / rel_path)
-    source_ref = f"../state/{rel_path.as_posix()}"
+    source_ref = f"../../state/{rel_path.as_posix()}"
     if rel_path.suffix == ".md":
         banner = (
             "<!--\n"
@@ -167,14 +166,17 @@ def render_entities_yaml() -> str:
 
     lines = [
         "# Registry derivado localmente para ativação do Jarvis no Ruptur.",
-        "# Fonte canônica primária: ../state/registry/manifestations.yaml",
+        "# Fonte canônica primária: ../../state/registry/manifestations.yaml",
         "# Não substitui o STATE; apenas fecha a consulta local pedida na ativação.",
         "",
         "version: 1",
         "generated_from:",
         "  activation: .jarvis-activation.md",
         "  local_identity: .agent/agents/jarvis.md",
-        "  state_manifestations: ../state/registry/manifestations.yaml",
+        "  state_manifestations: ../../state/registry/manifestations.yaml",
+        "  alpha_genesis_canonical: ../../alpha/GENESIS.yaml",
+        "  alpha_local_mirror: ../alpha/GENESIS.yaml",
+        "  alpha_local_mirror_policy: espelho_local_nao_canonico_se_existir",
         "",
         "entities:",
         "  - id: jarvis",
@@ -215,7 +217,7 @@ def render_genome_yaml() -> str:
 
     lines = [
         "# Genome público do Jarvis no tronco operacional Ruptur.",
-        "# Derivado de .agent/agents/jarvis.md + ../state/registry/manifestations.yaml.",
+        "# Derivado de .agent/agents/jarvis.md + ../../state/registry/manifestations.yaml.",
         "# Não inclui material selado ou segredos.",
         "",
         "version: 1",

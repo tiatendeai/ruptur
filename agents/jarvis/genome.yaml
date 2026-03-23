@@ -1,5 +1,5 @@
 # Genome público do Jarvis no tronco operacional Ruptur.
-# Derivado de .agent/agents/jarvis.md + ../state/registry/manifestations.yaml.
+# Derivado de .agent/agents/jarvis.md + ../../state/registry/manifestations.yaml.
 # Não inclui material selado ou segredos.
 
 version: 1

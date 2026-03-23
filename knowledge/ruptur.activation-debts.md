@@ -1,72 +1,51 @@
 <!--
 Espelho local gerado por scripts/jarvis/sync_state_duality.py.
-Fonte canônica: ../state/knowledge/ruptur.activation-debts.md
+Fonte canônica: ../../state/knowledge/ruptur.activation-debts.md
 Não edite manualmente aqui sem promover no STATE.
 -->
 
 # Débitos de ativação do STATE / Ruptur
 
-**Data-base:** 2026-03-22  
-**Status:** Parcialmente endereçado nesta rodada
+**Data-base:** 2026-03-23  
+**Status:** atualizado após consolidação documental
 
 ---
 
-## Fundação mínima fechada nesta rodada
+## Fundação já materializada
 
-Foram fechados os débitos de ativação mais críticos ligados a:
+Nesta altura, já existe base canônica explícita para:
 
 - hierarquia da verdade
-- guardrails canônicos do Jarvis
-- modelo de estado do Jarvis
+- guardrails do Jarvis
+- modelo de estado
 - política de aborto
 - registro de manifestações
+- carta, DNA e linhagem do Jarvis
+- handoff, supervisão, suspensão e performance default
+- registry de agentes e de supervisão
+- intake gate documental, trace grading e template de trace
+- memória curada do Jarvis e leitura canônica das frentes de execução do Ruptur
 
-Esses itens deixam de existir apenas como intenção estrutural vazia e passam a ter artefato canônico versionado.
+Também foi encerrado o problema de placeholders zero-byte no corpus canônico: os arquivos vazios passaram a ter conteúdo mínimo ou placeholder controlado.
 
 ---
 
-## Débitos restantes
+## Débitos remanescentes
 
-### D1. Constituição ainda incompleta fora do núcleo mínimo
+### D1. `registry/pairs.yaml` segue sem base factual suficiente
 
-Arquivos ainda vazios:
+O débito permanece aberto porque ainda não há evidência curada suficiente para canonizar pares, vínculos ou conselhos sem inventar conteúdo.
 
-- `constitution/jarvis.charter.md`
-- `constitution/jarvis.dna.md`
-- `constitution/jarvis.lineage.md`
-- `constitution/ruptur.cosmology.md`
-- `constitution/ruptur.love.biblical.md`
-- `constitution/ruptur.principles.md`
+### D2. Intake e telemetria ainda não estão fechados de ponta a ponta
 
-**Tratamento:** manter congelado até revisão explícita do que já entrou. Não expandir conceito antes de validar a base recém-fechada.
+O STATE já possui gate documental (`playbooks/jarvis.intake-gate.md`), guia de trace grading e template.  
+O que ainda falta é a automação ponta a ponta entre runtime, sessão, telemetria e promoção assistida (`JARVIS-AUT-004`, `JARVIS-AUT-005`, `JARVIS-AUT-009`).
 
-### D2. Playbooks de continuidade ainda não ativados
+### D3. Assimetria semântica entre `omega` e `codex/ruptur`
 
-Arquivos ainda vazios:
+Ainda resta harmonizar completamente deliverables, status e espelhamento dos artefatos de sessão entre as duas camadas (`JARVIS-REC-015`).
 
-- `playbooks/jarvis.handoff.md`
-- `playbooks/jarvis.supervision.md`
-- `playbooks/jarvis.suspension.md`
-
-**Impacto:** há definição de estado e política de aborto, mas ainda falta disciplina canônica completa para continuidade, supervisão e pausa controlada.
-
-### D3. Registries restantes ainda incompletos
-
-Arquivos ainda vazios:
-
-- `registry/agents.yaml`
-- `registry/supervision.yaml`
-
-**Impacto:** já existe registry de repositórios e manifestações, mas ainda falta registry canônico de agentes e da malha de supervisão.
-
-### D4. Drift factual a automatizar entre STATE e Ruptur
-
-Foi identificado que `contexts/ruptur.md` carregava contagem volátil de agentes/skills incompatível com a fonte viva atual em `codex/ruptur`.
-
-**Ação aplicada nesta rodada:** a prosa canônica deixou de depender de contagens estáticas.  
-**Débito restante:** criar registry ou rotina de inspeção para inventário operacional quando isso passar a ser necessário de forma estável.
-
-### D5. Conflitos operacionais externos continuam abertos
+### D4. Conflitos operacionais externos continuam abertos
 
 Conflitos já identificados e ainda não reconciliados:
 
@@ -75,16 +54,9 @@ Conflitos já identificados e ainda não reconciliados:
 - rastros de segredos e dados sensíveis em repositórios operacionais
 - drift documental e de deploy no `codex/ruptur`
 
-**Tratamento:** continuam como débito até haver reconciliação factual ou decisão explícita.
+### D5. `constitution/ruptur.love.biblical.md` permanece apenas como reserva controlada
 
-### D6. Memória curada e frentes de execução ainda incompletas
-
-Arquivos ainda vazios:
-
-- `memory/jarvis.memory.md`
-- `knowledge/ruptur.execution-fronts.md`
-
-**Impacto:** a base mínima de governança foi fechada, mas ainda falta consolidar memória curada longitudinal do Jarvis e a leitura canônica das frentes de execução do Ruptur.
+O arquivo deixou de ser vazio, mas continua sem autoridade ativa até que exista decisão explícita, escopo definido e base factual suficiente.
 
 ---
 
@@ -92,4 +64,5 @@ Arquivos ainda vazios:
 
 - vira **decisão** quando a direção canônica estiver clara
 - permanece **débito** quando faltar reconciliação factual
-- não deve voltar para a conversa como verdade solta sem registro no STATE
+- placeholder controlado não pode ser tratado como política vigente
+- nada relevante deve voltar para a conversa como verdade solta sem registro no STATE

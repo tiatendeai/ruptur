@@ -1,6 +1,6 @@
 <!--
 Espelho local gerado por scripts/jarvis/sync_state_duality.py.
-Fonte canônica: ../state/constitution/ruptur.sources-and-queries.md
+Fonte canônica: ../../state/constitution/ruptur.sources-and-queries.md
 Não edite manualmente aqui sem promover no STATE.
 -->
 

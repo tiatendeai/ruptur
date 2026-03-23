@@ -2,11 +2,15 @@
   "session_id": "OMEGA-20260323-001002-8fcbcf98-jarvis-001",
   "status": "active",
   "created_at": "2026-03-23T00:10:02-03:00",
-  "lifecycle_stage": "GENESIS",
+  "lifecycle_stage": "ORCHESTRATION",
   "agents_involved": [
     "Maestro",
-    "Status",
-    "Docs"
+    "Dev",
+    "Deploy",
+    "QA",
+    "Security",
+    "Docs",
+    "Status"
   ],
   "tasks": [
     {
@@ -26,6 +30,12 @@
       "title": "Institucionalizar performance default e revisão contínua para próximas sessões",
       "status": "done",
       "operational_state": "performance_governance_enabled"
+    },
+    {
+      "id": "SESSION-AUDIT-WARMUP-KVM2-004",
+      "title": "Executar auditoria full mode do Warmup Manager e da migração KVM2",
+      "status": "in_progress",
+      "operational_state": "full_mode_activated"
     }
   ],
   "deliverables": [
@@ -72,6 +82,11 @@
     {
       "type": "state_performance_default_playbook",
       "path": "../../state/playbooks/jarvis.performance-default.md",
+      "status": "materializado"
+    },
+    {
+      "type": "full_mode_activation_note",
+      "path": "sessions/OMEGA-20260323-001002-8fcbcf98-jarvis-001-full-mode-warmup-kvm2.md",
       "status": "materializado"
     }
   ],
@@ -144,8 +159,8 @@
         "rule_ref_state": "../../state/playbooks/jarvis.performance-default.md",
         "rule_ref_omega": "../../omega/protocol/workflow/performance-review-loop.md"
       },
-      "last_reviewed_at": "2026-03-23T01:17:18-03:00",
-      "review_reason": "default_future_sessions_and_continuous_review_enabled"
+      "last_reviewed_at": "2026-03-23T02:29:39-03:00",
+      "review_reason": "full_mode_reaffirmed_for_warmup_kvm2_audit"
     },
     "liveness": {
       "last_checked_at": "2026-03-23T01:38:47-03:00",
@@ -160,8 +175,30 @@
       "auto_close_exempt_reason": "sessao_em_uso_real",
       "policy_ref": "../../omega/configs/session-liveness-policy.json",
       "script_ref": "../../omega/scripts/session_liveness_guard.py"
+    },
+    "current_focus": {
+      "context": "warmup_manager_kvm2_audit",
+      "activated_full_mode_at": "2026-03-23T02:29:39-03:00",
+      "operator_request": "ativar modo full e usar todas as capacidades listadas",
+      "capabilities_required_now": [
+        "maestro_orchestration",
+        "multi_agent_debate_guided",
+        "profile_ops",
+        "profile_vcfo",
+        "profile_vcvo",
+        "profile_eggs",
+        "state_capitalization_required",
+        "rag_context7_reference_required",
+        "documentation_and_comment_coverage_required",
+        "session_telemetry_basic",
+        "github_projects_backlog_linkage"
+      ],
+      "notes": [
+        "registro local efetuado no Ruptur",
+        "espelhos fora do repositório podem exigir sincronização posterior se desejado"
+      ]
     }
   },
-  "last_activity_at": "2026-03-23T01:38:47-03:00",
-  "last_heartbeat_at": "2026-03-23T01:38:47-03:00"
+  "last_activity_at": "2026-03-23T02:29:39-03:00",
+  "last_heartbeat_at": "2026-03-23T02:29:39-03:00"
 }
