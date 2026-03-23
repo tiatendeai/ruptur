@@ -17,11 +17,11 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/pipeline", label: "Pipeline", kicker: "CRM" },
   { href: "/broadcasts", label: "Campanhas", kicker: "Disparos" },
   { href: "/connections", label: "Conexoes", kicker: "Canais" },
-  { href: "https://app.ruptur.cloud/warmup", label: "Warmup", kicker: "Maturacao", external: true },
+  { href: "http://localhost:8787/dashboard", label: "Warmup", kicker: "Maturacao", external: true },
   { href: "/sendflow", label: "Sendflow", kicker: "Fluxos" },
   { href: "/metrics", label: "Metricas", kicker: "Saude" },
   { href: "/billing", label: "Planos", kicker: "Receita" },
-  { href: "https://studio.ruptur.cloud", label: "Studio", kicker: "Connectome", external: true },
+  { href: "http://localhost:3000/studio", label: "Studio", kicker: "Connectome", external: true },
 ];
 
 export default function AppShell({
@@ -105,7 +105,7 @@ export default function AppShell({
               </div>
               <div className="bg-[#f3ecdf] px-4 py-4 text-zinc-500">
                 ambiente
-                <div className="mt-2 text-xs tracking-[0.12em] text-zinc-900">app.ruptur.cloud</div>
+                <div className="mt-2 text-xs tracking-[0.12em] text-zinc-900">localhost:3000 (KVM2-DEV)</div>
               </div>
             </div>
 

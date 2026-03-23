@@ -1,5 +1,9 @@
 # Antigravity Kit Architecture
 
+> [!IMPORTANT]
+> **GOVERNANÇA CANÔNICA:** Esta arquitetura e topologia técnica local estão diretamente subordinadas à inteligência central TiatendeAI. 
+> Sempre consulte previamente as políticas e decisões nos repositórios `state/contexts/ruptur.md` e `state/ecosystem/topology.md`.
+
 > Comprehensive AI Agent Capability Expansion Toolkit
 
 ---

@@ -1,0 +1,13 @@
+# Template local do alpha do Jarvis.
+# Copie para um arquivo local não versionado se precisar carregar material selado.
+# Não commite segredos, tokens, chaves ou soulids selados reais.
+
+version: 1
+entity: jarvis
+uid: jarvis-root-001
+alpha_local_only:
+  soulid_sealed: "preencher_localmente"
+  operator_override: null
+  notes:
+    - "Arquivo template apenas para a metade local/selada da dualidade."
+    - "Se existir um alpha real, mantenha fora do git."

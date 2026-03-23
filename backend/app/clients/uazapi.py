@@ -1,20 +1,13 @@
 from __future__ import annotations
 
-<<<<<<< HEAD
-=======
 import base64
 import logging
->>>>>>> work
 from dataclasses import dataclass
 from typing import Any
 
 import httpx
 
-<<<<<<< HEAD
-=======
 logger = logging.getLogger(__name__)
-
->>>>>>> work
 
 class UazapiNotConfiguredError(RuntimeError):
     pass
@@ -36,8 +29,6 @@ class UazapiError(RuntimeError):
 
 
 @dataclass(frozen=True)
-<<<<<<< HEAD
-=======
 class UazapiAdminClient:
     base_url: str
     admin_token: str
@@ -148,7 +139,6 @@ class UazapiAdminClient:
 
 
 @dataclass(frozen=True)
->>>>>>> work
 class UazapiClient:
     base_url: str
     token: str
@@ -156,8 +146,6 @@ class UazapiClient:
     def _headers(self) -> dict[str, str]:
         return {"token": self.token}
 
-<<<<<<< HEAD
-=======
     def chat_check(self, *, numbers: list[str]) -> list[dict[str, Any]]:
         url = f"{self.base_url.rstrip('/')}/chat/check"
         payload = {"numbers": numbers}
@@ -215,8 +203,6 @@ class UazapiClient:
         if isinstance(data, dict):
             return data
         raise UazapiError("uazapi_unexpected_response", body=str(data)[:2000], url=str(resp.request.url))
-
->>>>>>> work
     def send_text(self, *, number: str, text: str) -> dict[str, Any]:
         url = f"{self.base_url.rstrip('/')}/send/text"
         payload = {"number": number, "text": text}
@@ -246,8 +232,6 @@ class UazapiClient:
             return {"raw": data}
         return data
 
-<<<<<<< HEAD
-=======
     def send_ptt(self, *, number: str, url: str) -> dict[str, Any]:
         endpoint = f"{self.base_url.rstrip('/')}/send/voice"
         payload = {"number": number, "url": url}
@@ -336,8 +320,6 @@ class UazapiClient:
         except Exception:
             return {"raw": resp.text}
         return data if isinstance(data, dict) else {"raw": data}
-
->>>>>>> work
     def instance_status(self) -> dict[str, Any]:
         url = f"{self.base_url.rstrip('/')}/instance/status"
         try:
@@ -391,9 +373,6 @@ class UazapiClient:
         except Exception:
             return {"raw": resp.text}
         return data if isinstance(data, dict) else {"raw": data}
-<<<<<<< HEAD
-=======
-
     def raw_request(self, *, method: str, path: str, payload: dict[str, Any] | None = None) -> dict[str, Any] | list[Any]:
         url = f"{self.base_url.rstrip('/')}{path}"
         try:
@@ -420,4 +399,3 @@ class UazapiClient:
         if isinstance(data, (dict, list)):
             return data
         return {"raw": data}
->>>>>>> work

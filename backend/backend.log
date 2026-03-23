@@ -1,0 +1,14 @@
+/Users/diego/Documents/GitHub/codex/ruptur/backend/.venv/lib/python3.14/site-packages/openai/_compat.py:48: UserWarning: Core Pydantic V1 functionality isn't compatible with Python 3.14 or greater.
+  from pydantic.v1.typing import (
+INFO:     Started server process [57917]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8888 (Press CTRL+C to quit)
+INFO:     127.0.0.1:59582 - "GET /api/local/app/config HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:59591 - "GET /api/local/app/config HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:63706 - "GET /api/local/app/config HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:63706 - "GET /health HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [57917]

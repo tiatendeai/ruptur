@@ -1,10 +1,7 @@
 from __future__ import annotations
 
 import json
-<<<<<<< HEAD
-=======
 import logging
->>>>>>> work
 from dataclasses import dataclass
 from typing import Any
 
@@ -14,10 +11,12 @@ from psycopg.types.json import Jsonb
 from app.services.qualification import qualify_text_v1
 
 
-<<<<<<< HEAD
-=======
+# Serviço de Ingestão de Webhooks do UAZAPI
+# Este módulo processa mensagens recebidas do WhatsApp e as armazena no Supabase (KVM2).
+# Realiza a qualificação automática de leads e a criação de conversas e mensagens.
 logger = logging.getLogger(__name__)
 
+# Campos esperados na carga útil para identificar mensagens
 MESSAGE_FIELD_HINTS = {
     "messageid",
     "id",
@@ -34,9 +33,6 @@ MESSAGE_FIELD_HINTS = {
     "messageType",
     "type",
 }
-
-
->>>>>>> work
 @dataclass(frozen=True)
 class IngestResult:
     stored: bool
@@ -49,8 +45,6 @@ def _digits_only(value: str) -> str:
     return "".join(ch for ch in value if ch.isdigit())
 
 
-<<<<<<< HEAD
-=======
 def neutralize_br_number(number: str) -> str:
     """
     Remove o nono dígito de números brasileiros (especialmente DDD 31)
@@ -61,55 +55,11 @@ def neutralize_br_number(number: str) -> str:
     if digits.startswith("55") and len(digits) == 13 and digits[4] == "9":
         return digits[:4] + digits[5:]
     return digits
-
-
->>>>>>> work
 def extract_phone_from_jid(jid: str | None) -> str | None:
     if not jid:
         return None
     if "@g.us" in jid:
         return None
-    digits = _digits_only(jid)
-<<<<<<< HEAD
-    return digits or None
-
-
-def extract_chat_id(payload: dict[str, Any]) -> str | None:
-    data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
-    for key in ("chatid", "wa_chatid", "chatId", "chat_id"):
-        value = data.get(key)
-        if isinstance(value, str) and value.strip():
-            return value.strip()
-    # fallback comum: a própria mensagem é o payload
-    for key in ("chatid", "wa_chatid"):
-        value = payload.get(key)
-        if isinstance(value, str) and value.strip():
-            return value.strip()
-    sender = data.get("sender") if isinstance(data.get("sender"), str) else None
-    return sender
-
-
-def extract_message_fields(payload: dict[str, Any]) -> dict[str, Any]:
-    data = payload.get("data") if isinstance(payload.get("data"), dict) else payload
-
-    message_external_id = data.get("messageid") or data.get("id")
-    sender = data.get("sender") or data.get("from")
-    sender_name = data.get("senderName") or data.get("pushName")
-    chatid = data.get("chatid") or extract_chat_id(payload)
-    text = data.get("text")
-    from_me = data.get("fromMe")
-
-    body = None
-    if isinstance(text, str) and text.strip():
-        body = text
-    else:
-        content = data.get("content")
-        if isinstance(content, str) and content.strip():
-            body = content
-        elif content is not None:
-            body = json.dumps(content, ensure_ascii=False)
-
-=======
     if digits and digits.startswith("55"):
         return neutralize_br_number(digits)
     return digits or None
@@ -151,9 +101,9 @@ def _message_candidates(payload: dict[str, Any]) -> list[tuple[str, dict[str, An
             child = parent.get(key)
             if isinstance(child, dict) and child:
                 before = len(out)
-                add(f"{parent_label}.{key}", child)
+                add(f"{parent_label}.key", child)
                 if len(out) > before:
-                    queue.append((f"{parent_label}.{key}", child))
+                    queue.append((f"{parent_label}.key", child))
     return out
 
 
@@ -239,7 +189,6 @@ def extract_message_fields(payload: dict[str, Any]) -> dict[str, Any]:
             sorted(payload.keys())[:20],
             sorted(data.keys())[:40],
         )
->>>>>>> work
     return {
         "message_external_id": str(message_external_id) if message_external_id else None,
         "chatid": str(chatid) if chatid else None,
@@ -262,20 +211,6 @@ def ingest_uazapi_webhook(conn: Connection, payload: dict[str, Any]) -> IngestRe
 
     lead_id: str | None = None
     if phone:
-<<<<<<< HEAD
-        row = conn.execute(
-            """
-            INSERT INTO leads (source, external_id, phone, name, updated_at)
-            VALUES ('uazapi', %s, %s, %s, now())
-            ON CONFLICT (phone) DO UPDATE
-              SET updated_at = now(),
-                  name = COALESCE(EXCLUDED.name, leads.name)
-            RETURNING id::text
-            """,
-            (phone, phone, fields["sender_name"]),
-        ).fetchone()
-        lead_id = row[0] if row else None
-=======
         row = conn.execute("SELECT id::text FROM leads WHERE phone = %s", (phone,)).fetchone()
         if row:
             conn.execute(
@@ -299,7 +234,6 @@ def ingest_uazapi_webhook(conn: Connection, payload: dict[str, Any]) -> IngestRe
                 (phone, phone, fields["sender_name"]),
             ).fetchone()
             lead_id = row[0] if row else None
->>>>>>> work
     else:
         row = conn.execute(
             """
@@ -331,9 +265,6 @@ def ingest_uazapi_webhook(conn: Connection, payload: dict[str, Any]) -> IngestRe
             """
             INSERT INTO messages (conversation_id, external_id, direction, sender, body, raw)
             VALUES (%s, %s, %s, %s, %s, %s)
-<<<<<<< HEAD
-            ON CONFLICT (conversation_id, external_id) DO NOTHING
-=======
             ON CONFLICT (conversation_id, external_id) DO UPDATE
               SET sender = COALESCE(messages.sender, EXCLUDED.sender),
                   body = CASE
@@ -350,7 +281,6 @@ def ingest_uazapi_webhook(conn: Connection, payload: dict[str, Any]) -> IngestRe
                     ) AND COALESCE(EXCLUDED.body, '') <> '' THEN EXCLUDED.raw
                     ELSE COALESCE(messages.raw, EXCLUDED.raw)
                   END
->>>>>>> work
             RETURNING id::text
             """,
             (
