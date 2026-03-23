@@ -38,9 +38,9 @@ class UpdateStageRequest(BaseModel):
 
 
 @router.get("/stages")
-def list_stages() -> dict[str, Any]:
+def list_stages(authorization: str | None = Header(default=None)) -> dict[str, Any]:
     try:
-        with connect() as conn:
+        with connect(token=authorization) as conn:
             stages = crm_repo.list_stages(conn)
             return {"ok": True, "stages": [Stage(**s.__dict__).model_dump() for s in stages]}
     except DatabaseNotConfiguredError:
@@ -48,9 +48,9 @@ def list_stages() -> dict[str, Any]:
 
 
 @router.post("/stages")
-def create_stage(req: CreateStageRequest) -> dict[str, Any]:
+def create_stage(req: CreateStageRequest, authorization: str | None = Header(default=None)) -> dict[str, Any]:
     try:
-        with connect() as conn:
+        with connect(token=authorization) as conn:
             crm_repo.create_stage(conn, key=req.key, name=req.name, position=req.position, is_terminal=req.is_terminal)
             conn.commit()
             return {"ok": True}
@@ -59,9 +59,9 @@ def create_stage(req: CreateStageRequest) -> dict[str, Any]:
 
 
 @router.patch("/stages/{key}")
-def update_stage(key: str, req: UpdateStageRequest) -> dict[str, Any]:
+def update_stage(key: str, req: UpdateStageRequest, authorization: str | None = Header(default=None)) -> dict[str, Any]:
     try:
-        with connect() as conn:
+        with connect(token=authorization) as conn:
             current = {s.key: s for s in crm_repo.list_stages(conn)}.get(key)
             if not current:
                 raise HTTPException(status_code=404, detail="stage_not_found")
@@ -154,9 +154,10 @@ def list_leads(
     status: str | None = Query(default=None),
     q: str | None = Query(default=None, description="Filtro simples por nome/telefone"),
     limit: int = Query(default=50, ge=1, le=200),
+    authorization: str | None = Header(default=None),
 ) -> dict[str, Any]:
     try:
-        with connect() as conn:
+        with connect(token=authorization) as conn:
             rows = crm_repo.list_leads(conn, status=status, q=q, limit=limit)
             leads = [Lead(**r.__dict__).model_dump() for r in rows]
             return {"ok": True, "leads": leads}
@@ -165,9 +166,9 @@ def list_leads(
 
 
 @router.get("/labels")
-def list_labels() -> dict[str, Any]:
+def list_labels(authorization: str | None = Header(default=None)) -> dict[str, Any]:
     try:
-        with connect() as conn:
+        with connect(token=authorization) as conn:
             rows = crm_repo.list_labels(conn)
             return {"ok": True, "labels": [Label(**r.__dict__).model_dump() for r in rows]}
     except DatabaseNotConfiguredError:
@@ -175,9 +176,9 @@ def list_labels() -> dict[str, Any]:
 
 
 @router.get("/queues/summary")
-def get_queues_summary() -> dict[str, Any]:
+def get_queues_summary(authorization: str | None = Header(default=None)) -> dict[str, Any]:
     try:
-        with connect() as conn:
+        with connect(token=authorization) as conn:
             leads = crm_repo.list_leads(conn, limit=1000)
             summary = {
                 "total": len(leads),
@@ -194,9 +195,9 @@ def get_queues_summary() -> dict[str, Any]:
 
 
 @router.post("/labels")
-def create_label(req: CreateLabelRequest) -> dict[str, Any]:
+def create_label(req: CreateLabelRequest, authorization: str | None = Header(default=None)) -> dict[str, Any]:
     try:
-        with connect() as conn:
+        with connect(token=authorization) as conn:
             crm_repo.create_label(conn, key=req.key, name=req.name, color=req.color)
             conn.commit()
             return {"ok": True}
@@ -210,9 +211,9 @@ class UpdateLeadRequest(BaseModel):
 
 
 @router.patch("/leads/{lead_id}")
-def update_lead(lead_id: str, req: UpdateLeadRequest) -> dict[str, Any]:
+def update_lead(lead_id: str, req: UpdateLeadRequest, authorization: str | None = Header(default=None)) -> dict[str, Any]:
     try:
-        with connect() as conn:
+        with connect(token=authorization) as conn:
             ok = crm_repo.update_lead(conn, lead_id=lead_id, name=req.name, status=req.status)
             if not ok:
                 raise HTTPException(status_code=404, detail="lead_not_found")
@@ -223,9 +224,9 @@ def update_lead(lead_id: str, req: UpdateLeadRequest) -> dict[str, Any]:
 
 
 @router.patch("/leads/{lead_id}/labels")
-def set_lead_labels(lead_id: str, req: SetLeadLabelsRequest) -> dict[str, Any]:
+def set_lead_labels(lead_id: str, req: SetLeadLabelsRequest, authorization: str | None = Header(default=None)) -> dict[str, Any]:
     try:
-        with connect() as conn:
+        with connect(token=authorization) as conn:
             ok = crm_repo.set_lead_labels(conn, lead_id=lead_id, label_keys=req.labels)
             if not ok:
                 raise HTTPException(status_code=404, detail="lead_not_found")
@@ -236,9 +237,9 @@ def set_lead_labels(lead_id: str, req: SetLeadLabelsRequest) -> dict[str, Any]:
 
 
 @router.patch("/leads/{lead_id}/assign")
-def assign_lead(lead_id: str, req: AssignLeadRequest) -> dict[str, Any]:
+def assign_lead(lead_id: str, req: AssignLeadRequest, authorization: str | None = Header(default=None)) -> dict[str, Any]:
     try:
-        with connect() as conn:
+        with connect(token=authorization) as conn:
             ok = crm_repo.assign_lead(conn, lead_id=lead_id, owner_name=req.owner_name, team=req.team)
             if not ok:
                 raise HTTPException(status_code=404, detail="lead_not_found")
@@ -249,9 +250,9 @@ def assign_lead(lead_id: str, req: AssignLeadRequest) -> dict[str, Any]:
 
 
 @router.patch("/leads/{lead_id}/automation")
-def update_lead_automation_state(lead_id: str, req: UpdateLeadAutomationStateRequest) -> dict[str, Any]:
+def update_lead_automation_state(lead_id: str, req: UpdateLeadAutomationStateRequest, authorization: str | None = Header(default=None)) -> dict[str, Any]:
     try:
-        with connect() as conn:
+        with connect(token=authorization) as conn:
             ok = crm_repo.set_lead_automation_state(
                 conn,
                 lead_id=lead_id,
@@ -267,9 +268,9 @@ def update_lead_automation_state(lead_id: str, req: UpdateLeadAutomationStateReq
 
 
 @router.get("/views")
-def list_saved_views(scope: str = Query(default="inbox")) -> dict[str, Any]:
+def list_saved_views(scope: str = Query(default="inbox"), authorization: str | None = Header(default=None)) -> dict[str, Any]:
     try:
-        with connect() as conn:
+        with connect(token=authorization) as conn:
             rows = crm_repo.list_saved_views(conn, scope=scope)
             return {"ok": True, "views": [SavedView(**r.__dict__).model_dump() for r in rows]}
     except DatabaseNotConfiguredError:
@@ -277,9 +278,9 @@ def list_saved_views(scope: str = Query(default="inbox")) -> dict[str, Any]:
 
 
 @router.get("/queues/summary")
-def get_queue_summary() -> dict[str, Any]:
+def get_queue_summary(authorization: str | None = Header(default=None)) -> dict[str, Any]:
     try:
-        with connect() as conn:
+        with connect(token=authorization) as conn:
             rows = crm_repo.queue_summary(conn)
             return {"ok": True, "items": [QueueSummaryItem(**r.__dict__).model_dump() for r in rows]}
     except DatabaseNotConfiguredError:
@@ -287,9 +288,9 @@ def get_queue_summary() -> dict[str, Any]:
 
 
 @router.post("/views")
-def create_saved_view(req: CreateSavedViewRequest) -> dict[str, Any]:
+def create_saved_view(req: CreateSavedViewRequest, authorization: str | None = Header(default=None)) -> dict[str, Any]:
     try:
-        with connect() as conn:
+        with connect(token=authorization) as conn:
             view_id = crm_repo.create_saved_view(
                 conn,
                 scope=req.scope,
@@ -554,9 +555,10 @@ def _fetch_contact_profile_image(
 def list_messages(
     conversation_id: str,
     limit: int = Query(default=50, ge=1, le=200),
+    authorization: str | None = Header(default=None),
 ) -> dict[str, Any]:
     try:
-        with connect() as conn:
+        with connect(token=authorization) as conn:
             rows = crm_repo.list_messages(conn, conversation_id=conversation_id, limit=limit)
             messages = [_serialize_message(r).model_dump() for r in rows]
             return {"ok": True, "messages": messages}
@@ -569,6 +571,7 @@ def contact_profile_images(
     req: ContactProfileImagesRequest,
     x_uazapi_token: str | None = Header(default=None, alias="x-uazapi-token"),
     x_uazapi_admintoken: str | None = Header(default=None, alias="x-uazapi-admintoken"),
+    authorization: str | None = Header(default=None),
 ) -> dict[str, Any]:
     provider = _resolve_avatar_provider(req.provider)
     seen: set[str] = set()
@@ -626,12 +629,13 @@ def send_conversation_text(
     req: SendConversationTextRequest,
     x_uazapi_token: str | None = Header(default=None, alias="x-uazapi-token"),
     x_uazapi_admintoken: str | None = Header(default=None, alias="x-uazapi-admintoken"),
+    authorization: str | None = Header(default=None),
 ) -> dict[str, Any]:
     if not (settings.uazapi_base_url and (settings.uazapi_admin_token or settings.uazapi_token or x_uazapi_token or x_uazapi_admintoken)):
         raise HTTPException(status_code=400, detail="uazapi_not_configured")
 
     try:
-        with connect() as conn:
+        with connect(token=authorization) as conn:
             chatid = crm_repo.get_conversation_external_id(conn, conversation_id=conversation_id)
             if not chatid:
                 raise HTTPException(status_code=404, detail="conversation_not_found")
@@ -662,3 +666,18 @@ def send_conversation_text(
             return {"ok": True, "uazapi": upstream, "stored_external_id": external_id}
     except DatabaseNotConfiguredError:
         raise HTTPException(status_code=503, detail="database_not_configured")
+
+
+@router.get("/leads/{lead_id}/events")
+def list_pipeline_events(lead_id: str, limit: int = Query(default=50), authorization: str | None = Header(default=None)) -> dict[str, Any]:
+    try:
+        with connect(token=authorization) as conn:
+            rows = conn.execute(
+                "SELECT id::text, event_type, payload, created_at::text FROM pipeline_events WHERE lead_id = %s ORDER BY created_at DESC LIMIT %s", 
+                (lead_id, limit)
+            ).fetchall()
+            events = [{"id": r[0], "event_type": r[1], "payload": r[2] or {}, "created_at": str(r[3])} for r in rows]
+            return {"ok": True, "events": events}
+    except DatabaseNotConfiguredError:
+        return {"ok": True, "events": [], "reason": "database_not_configured"}
+
