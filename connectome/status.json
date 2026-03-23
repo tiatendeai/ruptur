@@ -1,7 +1,14 @@
 {
   "last_updated": "2026-03-22T21:20:20-03:00",
   "operator": "diego",
-  "active_sessions": [],
+  "active_sessions": [
+    {
+      "soul_id": "RUPTUR-AGENT-0001",
+      "agent": "jarvis",
+      "state": "contextualizando",
+      "started_at": "2026-03-22T21:55:00-03:00"
+    }
+  ],
   "tasks": {
     "em_progresso": [
       {
@@ -24,7 +31,7 @@
       }
     ]
   },
-  "agents_active": [],
+  "agents_active": ["jarvis"],
   "infra": {
     "servidor": "167.234.228.71",
     "app": "https://app.ruptur.cloud",
