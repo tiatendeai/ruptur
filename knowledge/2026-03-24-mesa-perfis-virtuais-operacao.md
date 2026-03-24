@@ -40,6 +40,9 @@ Para não quebrar o runtime atual:
 
 - `POST /jarvis/ask/vceo`
 - `POST /jarvis/vceo/weekly-close`
+- `POST /jarvis/ask/vcontroller`
+- `POST /jarvis/ask/vadminops`
+- `POST /jarvis/ask/vfinops`
 
 Ambas mantêm compatibilidade com os endpoints legados:
 
@@ -59,6 +62,8 @@ Ambas mantêm compatibilidade com os endpoints legados:
 - `JARVIS-AUT-012` — gate de `não fazer`, falso positivo e aborto
 - `JARVIS-AUT-013` — materialização pós-mesa
 - `JARVIS-AUT-014` — gatilhos automáticos com uso ativo garantido
+- `JARVIS-AUT-015` — formalização de `vController`, `vAdminOps` e `vFinOps`
+- `JARVIS-AUT-016` — enforcement runtime da matriz de acionamento / no-go
 
 ---
 

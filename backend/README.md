@@ -30,11 +30,32 @@ Jarvis vCVO: `POST http://localhost:8000/jarvis/ask/vcvo`
 Jarvis vCVO Weekly Brief: `POST http://localhost:8000/jarvis/vcvo/weekly-brief`
 Jarvis vCEO: `POST http://localhost:8000/jarvis/ask/vceo` (compatível com `/jarvis/ask/eggs`)
 Jarvis vCEO Weekly Close: `POST http://localhost:8000/jarvis/vceo/weekly-close` (compatível com `/jarvis/eggs/weekly-close`)
+Jarvis vController: `POST http://localhost:8000/jarvis/ask/vcontroller`
+Jarvis vAdminOps: `POST http://localhost:8000/jarvis/ask/vadminops`
+Jarvis vFinOps: `POST http://localhost:8000/jarvis/ask/vfinops`
 Jarvis Command (missões): `POST http://localhost:8000/jarvis/command`
 Jarvis Missões: `GET http://localhost:8000/jarvis/missions` e `PATCH http://localhost:8000/jarvis/missions/{id}`
 Jarvis Updates de missão: `GET/POST http://localhost:8000/jarvis/missions/{id}/updates`
 Jarvis Notícias de entrega: `GET http://localhost:8000/jarvis/news/deliveries`
 Jarvis Brief diário (anti-sobrecarga): `GET http://localhost:8000/jarvis/brief/daily`
+
+### Guardrails automáticos de governança
+
+As rotas dos perfis críticos agora auto-injetam contexto mínimo quando detectam temas como:
+
+- falso positivo / não fazer / bloqueio / aborto
+- hipótese / experimento / lean / discovery
+- variância / budget / orçado x realizado
+- fila / handoff / SOP / administrativo
+- finops / custo de nuvem / custo de IA / token
+
+Saída mínima esperada nesses casos:
+
+- caminho recomendado
+- caminho não seguir
+- estado recomendado (`seguir`, `bloqueado`, `abortado`, `reenquadrar`)
+- evidência faltante
+- condição de retomada
 
 CFO API (dados financeiros):
 

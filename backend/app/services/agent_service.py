@@ -29,12 +29,18 @@ class AgentService:
         user_message: str,
         persona: AssistantPersona = "jarvis",
     ) -> str:
-        if profile == "cfo":
+        if profile in {"cfo", "vcfo"}:
             mode = "vCFO"
         elif profile == "vcvo":
             mode = "vCVO"
-        elif profile == "eggs":
-            mode = "Eggs"
+        elif profile in {"eggs", "vceo"}:
+            mode = "vCEO"
+        elif profile == "vcontroller":
+            mode = "vController"
+        elif profile == "vadminops":
+            mode = "vAdminOps"
+        elif profile == "vfinops":
+            mode = "vFinOps"
         else:
             mode = "IAzinha" if persona == "iazinha" else "Ops"
         prefix = "*IAzinha:*" if persona == "iazinha" else f"*Jarvis ({mode} Offline):*"
@@ -120,7 +126,7 @@ class AgentService:
         if focus and focus.strip():
             extra.append(f"Foco atual da analise CFO: {focus.strip()}.")
         return self.get_response(
-            profile="cfo",
+            profile="vcfo",
             principal_name=principal_name,
             user_message=user_message,
             persona="jarvis",
@@ -155,6 +161,24 @@ class AgentService:
     ) -> str:
         return self.get_response(
             profile="vcvo",
+            principal_name=principal_name,
+            user_message=user_message,
+            persona="jarvis",
+            history=history,
+            context_blocks=context_blocks,
+        )
+
+    def get_profile_response(
+        self,
+        *,
+        profile: JarvisProfile,
+        principal_name: str,
+        user_message: str,
+        history: list[dict[str, str]] | None = None,
+        context_blocks: list[str] | None = None,
+    ) -> str:
+        return self.get_response(
+            profile=profile,
             principal_name=principal_name,
             user_message=user_message,
             persona="jarvis",

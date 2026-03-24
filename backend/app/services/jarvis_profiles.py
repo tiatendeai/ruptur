@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Literal
 
 
-JarvisProfile = Literal["ops", "cfo", "vcvo", "eggs", "vceo"]
+JarvisProfile = Literal["ops", "cfo", "vcfo", "vcvo", "eggs", "vceo", "vcontroller", "vadminops", "vfinops"]
 AssistantPersona = Literal["jarvis", "iazinha"]
 
 
@@ -72,6 +72,27 @@ def build_system_prompt(
         "Do not hide uncertainty; mark assumptions and required validation data.\n"
     )
 
+    vcontroller_block = (
+        "## VCONTROLLER MODE\n\n"
+        "Primary goal: act as virtual controller for budget discipline and variance control.\n"
+        "Always compare target vs actual, show variance, threshold, owner and recovery plan.\n"
+        "Prefer concise control language and explicit unit economics.\n"
+    )
+
+    vadminops_block = (
+        "## VADMINOPS MODE\n\n"
+        "Primary goal: act as virtual administrative operations lead.\n"
+        "Reduce retrabalho through SOPs, queue hygiene, handoff quality and clear checkpoints.\n"
+        "Always report owner, SLA, bottleneck, next checkpoint and anti-rework action.\n"
+    )
+
+    vfinops_block = (
+        "## VFINOPS MODE\n\n"
+        "Primary goal: act as virtual FinOps lead for cloud and AI cost efficiency.\n"
+        "Balance cost, throughput, latency and reliability without degrading service quality.\n"
+        "Always report cost driver, unit cost, safe optimization, risk and rollback.\n"
+    )
+
     user_anchor = (
         "## USER CONTEXT\n\n"
         f"Primary user for this interaction: {principal}.\n"
@@ -80,8 +101,16 @@ def build_system_prompt(
 
     if profile == "cfo":
         profile_block = cfo_block
+    elif profile == "vcfo":
+        profile_block = cfo_block
     elif profile == "vcvo":
         profile_block = vcvo_block
+    elif profile == "vcontroller":
+        profile_block = vcontroller_block
+    elif profile == "vadminops":
+        profile_block = vadminops_block
+    elif profile == "vfinops":
+        profile_block = vfinops_block
     elif profile in {"eggs", "vceo"}:
         profile_block = eggs_block
     else:

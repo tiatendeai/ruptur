@@ -67,6 +67,8 @@ Mas ainda não possui, de ponta a ponta, uma malha fechada de:
 | JARVIS-AUT-012 | P0 | Gate explícito de `não fazer`, falso positivo, bloqueio e aborto | `state` + `codex/ruptur` | `Ruptur Delivery OS` | o sistema aumenta a capacidade de negar e parar cedo com motivo auditável |
 | JARVIS-AUT-013 | P0 | Pipeline de materialização pós-mesa para backlog, regra, runbook, trace e GitHub Projects | `state` + `codex/ruptur` | `Ruptur Delivery OS` | decisões deixam de morrer em conversa e passam a gerar artefato acionável |
 | JARVIS-AUT-014 | P1 | Gatilhos automáticos com garantia de uso ativo | `state` + `codex/ruptur` | `Ruptur Delivery OS` | conhecimento acionado automaticamente só entra se tiver owner, métrica e trilha real de uso |
+| JARVIS-AUT-015 | P0 | Formalização de `vController`, `vAdminOps` e `vFinOps` com taxonomia, gatilhos e runtime mínimo | `state` + `codex/ruptur` | `Ruptur Delivery OS` | frentes financeira/administrativa/finops passam a ter perfis canônicos, contrato de saída e acionamento |
+| JARVIS-AUT-016 | P0 | Enforcement runtime da matriz de acionamento, `não fazer`, bloqueio, aborto e uso ativo | `state` + `codex/ruptur` | `Ruptur Delivery OS` | o runtime passa a auto-injetar guardrails e saídas mínimas com trilha de adoção |
 
 ---
 
@@ -157,6 +159,20 @@ Mas ainda não possui, de ponta a ponta, uma malha fechada de:
 - gatilhos passam a registrar trilha mínima de uso
 - fica visível o que foi acionado automaticamente e com qual efeito
 
+## JARVIS-AUT-015 — Formalização de vController / vAdminOps / vFinOps
+
+- existe taxonomia canônica para os três perfis
+- cada perfil tem gatilho, owner, objetivo e saída mínima obrigatória
+- `state` e `ruptur` deixam claro quando usar cada perfil
+- aliases legados não substituem os nomes canônicos
+
+## JARVIS-AUT-016 — Enforcement runtime da matriz de acionamento / no-go
+
+- o runtime injeta contexto mínimo de governança quando detectar gatilhos
+- respostas de perfis críticos passam a explicitar caminho recomendado, caminho proibido, bloqueio, aborto e evidência faltante
+- existe trilha mínima de uso ativo para a auto-injeção
+- o enforcement preserva qualidade, velocidade e capacidade de negar
+
 ---
 
 ## 5. Riscos que este backlog tenta reduzir
@@ -203,6 +219,8 @@ Em 2026-03-23, os itens deste backlog foram publicados nos boards ativos do ecos
 | JARVIS-AUT-012 | `Ruptur Delivery OS` | `PVTI_lAHODOO6r84BRgVSzgoMv4g` |
 | JARVIS-AUT-013 | `Ruptur Delivery OS` | `PVTI_lAHODOO6r84BRgVSzgoMv40` |
 | JARVIS-AUT-014 | `Ruptur Delivery OS` | `PVTI_lAHODOO6r84BRgVSzgoMv48` |
+| JARVIS-AUT-015 | `Ruptur Delivery OS` | `PVTI_lAHODOO6r84BRgVSzgoNTTM` |
+| JARVIS-AUT-016 | `Ruptur Delivery OS` | `PVTI_lAHODOO6r84BRgVSzgoNTTc` |
 
 Critério aplicado na publicação:
 

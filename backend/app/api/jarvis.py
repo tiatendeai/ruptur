@@ -11,6 +11,7 @@ from app.db import DatabaseNotConfiguredError, connect
 from app.repositories import jarvis_ops_repo
 from app.services.agent_service import agent_service
 from app.services.jarvis_daily_brief_service import build_executive_daily_brief
+from app.services.jarvis_governance_context import build_governance_context
 from app.services.jarvis_skill_runtime import SkillContext, get_skill
 
 # garante registro da skill no runtime
@@ -30,7 +31,7 @@ class JarvisHistoryItem(BaseModel):
 class JarvisAskRequest(BaseModel):
     message: str = Field(min_length=1)
     principal_name: str = Field(default="Diego", min_length=1)
-    profile: Literal["ops", "cfo", "vcfo", "vcvo", "eggs", "vceo"] = "ops"
+    profile: Literal["ops", "cfo", "vcfo", "vcvo", "eggs", "vceo", "vcontroller", "vadminops", "vfinops"] = "ops"
     history: list[JarvisHistoryItem] = Field(default_factory=list)
     context: list[str] = Field(default_factory=list)
 
@@ -63,6 +64,10 @@ class JarvisVcvoAskRequest(BaseModel):
 
 def _to_history(items: list[JarvisHistoryItem]) -> list[dict[str, str]]:
     return [{"role": i.role, "content": i.content} for i in items]
+
+
+def _governed_context(profile: str, message: str, context_blocks: list[str]) -> list[str]:
+    return build_governance_context(profile=profile, message=message, context_blocks=context_blocks)
 
 
 def _load_skill_context(skill_key: str) -> SkillContext:
@@ -102,6 +107,7 @@ def ask(req: JarvisAskRequest) -> dict[str, Any]:
     if req.profile == "cfo":
         cfo_ctx = _load_cfo_context()
         context_blocks.extend(cfo_ctx.context_blocks)
+        context_blocks = _governed_context("vcfo", req.message, context_blocks)
         response = agent_service.get_jarvis_cfo_response(
             principal_name=req.principal_name,
             user_message=req.message,
@@ -111,6 +117,7 @@ def ask(req: JarvisAskRequest) -> dict[str, Any]:
     elif req.profile == "vcfo":
         cfo_ctx = _load_cfo_context()
         context_blocks.extend(cfo_ctx.context_blocks)
+        context_blocks = _governed_context("vcfo", req.message, context_blocks)
         response = agent_service.get_jarvis_cfo_response(
             principal_name=req.principal_name,
             user_message=req.message,
@@ -120,7 +127,43 @@ def ask(req: JarvisAskRequest) -> dict[str, Any]:
     elif req.profile == "vcvo":
         vcvo_ctx = _load_vcvo_context()
         context_blocks.extend(vcvo_ctx.context_blocks)
+        context_blocks = _governed_context("vcvo", req.message, context_blocks)
         response = agent_service.get_jarvis_vcvo_response(
+            principal_name=req.principal_name,
+            user_message=req.message,
+            history=history,
+            context_blocks=context_blocks,
+        )
+    elif req.profile == "vcontroller":
+        cfo_ctx = _load_cfo_context()
+        context_blocks.extend(cfo_ctx.context_blocks)
+        context_blocks = _governed_context("vcontroller", req.message, context_blocks)
+        response = agent_service.get_profile_response(
+            profile="vcontroller",
+            principal_name=req.principal_name,
+            user_message=req.message,
+            history=history,
+            context_blocks=context_blocks,
+        )
+    elif req.profile == "vadminops":
+        eggs_ctx = _load_eggs_context()
+        context_blocks.extend(eggs_ctx.context_blocks)
+        context_blocks = _governed_context("vadminops", req.message, context_blocks)
+        response = agent_service.get_profile_response(
+            profile="vadminops",
+            principal_name=req.principal_name,
+            user_message=req.message,
+            history=history,
+            context_blocks=context_blocks,
+        )
+    elif req.profile == "vfinops":
+        cfo_ctx = _load_cfo_context()
+        eggs_ctx = _load_eggs_context()
+        context_blocks.extend(cfo_ctx.context_blocks)
+        context_blocks.extend(eggs_ctx.context_blocks)
+        context_blocks = _governed_context("vfinops", req.message, context_blocks)
+        response = agent_service.get_profile_response(
+            profile="vfinops",
             principal_name=req.principal_name,
             user_message=req.message,
             history=history,
@@ -129,6 +172,7 @@ def ask(req: JarvisAskRequest) -> dict[str, Any]:
     elif req.profile in {"eggs", "vceo"}:
         eggs_ctx = _load_eggs_context()
         context_blocks.extend(eggs_ctx.context_blocks)
+        context_blocks = _governed_context("vceo", req.message, context_blocks)
         response = agent_service.get_jarvis_eggs_response(
             principal_name=req.principal_name,
             user_message=req.message,
@@ -136,6 +180,7 @@ def ask(req: JarvisAskRequest) -> dict[str, Any]:
             context_blocks=context_blocks,
         )
     else:
+        context_blocks = _governed_context("ops", req.message, context_blocks)
         response = agent_service.get_response(
             profile="ops",
             principal_name=req.principal_name,
@@ -155,6 +200,7 @@ def ask_cfo(req: JarvisCfoAskRequest) -> dict[str, Any]:
     cfo_ctx = _load_cfo_context()
     if req.include_snapshot:
         context_blocks.extend(cfo_ctx.context_blocks)
+    context_blocks = _governed_context("vcfo", req.message, context_blocks)
 
     response = agent_service.get_jarvis_cfo_response(
         principal_name=req.principal_name,
@@ -181,6 +227,7 @@ def ask_vcvo(req: JarvisVcvoAskRequest) -> dict[str, Any]:
         context_blocks.extend(vcvo_ctx.context_blocks)
     if req.focus and req.focus.strip():
         context_blocks.append(f"Foco atual do vCVO: {req.focus.strip()}.")
+    context_blocks = _governed_context("vcvo", req.message, context_blocks)
 
     response = agent_service.get_jarvis_vcvo_response(
         principal_name=req.principal_name,
@@ -198,6 +245,7 @@ def ask_eggs(req: JarvisEggsAskRequest) -> dict[str, Any]:
     eggs_ctx = _load_eggs_context()
     if req.include_snapshot:
         context_blocks.extend(eggs_ctx.context_blocks)
+    context_blocks = _governed_context("vceo", req.message, context_blocks)
 
     response = agent_service.get_jarvis_eggs_response(
         principal_name=req.principal_name,
@@ -214,6 +262,71 @@ def ask_vceo(req: JarvisEggsAskRequest) -> dict[str, Any]:
     result = ask_eggs(req)
     result["profile"] = "vceo"
     return result
+
+
+@router.post("/ask/vcontroller")
+def ask_vcontroller(req: JarvisCfoAskRequest) -> dict[str, Any]:
+    history = _to_history(req.history)
+    context_blocks = [c for c in req.context if isinstance(c, str) and c.strip()]
+    cfo_ctx = _load_cfo_context()
+    if req.include_snapshot:
+        context_blocks.extend(cfo_ctx.context_blocks)
+    if req.focus and req.focus.strip():
+        context_blocks.append(f"Foco atual do vController: {req.focus.strip()}.")
+    context_blocks = _governed_context("vcontroller", req.message, context_blocks)
+    response = agent_service.get_profile_response(
+        profile="vcontroller",
+        principal_name=req.principal_name,
+        user_message=req.message,
+        history=history,
+        context_blocks=context_blocks,
+    )
+    return {"ok": True, "profile": "vcontroller", "response": response, "snapshot": cfo_ctx.snapshot if req.include_snapshot else None}
+
+
+@router.post("/ask/vadminops")
+def ask_vadminops(req: JarvisEggsAskRequest) -> dict[str, Any]:
+    history = _to_history(req.history)
+    context_blocks = [c for c in req.context if isinstance(c, str) and c.strip()]
+    eggs_ctx = _load_eggs_context()
+    if req.include_snapshot:
+        context_blocks.extend(eggs_ctx.context_blocks)
+    context_blocks = _governed_context("vadminops", req.message, context_blocks)
+    response = agent_service.get_profile_response(
+        profile="vadminops",
+        principal_name=req.principal_name,
+        user_message=req.message,
+        history=history,
+        context_blocks=context_blocks,
+    )
+    return {"ok": True, "profile": "vadminops", "response": response, "snapshot": eggs_ctx.snapshot if req.include_snapshot else None}
+
+
+@router.post("/ask/vfinops")
+def ask_vfinops(req: JarvisCfoAskRequest) -> dict[str, Any]:
+    history = _to_history(req.history)
+    context_blocks = [c for c in req.context if isinstance(c, str) and c.strip()]
+    cfo_ctx = _load_cfo_context()
+    eggs_ctx = _load_eggs_context()
+    if req.include_snapshot:
+        context_blocks.extend(cfo_ctx.context_blocks)
+        context_blocks.extend(eggs_ctx.context_blocks)
+    if req.focus and req.focus.strip():
+        context_blocks.append(f"Foco atual do vFinOps: {req.focus.strip()}.")
+    context_blocks = _governed_context("vfinops", req.message, context_blocks)
+    response = agent_service.get_profile_response(
+        profile="vfinops",
+        principal_name=req.principal_name,
+        user_message=req.message,
+        history=history,
+        context_blocks=context_blocks,
+    )
+    return {
+        "ok": True,
+        "profile": "vfinops",
+        "response": response,
+        "snapshot": {"vcfo": cfo_ctx.snapshot, "vceo": eggs_ctx.snapshot} if req.include_snapshot else None,
+    }
 
 
 class JarvisCfoWeeklyCloseRequest(BaseModel):
