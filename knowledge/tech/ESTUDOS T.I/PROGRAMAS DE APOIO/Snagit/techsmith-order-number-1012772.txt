@@ -1,0 +1,81 @@
+# Espelho local gerado por scripts/jarvis/sync_state_duality.py.
+# Fonte canônica: ../../state/knowledge/tech/ESTUDOS T.I/PROGRAMAS DE APOIO/Snagit/techsmith-order-number-1012772.txt
+# Não edite manualmente aqui sem promover no STATE.
+
+De:	TechSmith Corporation [custservice@techsmith.com]
+Enviado em:	quarta-feira, 3 de setembro de 2008 22:56
+Para:	joel.rosa@oi.com.br
+Assunto:	TechSmith Order Number 1012772
+
+
+TechSmith thanks you for your order! Your software key can be found below 
+in the Order Details section of your receipt.
+
+Keep a copy of this in a safe place - it may be your only record of this 
+transaction.
+
+Customer Number     837889
+Confirmation Number TSW867624
+Order Number        1012772
+Order Date          9/3/2008 9:50:20 PM
+Product Total       $49.95
+Shipping Amount     $0.00
+-------------------------------
+Order Total         $49.95
+
+------------------------------------------------------------
+Order Details
+------------------------------------------------------------
+Key                CCXA5-DFMCC-DUHA3-8D2M7-774F8
+Quantity           1
+Seats              1
+Description        SnagIt Electronic
+Product Amount     $49.95
+
+------------------------------------------------------------
+Customer Billing Information
+------------------------------------------------------------
+Name:              Joel Pereira Rosa
+Pay Method:        Visa
+Address:           Apt 302
+Address:           Rua Raimundo Correia 16
+City:              Rio de Janeiro - RJ
+State:             None
+Zip Code:          22040-040
+Country            BRA
+Phone:             55 21 8125 5399
+E-mail:            joel.rosa@oi.com.br
+
+------------------------------------------------------------
+Special Requests and Comments
+------------------------------------------------------------
+TSW867624
+
+Thank You for purchasing SnagIt!
+
+Please follow this link for important instructions on how to install and 
+license your software:
+http://www.techsmith.com/download/licenses/snagit.asp
+ 
+To download the SnagIt Documentation, go to: 
+http://www.techsmith.com/learn/snagit/documentation.asp
+
+For installation instructions on how to deploy on multiple machines, see 
+our MSI Enterprise Install here:
+http://www.techsmith.com/download/accessories/default.asp#snagitaccessori
+es
+
+-------------------------------------------------------------------------
+------
+
+Warning: This computer program is protected by copyright law and 
+international treaties. Unauthorized reproduction or distribution of this 
+program, or any portion of it, may result in severe civil and criminal 
+penalties, and will be prosecuted to the maximum extent possible under 
+the law.
+
+TechSmith Corporation
+Website:        http://www.techsmith.com
+Online Support: http://www.techsmith.com/contact.asp
+Phone:          1.800.517.3001 USA Only
+               +1.517.381.2300

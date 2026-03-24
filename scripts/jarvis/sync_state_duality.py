@@ -31,7 +31,7 @@ def ensure_prerequisites() -> None:
 
 
 def read_text(path: Path) -> str:
-    return path.read_text(encoding="utf-8")
+    return path.read_text(encoding="utf-8", errors="replace")
 
 
 def discover_mirror_paths() -> list[Path]:
@@ -40,7 +40,7 @@ def discover_mirror_paths() -> list[Path]:
         state_dir = STATE_ROOT / directory_name
         if not state_dir.exists():
             continue
-        for path in sorted(candidate for candidate in state_dir.rglob("*") if candidate.is_file()):
+        for path in sorted(candidate for candidate in state_dir.rglob("*") if candidate.is_file() and candidate.suffix in (".md", ".yaml", ".yml", ".json", ".txt", ".csv")):
             rel = path.relative_to(STATE_ROOT)
             if rel.as_posix() == "registry/entities.yaml":
                 continue

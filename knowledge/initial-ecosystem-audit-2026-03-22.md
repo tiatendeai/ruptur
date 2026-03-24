@@ -221,7 +221,7 @@ Conclusão: existe risco real de exposição de segredos e/ou dados operacionais
 
 Hoje coexistem, sem harmonização formal:
 
-- `state/playbooks/multi-agent-debate.md`
+- `playbooks/multi-agent-debate.md`
 - `ruptur-prompts/MULTIAGENTES EM DEBATE/*`
 - `ruptur-prompts/sandeco-maestro/*`
 - `codex/ruptur/docs/governanca/processos/orquestracao-a2a.md`
@@ -302,7 +302,7 @@ Em termos práticos:
 - `state/index.yaml`
 - `state/contexts/ruptur.md`
 - `state/ecosystem/topology.md`
-- `state/playbooks/multi-agent-debate.md`
+- `playbooks/multi-agent-debate.md`
 - `codex/ruptur/JARVIS.md`
 - `codex/ruptur/.agent/ARCHITECTURE.md`
 - `codex/ruptur/.agent/agents/jarvis.md`

@@ -1,0 +1,112 @@
+# Espelho local gerado por scripts/jarvis/sync_state_duality.py.
+# Fonte canônica: ../../state/playbooks/governanca/ativos/registry.yaml
+# Não edite manualmente aqui sem promover no STATE.
+
+# CMDB-lite (inventário de ativos) — Ruptur
+#
+# Diretriz: manter simples, mas suficiente para replicar e operar.
+
+portfolio:
+  product:
+    name: Ruptur
+    primary_domain: ruptur.cloud
+    repository_root: /Users/diego/Downloads/ruptur
+
+  providers:
+    uazapi:
+      role: primary
+      base_url: https://tiatendeai.uazapi.com
+      auth:
+        # Não versionar tokens aqui; apenas referenciar onde ficam.
+        admin_token_ref: env:RUPTUR_UAZAPI_ADMIN_TOKEN
+    baileys:
+      role: secondary
+      base_url: https://baileys.statuspersianas.com.br
+    supabase:
+      role: data-platform
+      project_ref: env:SUPABASE_PROJECT_REF
+    asaas:
+      role: billing
+      base_url: https://api.asaas.com
+    cloudflare:
+      role: dns-edge
+      zone_ref: env:CLOUDFLARE_ZONE_ID
+      account_ref: env:CLOUDFLARE_ACCOUNT_ID
+
+  hosts:
+    host1:
+      name: oracle-micro-1
+      ip: 129.148.17.85
+      role: landing + app web
+      access:
+        ssh_user: unknown
+        ssh_key_ref: pending-validation
+    host2:
+      name: oracle-micro-2
+      ip: 167.234.228.71
+      role: traefik + baileys + whisper + ruptur-backend + postgres
+      access:
+        ssh_user: ubuntu
+        ssh_key_ref: /Users/diego/.ssh/id_ed25519
+        app_root: /home/ubuntu/apps/ruptur-backend
+        legacy_root: /home/ubuntu/apps/ruptur-host2/host2
+
+  domains:
+    apex:
+      hostname: ruptur.cloud
+      host: host1
+      provider: cloudflare
+    www:
+      hostname: www.ruptur.cloud
+      target: ruptur.cloud
+      provider: cloudflare
+    api:
+      hostname: api.ruptur.cloud
+      host: host2
+      provider: cloudflare
+    webhook:
+      hostname: webhook.ruptur.cloud
+      host: host2
+      provider: cloudflare
+    baileys:
+      hostname: baileys.ruptur.cloud
+      host: host2
+      provider: cloudflare
+    app:
+      hostname: app.ruptur.cloud
+      host: host1
+      provider: cloudflare
+    n8n:
+      hostname: n8n.ruptur.cloud
+      host: host2
+      provider: cloudflare
+    portainer:
+      hostname: portainer.ruptur.cloud
+      host: host2
+      provider: cloudflare
+    traefik:
+      hostname: traefik.ruptur.cloud
+      host: host2
+      provider: cloudflare
+    minio:
+      hostname: minio.ruptur.cloud
+      host: host2
+      provider: cloudflare
+    typebot:
+      hostname: typebot.ruptur.cloud
+      host: host2
+      provider: cloudflare
+    redis:
+      hostname: redis.ruptur.cloud
+      host: host2
+      provider: cloudflare
+      note: dns_only_nao_substitui_firewall
+
+  work_management:
+    backlog_source:
+      preferred: notion-or-github-projects
+      status: pending-credential
+    agent_control:
+      source_of_truth: docs/governanca/processos/orquestracao-a2a.md
+
+tenants: []

@@ -1,0 +1,46 @@
+# Espelho local gerado por scripts/jarvis/sync_state_duality.py.
+# Fonte canônica: ../../state/knowledge/tech/ESTUDOS T 2.I/BIG DATA/big-data-introducao-a-data-analysis/sumario.txt
+# Não edite manualmente aqui sem promover no STATE.
+
+Big Data: Uma introdu��o a data analysis na pr�tica
+
+
+1	1. An�lise de Vendas
+1.1	V�deo 1.1
+1.2	V�deo 1.2
+1.3	V�deo 1.3
+
+2	2. Corrigindo por dias �teis.
+2.1	V�deo 2.1
+2.2	V�deo 2.2
+
+3	3. CSV e importa��es.
+3.1	V�deo 3.1
+
+4	4. Limpando os missings
+4.1	V�deo 4.1
+4.2	V�deo 4.2
+4.3	V�deo 4.3
+
+5	5. Fatores de sazonalidade
+5.1	V�deo 5.1
+5.2	V�deo 5.2
+5.3	V�deo 5.3
+5.4	V�deo 5.4
+5.5	V�deo 5.5
+
+6	6. Medidas
+6.1	V�deo 6.1
+6.2	V�deo 6.2
+6.3	V�deo 6.3
+6.4	V�deo 6.4
+
+7	7. M�dia Geom�trica
+7.1	V�deo 7.1
+7.2	V�deo 7.2
+
+8	8. Churm Rate
+8.1	V�deo 8.1
+8.2	V�deo 8.2
+8.3	V�deo 8.3
+8.4	V�deo 8.4

@@ -1,0 +1,149 @@
+# Espelho local gerado por scripts/jarvis/sync_state_duality.py.
+# Fonte canônica: ../../state/registry/repositories.yaml
+# Não edite manualmente aqui sem promover no STATE.
+
+# Espelho local gerado por scripts/jarvis/sync_state_duality.py.
+# Fonte canônica: ../../state/registry/repositories.yaml
+# Não edite manualmente aqui sem promover no STATE.
+
+version: 1
+audited_at: 2026-03-22
+
+repositories:
+  - id: state
+    classification: canonical
+    role: governanca_identidade_contexto_memoria_backlog
+    maturity: seed_minimo
+    source_of_truth_scope:
+      - governanca
+      - identidade
+      - contexto_curado
+      - memoria_curada
+      - backlog_de_consolidacao
+      - capital_intelectual
+    local_path: /Users/diego/Documents/GitHub/state
+    remote: https://github.com/tiatendeai/state.git
+    notes:
+      - Repositorio canônico em intenção, mas ainda com baixa cobertura factual.
+      - Fundação mínima de ativação fechada em 2026-03-22 para hierarquia da verdade, guardrails, modelo de estado, política de aborto e registro de manifestações.
+      - Exige expansão de decisions, patterns, contexts satélite, registries restantes e templates.
+
+  - id: alpha
+    classification: genesis_foundation
+    role: genesis_identidade_raiz_bootstrap
+    maturity: bootstrap_foundation
+    source_of_truth_scope:
+      - genesis
+      - identidade_raiz
+      - prova_de_origem
+      - preexistencia
+      - contrato_de_fronteira
+    local_path: /Users/diego/Documents/GitHub/alpha
+    remote: https://github.com/tiatendeai/alpha.git
+    notes:
+      - Repositorio de gênese e identidade raiz do Jarvis.
+      - Não substitui a governança do STATE nem o runtime do RUPTUR.
+      - Formalizado como camada própria em 2026-03-22 a partir do corpus consolidado e da fundação documental do Alpha.
+
+  - id: omega
+    classification: session_lifecycle
+    role: lifecycle_de_sessao_replay_recovery
+    maturity: seed_with_structural_debt
+    source_of_truth_scope:
+      - lifecycle_de_sessao
+      - replay
+      - recovery
+      - handoff_entre_sessoes
+      - lineage_de_execucao
+    local_path: /Users/diego/Documents/GitHub/omega
+    remote: https://github.com/tiatendeai/omega.git
+    notes:
+      - Repositorio destinado ao ciclo de sessão, replay e recovery do Jarvis.
+      - Ainda possui dívida estrutural entre README, CI e filesystem material.
+      - Deve operar sobre os invariantes de identidade definidos pelo Alpha e sob governança do STATE.
+
+  - id: codex/ruptur
+    classification: execution_trunk
+    role: implementacao_operacao_jarvis
+    maturity: active_with_drift
+    source_of_truth_scope:
+      - codigo
+      - contratos_ativos
+      - runbooks_operacionais
+      - RAG_operacional
+      - deploy
+    local_path: /Users/diego/Documents/GitHub/codex/ruptur
+    remote: https://github.com/tiatendeai/ruptur.git
+    notes:
+      - Maior concentracao de verdade operacional na auditoria inicial.
+      - Possui drift local, conflitos de merge e referencias legadas a corrigir.
+
+  - id: ruptur-prompts
+    classification: lab
+    role: prompts_patterns_rd
+    maturity: useful_non_canonical
+    source_of_truth_scope:
+      - hipoteses
+      - repertorio_de_prompts
+      - experimentos_multiagente
+    local_path: /Users/diego/Documents/GitHub/ruptur-prompts
+    remote: https://github.com/tiatendeai/ruptur-prompts.git
+    notes:
+      - Biblioteca complementar de prompts e padrões.
+      - Nao deve ser tratada como producao sem curadoria e promocao formal.
+
+  - id: tiatendeai-business-boost
+    classification: active_satellite
+    role: oficina_warmup_manager
+    maturity: active_integration
+    source_of_truth_scope:
+      - warmup_manager_local
+      - entrega_controlada_do_modulo
+      - trilha_de_integracao_com_ruptur
+    local_path: /Users/diego/Documents/GitHub/tiatendeai-business-boost
+    remote: unknown
+    notes:
+      - Satelite ativo e relevante.
+      - Deve alimentar o tronco e o STATE, nao competir com eles.
+
+  - id: happy-client-messager
+    classification: legacy_satellite
+    role: ancestral_operacional_de_canais_dispatcher_warmup
+    maturity: legacy_with_sensitive_risk
+    source_of_truth_scope:
+      - arqueologia_operacional
+      - extração_seletiva_de_ativos
+    local_path: /Users/diego/Documents/GitHub/happy-client-messager
+    remote: unknown
+    notes:
+      - Existe tambem como submodulo em codex/ruptur.
+      - Requer politica explicita de responsabilidade, extração e risco de dados sensiveis.
+
+  - id: vps-oracle
+    classification: infra_satellite
+    role: referencia_de_provisionamento_e_topologia
+    maturity: reference
+    source_of_truth_scope:
+      - topologia
+      - provisionamento
+      - observabilidade
+      - acesso
+    local_path: /Users/diego/Documents/GitHub/vps-oracle
+    remote: unknown
+    notes:
+      - Satelite de infraestrutura.
+      - Deve alimentar runbooks e registry canônico, sem virar tronco paralelo.
+
+  - id: codex/sdr
+    classification: product_motion_satellite
+    role: playbooks_comerciais_jornadas_e_agentes
+    maturity: reference
+    source_of_truth_scope:
+      - motion_comercial
+      - jornadas
+      - playbooks
+    local_path: /Users/diego/Documents/GitHub/codex/sdr
+    remote: unknown
+    notes:
+      - Relevante para produto, descoberta e workflows comerciais.
+      - Nao e fonte operacional primaria do ecossistema.

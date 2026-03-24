@@ -1,0 +1,31 @@
+# Espelho local gerado por scripts/jarvis/sync_state_duality.py.
+# Fonte canônica: ../../state/registry/supervision.yaml
+# Não edite manualmente aqui sem promover no STATE.
+
+# Espelho local gerado por scripts/jarvis/sync_state_duality.py.
+# Fonte canônica: ../../state/registry/supervision.yaml
+# Não edite manualmente aqui sem promover no STATE.
+
+version: 1
+updated_at: 2026-03-23
+
+supervision:
+  entity: jarvis
+  governance_repo: state
+  session_repo: omega
+  operational_repo: codex/ruptur
+  operator: diego
+  supervision_rules:
+    - identidade_raiz_e_genese_em_alpha
+    - governanca_e_reconciliacao_em_state
+    - lifecycle_de_sessao_em_omega
+    - operacao_viva_no_repo_do_dominio
+  active_chain:
+    - scope: identidade_raiz
+      authority: alpha
+    - scope: governanca_e_reconciliacao
+      authority: state
+    - scope: lifecycle_de_sessao
+      authority: omega
+    - scope: operacao
+      authority: codex/ruptur

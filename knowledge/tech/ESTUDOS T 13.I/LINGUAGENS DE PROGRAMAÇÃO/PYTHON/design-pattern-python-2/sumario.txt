@@ -1,0 +1,42 @@
+# Espelho local gerado por scripts/jarvis/sync_state_duality.py.
+# Fonte canônica: ../../state/knowledge/tech/ESTUDOS T 13.I/LINGUAGENS DE PROGRAMAÇÃO/PYTHON/design-pattern-python-2/sumario.txt
+# Não edite manualmente aqui sem promover no STATE.
+
+Design Patterns Python II: Boas pr�ticas de programa��o
+
+
+1	1. F�bricas e o problema de cria��o de objetos
+1.1	V�deo 1.1
+1.2	Explica��o
+1.3	Nomenclatura
+1.4	Factory e Builder
+1.5	Factory sem classe
+1.6	Escrevendo a f�brica
+
+2	2. Salvando estados anteriores e o Memento
+2.1	V�deo 2.1
+2.2	Explica��o
+2.3	Criando a classe Contrato
+2.4	Memento
+2.5	Necessidade da Classe Estado
+2.6	Problemas do memento
+
+3	3. DSLs e o Interpreter
+3.1	V�deo 3.1
+3.2	Explica��o
+3.3	Quando usar?
+3.4	Interpreter
+3.5	Classe abstrata
+
+4	4. Estruturas de dados e o Visitor
+4.1	V�deo 4.1
+4.2	Explica��o
+4.3	Implementando o padr�o Visitor
+4.4	Outra implementa��o de visitor
+
+5	5. Diferentes a��es com Command
+5.1	V�deo 5.1
+5.2	Explica��o
+5.3	Classe pedido
+5.4	Diferen�as
+5.5	Command

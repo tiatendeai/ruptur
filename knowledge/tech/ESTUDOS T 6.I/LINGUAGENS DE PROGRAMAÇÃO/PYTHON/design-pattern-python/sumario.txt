@@ -1,0 +1,71 @@
+# Espelho local gerado por scripts/jarvis/sync_state_duality.py.
+# Fonte canônica: ../../state/knowledge/tech/ESTUDOS T 6.I/LINGUAGENS DE PROGRAMAÇÃO/PYTHON/design-pattern-python/sumario.txt
+# Não edite manualmente aqui sem promover no STATE.
+
+Design Patterns Python I: Boas pr�ticas de programa��o
+
+
+1	1. A grande variedade de impostos e o padr�o Strategy
+1.1	V�deo 1.1
+1.2	Explica��o
+1.3	Preparando o ambiente
+1.4	Padr�o de projeto
+1.5	Motiva��o dos padr�es
+1.6	Quando usar o Strategy?
+1.7	Strategy o tempo todo?
+1.8	Colocando em pr�tica
+
+2	2. Muitos Descontos e o Chain of Responsibility
+2.1	V�deo 2.1
+2.2	Explica��o
+2.3	Quando usar o Chain of Responsibility?
+2.4	Utilidade da classe Calculador_de_descontos
+2.5	Strategy e Chain of Responsibility
+2.6	Desvantagens de Patterns
+2.7	Colocando em pr�tica
+
+3	3. C�digos parecidos e o Template Method
+3.1	V�deo 3.1
+3.2	Explica��o
+3.3	Classes abstratas
+3.4	Quando usar o Template Method?
+3.5	O princ�pio de Hollywood
+3.6	Colocando em pr�tica
+
+4	4. Comportamentos compostos por outros comportamentos e o Decorator
+4.1	V�deo 4.1
+4.2	Explica��o
+4.3	Quando usar o Decorator?
+4.4	Decorator ou Chain of Responsibility
+4.5	Decorator do Python
+4.6	Colocando em pr�tica
+
+5	5. Estados que variam e o State
+5.1	V�deo 5.1
+5.2	Explica��o
+5.3	Refletindo sobre o c�digo
+5.4	Quando usar o State?
+5.5	Colocando em pr�tica
+5.6	Desconto Extra aplicado uma �nica vez
+
+6	6. Cria��o de Objetos e Builder
+6.1	V�deo 6.1
+6.2	Explica��o
+6.3	Python e construtor
+6.4	Builder vs Recursos de linguagem
+6.5	Quando usar o Builder?
+6.6	Colocando em pr�tica
+
+7	7. Executando diferentes a��es e o Observer
+7.1	V�deo 7.1
+7.2	Explica��o
+7.3	Quando usar o Observer?
+7.4	Colocando em pr�tica
+
+8	8. Al�m dos padr�es de projeto
+8.1	Explica��o
+8.2	Qual � o padr�o para o problema dos V�rios Filtros?
+8.3	Qual � o padr�o para o problema da Notifica��o de Sistemas Externos?
+8.4	Qual � o padr�o para o problema dos Algoritmos Similares?
+8.5	Qual � o padr�o para o problema do Contrato?
+8.6	O que voce pensa sobre Padr�es de Projeto?

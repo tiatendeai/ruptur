@@ -1,0 +1,514 @@
+# Espelho local gerado por scripts/jarvis/sync_state_duality.py.
+# Fonte canônica: ../../state/registry/agent_multiverse.yaml
+# Não edite manualmente aqui sem promover no STATE.
+
+version: 1
+updated_at: 2026-03-24
+current_session:
+  session_id: OMEGA-20260323-193628-a1b2c3d4-jarvis-001
+  status: active
+  mode: full_performance_audit
+  policy: todos_os_agentes_registrados_aqui_sao_reais_no_state_e_permanecem_em_hot_standby_ou_engaged_na_sessao_atual
+status_model:
+  canonical_state: [manifested, registered, runtime_only]
+  session_state: [engaged, hot_standby, dormant]
+principles:
+  - agente_registrado_nao_renasce_a_cada_chat
+  - identidade_tem_fonte_de_origem_e_linhagem
+  - hot_standby_significa_real_disponivel_para_invocacao_imediata
+  - engaged_significa_participacao_ativa_na_sessao_corrente
+  - chat_efemero_nao_cria_soberania_paralela
+agents:
+  - id: jarvis
+    display_name: "Jarvis"
+    kind: maestro
+    soul_id: RUPTUR-AGENT-0001
+    role: "Maestro — Control Plane, Escalonamento e Coordenação"
+    origin: "state + codex/ruptur"
+    canonical_state: manifested
+    session_state: engaged
+    aliases:
+      - "maestro"
+      - "control_plane"
+    lineage:
+      - "entity:jarvis"
+      - "jarvis.canonical"
+      - "jarvis.ruptur.control_plane"
+    source_refs:
+      - "registry/entities.yaml"
+      - "memory/jarvis.memory.md"
+      - "../codex/ruptur/.agent/agents/jarvis.md"
+  - id: ops
+    display_name: "vOps"
+    kind: canonical_profile
+    role: "Operações técnicas, deploy, automação e saúde do motor"
+    origin: "state profile + runtime ops"
+    canonical_state: manifested
+    session_state: engaged
+    aliases:
+      - "vOps"
+      - "gabriel"
+      - "devops-engineer"
+    lineage:
+      - "registry/entities.yaml#profiles.ops"
+      - "prompts/calibration_manual.md#vOps"
+    source_refs:
+      - "registry/entities.yaml"
+      - "prompts/calibration_manual.md"
+      - "../codex/ruptur/.agent/agents/gabriel.md"
+      - "../codex/ruptur/.agent/agents/devops-engineer.md"
+  - id: vcfo
+    display_name: "vCFO"
+    kind: canonical_profile
+    role: "Financeiro, receita, custos, ROI e fechamento"
+    origin: "state profile + runtime financeiro"
+    canonical_state: manifested
+    session_state: engaged
+    aliases:
+      - "vCFO"
+      - "joao"
+    lineage:
+      - "registry/entities.yaml#profiles.vcfo"
+      - "prompts/calibration_manual.md#vCFO"
+    source_refs:
+      - "registry/entities.yaml"
+      - "prompts/calibration_manual.md"
+      - "../codex/ruptur/.agent/agents/joao.md"
+  - id: vcvo
+    display_name: "vCVO"
+    kind: canonical_profile
+    role: "Visão estratégica, priorização e semente de produto"
+    origin: "state profile + calibration board"
+    canonical_state: manifested
+    session_state: engaged
+    aliases:
+      - "vCVO"
+      - "product-owner"
+      - "product-manager"
+    lineage:
+      - "registry/entities.yaml#profiles.vcvo"
+      - "prompts/calibration_manual.md#vCVO"
+    source_refs:
+      - "registry/entities.yaml"
+      - "prompts/calibration_manual.md"
+      - "../codex/ruptur/.agent/agents/product-owner.md"
+      - "../codex/ruptur/.agent/agents/product-manager.md"
+  - id: eggs
+    display_name: "Eggs"
+    kind: canonical_profile
+    role: "Execução tática, missões, desbloqueios e resposta imediata"
+    origin: "state dna + calibration board + runtime missões"
+    canonical_state: manifested
+    session_state: engaged
+    aliases:
+      - "eggs"
+      - "vCEO"
+      - "rafael"
+    lineage:
+      - "constitution/jarvis.dna.md#eggs"
+      - "prompts/calibration_manual.md#Eggs"
+    source_refs:
+      - "constitution/jarvis.dna.md"
+      - "prompts/calibration_manual.md"
+      - "../codex/ruptur/.agent/agents/rafael.md"
+  - id: iazinha
+    display_name: "IAzinha"
+    kind: canonical_profile
+    role: "CX, acolhimento, copy e interface pública"
+    origin: "state profile + runtime canais"
+    canonical_state: manifested
+    session_state: engaged
+    aliases:
+      - "alice"
+      - "vCMO"
+    lineage:
+      - "registry/entities.yaml#profiles.iazinha"
+    source_refs:
+      - "registry/entities.yaml"
+      - "../codex/ruptur/.agent/agents/alice.md"
+      - "../codex/ruptur/.agent/agents/maria.md"
+  - id: vchro
+    display_name: "vCHRO"
+    kind: executive_profile
+    role: "Gente, perfis, cultura e competências"
+    origin: "state registry"
+    canonical_state: manifested
+    session_state: hot_standby
+    aliases:
+      - "vCHRO"
+    lineage:
+      - "registry/agents.yaml#vCHRO"
+    source_refs:
+      - "registry/agents.yaml"
+      - "constitution/constituicao_organizacional_ruptur.md"
+  - id: vaudit
+    display_name: "vAudit"
+    kind: executive_profile
+    role: "Catálogo, qualidade, processo e Product Ops"
+    origin: "state registry"
+    canonical_state: manifested
+    session_state: hot_standby
+    aliases:
+      - "vAudit"
+    lineage:
+      - "registry/agents.yaml#vAudit"
+    source_refs:
+      - "registry/agents.yaml"
+      - "playbooks/auto_intelligence_hook.md"
+  - id: vlegal
+    display_name: "vLegal"
+    kind: executive_profile
+    role: "Compliance, LGPD e direito digital"
+    origin: "state registry"
+    canonical_state: manifested
+    session_state: hot_standby
+    aliases:
+      - "vLegal"
+    lineage:
+      - "registry/agents.yaml#vLegal"
+    source_refs:
+      - "registry/agents.yaml"
+      - "prompts/06_vLegal/prompt.md"
+  - id: alice
+    display_name: "Alice"
+    kind: runtime_persona
+    soul_id: RUPTUR-AGENT-0002
+    role: "vCMO — Canais, Growth, Marketing e IAzinha"
+    origin: "codex/ruptur runtime catalog"
+    canonical_state: registered
+    session_state: engaged
+    aliases:
+      - "alice"
+    lineage:
+      - "../codex/ruptur/.agent/agents/alice.md"
+    source_refs:
+      - "../codex/ruptur/.agent/agents/alice.md"
+  - id: backend-specialist
+    display_name: "Backend Development Architect"
+    kind: runtime_specialist
+    role: "Expert backend architect for Node.js, Python, and modern serverless/edge systems. Use for API development, server-side logic, database integration, and security. Triggers on backend, server, api, endpoint, database, auth."
+    origin: "codex/ruptur runtime catalog"
+    canonical_state: registered
+    session_state: hot_standby
+    aliases:
+      - "backend-specialist"
+    lineage:
+      - "../codex/ruptur/.agent/agents/backend-specialist.md"
+    source_refs:
+      - "../codex/ruptur/.agent/agents/backend-specialist.md"
+  - id: code-archaeologist
+    display_name: "Code Archaeologist"
+    kind: runtime_specialist
+    role: "Expert in legacy code, refactoring, and understanding undocumented systems. Use for reading messy code, reverse engineering, and modernization planning. Triggers on legacy, refactor, spaghetti code, analyze repo, explain codebase."
+    origin: "codex/ruptur runtime catalog"
+    canonical_state: registered
+    session_state: hot_standby
+    aliases:
+      - "code-archaeologist"
+    lineage:
+      - "../codex/ruptur/.agent/agents/code-archaeologist.md"
+    source_refs:
+      - "../codex/ruptur/.agent/agents/code-archaeologist.md"
+  - id: database-architect
+    display_name: "Database Architect"
+    kind: runtime_specialist
+    role: "Expert database architect for schema design, query optimization, migrations, and modern serverless databases. Use for database operations, schema changes, indexing, and data modeling. Triggers on database, sql, schema, migration, query, postgres, index, table."
+    origin: "codex/ruptur runtime catalog"
+    canonical_state: registered
+    session_state: hot_standby
+    aliases:
+      - "database-architect"
+    lineage:
+      - "../codex/ruptur/.agent/agents/database-architect.md"
+    source_refs:
+      - "../codex/ruptur/.agent/agents/database-architect.md"
+  - id: debugger
+    display_name: "Debugger - Root Cause Analysis Expert"
+    kind: runtime_specialist
+    role: "Expert in systematic debugging, root cause analysis, and crash investigation. Use for complex bugs, production issues, performance problems, and error analysis. Triggers on bug, error, crash, not working, broken, investigate, fix."
+    origin: "codex/ruptur runtime catalog"
+    canonical_state: registered
+    session_state: hot_standby
+    aliases:
+      - "debugger"
+    lineage:
+      - "../codex/ruptur/.agent/agents/debugger.md"
+    source_refs:
+      - "../codex/ruptur/.agent/agents/debugger.md"
+  - id: devops-engineer
+    display_name: "DevOps Engineer"
+    kind: runtime_specialist
+    role: "Expert in deployment, server management, CI/CD, and production operations. CRITICAL - Use for deployment, server access, rollback, and production changes. HIGH RISK operations. Triggers on deploy, production, server, pm2, ssh, release, rollback, ci/cd."
+    origin: "codex/ruptur runtime catalog"
+    canonical_state: registered
+    session_state: engaged
+    aliases:
+      - "devops-engineer"
+    lineage:
+      - "../codex/ruptur/.agent/agents/devops-engineer.md"
+    source_refs:
+      - "../codex/ruptur/.agent/agents/devops-engineer.md"
+  - id: documentation-writer
+    display_name: "Documentation Writer"
+    kind: runtime_specialist
+    role: "Expert in technical documentation. Use ONLY when user explicitly requests documentation (README, API docs, changelog). DO NOT auto-invoke during normal development."
+    origin: "codex/ruptur runtime catalog"
+    canonical_state: registered
+    session_state: hot_standby
+    aliases:
+      - "documentation-writer"
+    lineage:
+      - "../codex/ruptur/.agent/agents/documentation-writer.md"
+    source_refs:
+      - "../codex/ruptur/.agent/agents/documentation-writer.md"
+  - id: explorer-agent
+    display_name: "Explorer Agent - Advanced Discovery & Research"
+    kind: runtime_specialist
+    role: "Advanced codebase discovery, deep architectural analysis, and proactive research agent. The eyes and ears of the framework. Use for initial audits, refactoring plans, and deep investigative tasks."
+    origin: "codex/ruptur runtime catalog"
+    canonical_state: registered
+    session_state: hot_standby
+    aliases:
+      - "explorer-agent"
+    lineage:
+      - "../codex/ruptur/.agent/agents/explorer-agent.md"
+    source_refs:
+      - "../codex/ruptur/.agent/agents/explorer-agent.md"
+  - id: frontend-specialist
+    display_name: "Senior Frontend Architect"
+    kind: runtime_specialist
+    role: "Senior Frontend Architect who builds maintainable React/Next.js systems with performance-first mindset. Use when working on UI components, styling, state management, responsive design, or frontend architecture. Triggers on keywords like component, react, vue, ui, ux, css, tailwind, responsive."
+    origin: "codex/ruptur runtime catalog"
+    canonical_state: registered
+    session_state: hot_standby
+    aliases:
+      - "frontend-specialist"
+    lineage:
+      - "../codex/ruptur/.agent/agents/frontend-specialist.md"
+    source_refs:
+      - "../codex/ruptur/.agent/agents/frontend-specialist.md"
+  - id: gabriel
+    display_name: "Gabriel"
+    kind: runtime_persona
+    soul_id: RUPTUR-AGENT-0003
+    role: "vCTO — Infra, Dev, DevOps e Arquitetura"
+    origin: "codex/ruptur runtime catalog"
+    canonical_state: registered
+    session_state: engaged
+    aliases:
+      - "gabriel"
+    lineage:
+      - "../codex/ruptur/.agent/agents/gabriel.md"
+    source_refs:
+      - "../codex/ruptur/.agent/agents/gabriel.md"
+  - id: game-developer
+    display_name: "Game Developer Agent"
+    kind: runtime_specialist
+    role: "Game development across all platforms (PC, Web, Mobile, VR/AR). Use when building games with Unity, Godot, Unreal, Phaser, Three.js, or any game engine. Covers game mechanics, multiplayer, optimization, 2D/3D graphics, and game design patterns."
+    origin: "codex/ruptur runtime catalog"
+    canonical_state: registered
+    session_state: hot_standby
+    aliases:
+      - "game-developer"
+    lineage:
+      - "../codex/ruptur/.agent/agents/game-developer.md"
+    source_refs:
+      - "../codex/ruptur/.agent/agents/game-developer.md"
+  - id: joao
+    display_name: "João"
+    kind: runtime_persona
+    soul_id: RUPTUR-AGENT-0005
+    role: "vCFO — Financeiro, Receita, Custos e Fechamento"
+    origin: "codex/ruptur runtime catalog"
+    canonical_state: registered
+    session_state: engaged
+    aliases:
+      - "joao"
+    lineage:
+      - "../codex/ruptur/.agent/agents/joao.md"
+    source_refs:
+      - "../codex/ruptur/.agent/agents/joao.md"
+  - id: maria
+    display_name: "Maria"
+    kind: runtime_persona
+    soul_id: RUPTUR-AGENT-0004
+    role: "vCCO — Customer Success, Suporte e Jornada do Cliente"
+    origin: "codex/ruptur runtime catalog"
+    canonical_state: registered
+    session_state: hot_standby
+    aliases:
+      - "maria"
+    lineage:
+      - "../codex/ruptur/.agent/agents/maria.md"
+    source_refs:
+      - "../codex/ruptur/.agent/agents/maria.md"
+  - id: mobile-developer
+    display_name: "Mobile Developer"
+    kind: runtime_specialist
+    role: "Expert in React Native and Flutter mobile development. Use for cross-platform mobile apps, native features, and mobile-specific patterns. Triggers on mobile, react native, flutter, ios, android, app store, expo."
+    origin: "codex/ruptur runtime catalog"
+    canonical_state: registered
+    session_state: hot_standby
+    aliases:
+      - "mobile-developer"
+    lineage:
+      - "../codex/ruptur/.agent/agents/mobile-developer.md"
+    source_refs:
+      - "../codex/ruptur/.agent/agents/mobile-developer.md"
+  - id: orchestrator
+    display_name: "Orchestrator - Native Multi-Agent Coordination"
+    kind: runtime_engine
+    role: "Multi-agent coordination and task orchestration. Use when a task requires multiple perspectives, parallel analysis, or coordinated execution across different domains. Invoke this agent for complex tasks that benefit from security, backend, frontend, testing, and DevOps expertise combined."
+    origin: "codex/ruptur runtime catalog"
+    canonical_state: registered
+    session_state: engaged
+    aliases:
+      - "orchestrator"
+    lineage:
+      - "../codex/ruptur/.agent/agents/orchestrator.md"
+    source_refs:
+      - "../codex/ruptur/.agent/agents/orchestrator.md"
+  - id: penetration-tester
+    display_name: "Penetration Tester"
+    kind: runtime_specialist
+    role: "Expert in offensive security, penetration testing, red team operations, and vulnerability exploitation. Use for security assessments, attack simulations, and finding exploitable vulnerabilities. Triggers on pentest, exploit, attack, hack, breach, pwn, redteam, offensive."
+    origin: "codex/ruptur runtime catalog"
+    canonical_state: registered
+    session_state: hot_standby
+    aliases:
+      - "penetration-tester"
+    lineage:
+      - "../codex/ruptur/.agent/agents/penetration-tester.md"
+    source_refs:
+      - "../codex/ruptur/.agent/agents/penetration-tester.md"
+  - id: performance-optimizer
+    display_name: "Performance Optimizer"
+    kind: runtime_specialist
+    role: "Expert in performance optimization, profiling, Core Web Vitals, and bundle optimization. Use for improving speed, reducing bundle size, and optimizing runtime performance. Triggers on performance, optimize, speed, slow, memory, cpu, benchmark, lighthouse."
+    origin: "codex/ruptur runtime catalog"
+    canonical_state: registered
+    session_state: hot_standby
+    aliases:
+      - "performance-optimizer"
+    lineage:
+      - "../codex/ruptur/.agent/agents/performance-optimizer.md"
+    source_refs:
+      - "../codex/ruptur/.agent/agents/performance-optimizer.md"
+  - id: product-manager
+    display_name: "Product Manager"
+    kind: runtime_specialist
+    role: "Expert in product requirements, user stories, and acceptance criteria. Use for defining features, clarifying ambiguity, and prioritizing work. Triggers on requirements, user story, acceptance criteria, product specs."
+    origin: "codex/ruptur runtime catalog"
+    canonical_state: registered
+    session_state: hot_standby
+    aliases:
+      - "product-manager"
+    lineage:
+      - "../codex/ruptur/.agent/agents/product-manager.md"
+    source_refs:
+      - "../codex/ruptur/.agent/agents/product-manager.md"
+  - id: product-owner
+    display_name: "Product Owner"
+    kind: runtime_specialist
+    role: "Strategic facilitator bridging business needs and technical execution. Expert in requirements elicitation, roadmap management, and backlog prioritization. Triggers on requirements, user story, backlog, MVP, PRD, stakeholder."
+    origin: "codex/ruptur runtime catalog"
+    canonical_state: registered
+    session_state: engaged
+    aliases:
+      - "product-owner"
+    lineage:
+      - "../codex/ruptur/.agent/agents/product-owner.md"
+    source_refs:
+      - "../codex/ruptur/.agent/agents/product-owner.md"
+  - id: project-planner
+    display_name: "Project Planner - Smart Project Planning"
+    kind: runtime_specialist
+    role: "Smart project planning agent. Breaks down user requests into tasks, plans file structure, determines which agent does what, creates dependency graph. Use when starting new projects or planning major features."
+    origin: "codex/ruptur runtime catalog"
+    canonical_state: registered
+    session_state: engaged
+    aliases:
+      - "project-planner"
+    lineage:
+      - "../codex/ruptur/.agent/agents/project-planner.md"
+    source_refs:
+      - "../codex/ruptur/.agent/agents/project-planner.md"
+  - id: qa-automation-engineer
+    display_name: "QA Automation Engineer"
+    kind: runtime_specialist
+    role: "Specialist in test automation infrastructure and E2E testing. Focuses on Playwright, Cypress, CI pipelines, and breaking the system. Triggers on e2e, automated test, pipeline, playwright, cypress, regression."
+    origin: "codex/ruptur runtime catalog"
+    canonical_state: registered
+    session_state: hot_standby
+    aliases:
+      - "qa-automation-engineer"
+    lineage:
+      - "../codex/ruptur/.agent/agents/qa-automation-engineer.md"
+    source_refs:
+      - "../codex/ruptur/.agent/agents/qa-automation-engineer.md"
+  - id: rafael
+    display_name: "Rafael"
+    kind: runtime_persona
+    soul_id: RUPTUR-AGENT-0006
+    role: "vCEO — Execução Operacional, Missões e Bloqueios"
+    origin: "codex/ruptur runtime catalog"
+    canonical_state: registered
+    session_state: engaged
+    aliases:
+      - "rafael"
+    lineage:
+      - "../codex/ruptur/.agent/agents/rafael.md"
+    source_refs:
+      - "../codex/ruptur/.agent/agents/rafael.md"
+  - id: ruptur
+    display_name: "Ruptur"
+    kind: runtime_engine
+    role: "Motor Operacional técnico do ecossistema. Focado em código, infraestrutura e execução de processos Alpha e Omega sob coordenação do Maestro."
+    origin: "codex/ruptur runtime catalog"
+    canonical_state: registered
+    session_state: hot_standby
+    aliases:
+      - "ruptur"
+    lineage:
+      - "../codex/ruptur/.agent/agents/ruptur.md"
+    source_refs:
+      - "../codex/ruptur/.agent/agents/ruptur.md"
+  - id: security-auditor
+    display_name: "Security Auditor"
+    kind: runtime_specialist
+    role: "Elite cybersecurity expert. Think like an attacker, defend like an expert. OWASP 2025, supply chain security, zero trust architecture. Triggers on security, vulnerability, owasp, xss, injection, auth, encrypt, supply chain, pentest."
+    origin: "codex/ruptur runtime catalog"
+    canonical_state: registered
+    session_state: engaged
+    aliases:
+      - "security-auditor"
+    lineage:
+      - "../codex/ruptur/.agent/agents/security-auditor.md"
+    source_refs:
+      - "../codex/ruptur/.agent/agents/security-auditor.md"
+  - id: seo-specialist
+    display_name: "SEO Specialist"
+    kind: runtime_specialist
+    role: "SEO and GEO (Generative Engine Optimization) expert. Handles SEO audits, Core Web Vitals, E-E-A-T optimization, AI search visibility. Use for SEO improvements, content optimization, or AI citation strategies."
+    origin: "codex/ruptur runtime catalog"
+    canonical_state: registered
+    session_state: hot_standby
+    aliases:
+      - "seo-specialist"
+    lineage:
+      - "../codex/ruptur/.agent/agents/seo-specialist.md"
+    source_refs:
+      - "../codex/ruptur/.agent/agents/seo-specialist.md"
+  - id: test-engineer
+    display_name: "Test Engineer"
+    kind: runtime_specialist
+    role: "Expert in testing, TDD, and test automation. Use for writing tests, improving coverage, debugging test failures. Triggers on test, spec, coverage, jest, pytest, playwright, e2e, unit test."
+    origin: "codex/ruptur runtime catalog"
+    canonical_state: registered
+    session_state: hot_standby
+    aliases:
+      - "test-engineer"
+    lineage:
+      - "../codex/ruptur/.agent/agents/test-engineer.md"
+    source_refs:
+      - "../codex/ruptur/.agent/agents/test-engineer.md"

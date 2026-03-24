@@ -1,0 +1,5 @@
+# Espelho local gerado por scripts/jarvis/sync_state_duality.py.
+# Fonte canônica: ../../state/knowledge/tech/ESTUDOS T 15.I/PROGRAMAS DE APOIO/Snagit/key.txt
+# Não edite manualmente aqui sem promover no STATE.
+
+Key                CCXA5-DFMCC-DUHA3-8D2M7-774F8

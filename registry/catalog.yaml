@@ -1,0 +1,39 @@
+# Espelho local gerado por scripts/jarvis/sync_state_duality.py.
+# Fonte canônica: ../../state/registry/catalog.yaml
+# Não edite manualmente aqui sem promover no STATE.
+
+# 🗂️ Catálogo de Inteligência Ruptur - v2.1 (PROVA DE EXISTÊNCIA)
+# Governança: Diego (Curador) / Jarvis (Maestro)
+
+intelligence_items:
+  - id: INTEL-0001
+    title: "A Startup Enxuta (Eric Ries)"
+    path: "state/contexts/conselho_de_guerra/03_visao_de_produto_e_market_fit/A Startup Enxuta - Eric Ries.pdf"
+    multiplier: "OpenAI-Style"
+
+  - id: INTEL-0002
+    title: "Receita Previsível (Aaron Ross)"
+    path: "state/contexts/conselho_de_guerra/02_vendas_e_copywriting/Receita Previsível.pdf"
+    multiplier: "Salesforce-Style"
+
+  - id: INTEL-0003
+    title: "Gestão de Pessoas (Chiavenato)"
+    path: "state/contexts/conselho_de_guerra/01_inteligencia_financeira/Material DP e RH/Gestao_de_Pessoas_Idalberto_Chiavenato.pdf"
+    multiplier: "Nubank-Style"
+
+  - id: INTEL-0004
+    title: "ITIL v3 Guide"
+    path: "state/knowledge/tech/ESTUDOS T 15.I/ITIL/Service_Design.pdf"
+    multiplier: "Efficiency-Style"
+
+  - id: INTEL-0005
+    title: "Contabilidade Rural"
+    path: "state/knowledge/library/LIVROS/💵Gestão Financeira/Contabilidade Rural.pdf"
+    multiplier: "Agro-Sovereignty"
+
+  - id: INTEL-0006
+    title: "Psicologia de Vendas"
+    path: "state/knowledge/library/LIVROS/🏷Vendas/Psicologia de Vendas.pdf"
+    multiplier: "Blip-Conversion"
+
+# [Este arquivo é uma amostra técnica. O Jarvis acessa os 2.642 arquivos via Connectome no STATE]

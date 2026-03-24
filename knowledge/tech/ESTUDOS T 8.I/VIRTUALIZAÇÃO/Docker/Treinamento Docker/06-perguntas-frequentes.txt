@@ -1,0 +1,53 @@
+# Espelho local gerado por scripts/jarvis/sync_state_duality.py.
+# Fonte canônica: ../../state/knowledge/tech/ESTUDOS T 8.I/VIRTUALIZAÇÃO/Docker/Treinamento Docker/06-perguntas-frequentes.txt
+# Não edite manualmente aqui sem promover no STATE.
+
+Perguntas frequentes
+Section 4, Lecture 7
+Pergunta: Qual � a diferen�a entre VMs e containers LXC?
+
+Uma Virtual Machine (VM) consiste em rodar diversos Sistemas Operacionais (SOs) clientes completos (Linux, Windows, BSD, �) em recursos de hardware compartilhados. Tais SOs podem ser diferentes em cada VM e tamb�m pode ser diferente do sistema operacional base, onde rodam as VMs. Cada kernel do Sistema Operacional virtualizado considera sua execu��o em um hardware comum, sendo ele gen�rico ou um driver hypervisorespec�fico.
+
+Os Containers s�o isolamento de recursos: processos, sistema de arquivos, interfaces de rede e outros recursos do kernel (mem�ria compartilhada, mutexes, sem�foros, �) sendo executando dentro de um sistema operacional, com algumas limita��es (CPU, mem�ria, iops). Os Containers s�o comumente descritos como �chroot on steroids�. O FreeBSD jails ou o Solaris zones/containers possuem o mesmo objetivo.
+
+Padr�o de virtualiza��o:
+
+
+Virtualiza��o container:
+
+
+Pergunta: Um container LXC pode rodar diversas distribui��es Linux em um mesmo host?
+
+Resposta direta: Sim.
+
+Resposta elaborada: Os containers compartilham o kernel de seus sistemas operacionais hosts. Logo, eles s�o capazes de coletar dados desses sistemas, por�m possuem seu pr�prios grupo de processos, configura��es de rede e sistemas de arquivo. � poss�vel incializar um container LXC Debian em um host LXC CentOS: neste caso o comando uname retorna a informa��o do kernel do host, exceto o hostname, dado que o arquivo /etc/*-release contem a informa��o do Debian sendo executado. Neste caso, o sistemas de gerenciamento de pacotes ser� o RPM para o host e o DPKG para o container.
+
+Pergunta: Ent�o, se containers s�o nada mais do que isolamento, porque compar�-los a VMs?
+
+No mundo Linux, incializar um container com um conjunto de processos de um sistema operacional completo (init, systemd, upstart, ssh) com um sistema de arquivos dedicado, d� acesso a um sistema isolado o qual realmente se comporta como uma VM, de uma perspectiva do usu�rio. � poss�vel �logar� na m�quina atrav�s de ssh em um IP dedicado, executar comandos como sudo, ps, top, yum/apt-get install, keill, service apache2 restart. OpenStack, libvirt, vagrant se conectam com LXC com uma outra maneira de prover VMs, mesmo que o termo n�o se encaixe.
+
+Pergunta: E como fica o consumo de mem�ria?
+
+O consumo de mem�ria consiste somente no total consumido pelo processo. Isto faz com que containers sejam t�o leves que � poss�vel lan�ar v�rios containers no mesmo host.
+
+Pergunta: O que s�o Dockerfiles?
+
+Assim como um Makefile ou um Vagrantfile, um Dockerfile � um arquivo texto utilizado para descrever a maneira como construir uma imagem Docker. A sintaxe de um Dockerfile � bem simples e cont�m somente alguns comandos auto-explicativos (FROM, RUN, CMD, USER, EXPOSE).
+
+# Imagem incial
+FROM ubuntu:latest
+ 
+# Os comandos a serem executados para constru��o do container
+RUN apt-get -y install python-software-properties
+RUN add-apt-repository -y ppa:nginx/stable
+RUN apt-get update
+RUN apt-get install -y nginx
+ 
+ADD nginx.conf /etc/nginx/
+ADD nginx.sh /
+ 
+# qual porta de rede ser� acess�vel para este container
+EXPOSE 80
+ 
+# o comando a ser executado sempre que o container for iniciado
+CMD ["/nginx.sh"]

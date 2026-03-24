@@ -1,0 +1,365 @@
+# Espelho local gerado por scripts/jarvis/sync_state_duality.py.
+# Fonte canônica: ../../state/knowledge/tech/ESTUDOS T 6.I/MICROSOFT/2 - MCSA - Server 2012/MCSA Windows Server 2012 - Computer ONLINE/lista-de-aulas.txt
+# Não edite manualmente aqui sem promover no STATE.
+
+Aula 1 - Requisitos e caracter�sticas do Windows Server 2012.
+
+Aula 2 - Instala��o b�sica do Windows Server 2012.
+
+Aula 3 - Tarefas Administrativas Iniciais.
+
+Aula 4 - Windows no modo Server Core e tarefas de configura��o.
+
+Aula 5 - Migrando do Server Core para o Modo Gr�fico Padr�o e Retonando para o Modo Server Core.
+
+Aula 6 - Mais Tarefas de Administra��o, �rea de Trabalho, Aplica��es.
+
+Aula 7 - Gerenciamento de Drivers.
+
+Aula 8 - Redes basedas em Grupo de Computadores e Redes baseadas em Dom�nio - Conceitos.
+
+Aula 9 - Promovendo um Servidor a Controlador de Dom�nio.
+
+Aula 10 - Ingressando um Servidor em um Dom�nio criado.
+
+Aula 11 - Gerenciando Servidores Remotos.
+
+Aula 12 - Usando o Windows 8 para gerenciar Servidores Windows Server 2012.
+
+Aula 13 - Gerenciando Objetos do Active Directory e Console.
+
+Aula 14 - Gerenciando OUs - Unidades Organizacionais.
+
+Aula 15 - Contas de Usu�rios no AD.
+
+Aula 16 - Propriedades Espec�ficas para as Contas de Usu�rios.
+
+Aula 17 - Perfil do Usu�rio - Conceitos.
+
+Aula 18 - Perfil M�vel para Usu�rios.
+
+Aula 19 - Perfil Mandat�rio para Usu�rios.
+
+Aula 20 - Scripts de Logon.
+
+Aula 21 - Pasta Base para Usu�rios.
+
+Aula 22 - Criando Contas de Modelo.
+
+Aula 23 - Alterando Configura��es de Contas em v�rios Usu�rios.
+
+Aula 24 - Tarefas Administrativas do AD, Delega��o.
+
+Aula 25 - Contas de M�quina no AD.
+
+Aula 26 - Grupos de Usu�rios - Conceitos.
+
+Aula 27 - Tipos de Grupos de Usu�rios. Permiss�es b�sicas.
+
+Aula 28 - Escopos de Grupos de Usu�rios. Grupos Locais, Grupos Globais.
+
+Aula 29 - Criando Controladores de Dom�nio Adicionais.
+
+Aula 30 - Configurado ADs adicionais em localidades distantes.
+
+Aula 31 - Criando Controladores de Dom�nio RODC Read Only Domais Control.
+
+Aula 32 - Rebaixando Controladores de Dom�nio.
+
+Aula 33 - Rebaixando Controladores de Dom�nio em falha na opera��o.
+
+Aula 34 - Fun��es de Mestres de Opera��es - FSMO.
+
+Aula 35 - Transferindo Fun��es de Mestre de Opera��es entre DCs.
+
+Aula 36 - Transferindo Fun��es de Mestre de Opera��es entre DCs atrav�s de Linha de Comando.
+
+Aula 37 - Windows Server como Servidor de Arquivos - Recursos.
+
+Aula 38 - Recursos avan�ados de Servidor de Arquivos.
+
+Aula 39 - Compartilhamento de recursos atrav�s de linha de comando.
+
+Aula 40 - Console do Gerenciamento de Servidores de Arquivos.
+
+Aula 41 - Novas tecnologias de Transfer�ncia de Arquivos.
+
+Aula 42 - Compartilhamento de Arquivos - Gerenciador de Servidores - Enumera��o Baseada em Acesso.
+
+Aula 43 - Compartilhamento de Arquivos - Melhorando a experi�ncia do Usu�rio.
+
+Aula 44 - Mapeamento de Unidades com linha de comando.
+
+Aula 45 - Gerenciamento de Disco com Quotas.
+
+Aula 46 - Usando Quotas com o FSRM.
+
+Aula 47 - Gerenciador de Recursos - Triagem de Arquivos.
+
+ Aula 48 - Relat�rios do FSRM.
+
+Aula 49 - DFS - Distributed File Sistem.
+
+Aula 50 - DFS - Distributed File Sistem.
+
+Aula 51 - Replica��o no DFS.
+
+Aula 52 - Checagem dos Servi�os do DFS.
+
+Aula 53 - C�pia de Sombra - Shadow Copy.
+
+Aula 54 - Desduplica��o de Dados.
+
+Aula 55 - Publica��o de Compratilhamento no Active Directory.
+
+Aula 56 - Arquivos Off-Line.
+
+Aula 57 - Permiss�es NTFS - Aula 1.
+
+Aula 58 - Permiss�es NTFS - Aula 2.
+
+Aula 59 - Permiss�es NTFS por linha de comando.
+
+Aula 60 - Virtualiza��o.
+
+Aula 61 - Habilitando o Hyper-V.
+
+Aula 62 - Habilitando o Hyper-V atrav�s de Linha de Comando.
+
+Aula 63 - Usando o Console do Hyper-V.
+
+Aula 64 - Redes Virtuais no Hyper-V.
+
+Aula 65 - Configurando M�quinas Virtuais no Hyper-V.
+
+Aula 66 - Componentes de integra��o no Hyper-V.
+
+Aula 67 - Trabalhando com discos no Hyper-V.
+
+Aula 68 - Snapshot no Hyper-V
+
+Aula 69 - Exportando m�quinas virtuais
+
+Aula 70 - Importando m�quinas virtuais.
+
+Aula 71 - Compacta��o de dados.
+
+Aula 72 - Criptografia de dados
+
+Aula 73 - Exportando chave criptogr�fica.
+
+Aula 74 - Agente de recupera��o de arquivos criptografados.
+
+Aula 75 - Delega��o.
+
+Aula 76 - Gerenciamento de Discos.
+
+Aula 77 - Particionamento.
+
+Aula 78 - Armazenamento e Performance
+
+Aula 79 - Convers�o de Sistemas de Arquivos.
+
+Aula 80 - Redimencionando Volumes
+
+Aula 81 - Convers�o do Tipo de Discos.
+
+Aula 82 - Trabalhando com Discos Din�micos.
+
+Aula 83 - Criando novos Volumes - RAID
+
+Aula 84 - Aplicando o RAID no Servidor.
+
+Aula 85 - Falhas e recupera��o.
+
+Aula 86 - Storage Spaces.
+
+Aula 87 - Configurando Discos Virtuais no Pool de Armazendamento do Storage Spaces
+
+Aula 88 - Criando Volumes em um Disco Virtual.
+
+Aula 89 - Firewall do Windows
+
+Aula 90 - Configura��o Avan�ada do Firewall
+
+Aula 92 - Regras e configura��o por Linha de Comando do Firewall.
+
+Aula 92 - Sites do Active Directory
+
+Aula 93 - Replica��o em Sites do AD.
+
+Aula 94 - Diretivas de Grupo.
+
+Aula 95 - Diretivas de Grupo: Organizando as Diretivas.
+
+Aula 96 - Diretivas de Grupo - Senhas.
+
+Aula 97 - Diretivas - Bloqueio de Conta
+
+Aula 98 - Auditoria
+
+Aula 99 - Configura��o de Diretivas de Auditoria Avan�adas.
+
+Aula 100 - Atribui��es de Dieitos do Usu�rio.
+
+Aula 101 - Configura��es de Seguran�a Adicionais.
+
+Aula 102 - Configurando GPOs para LOGs.
+
+Aula 103 - Configurando mais Diretivas de Grupo
+
+Aula 104 - Usando Diretivas para alterar Servi�os.
+
+Aula 105 - Alterando Permiss�es de Seguran�a nas Chaves de Registro.
+
+Aula 106 - Usando Diretivas para alterar Permiss�es de Pastas e Arquivos do Sistema.
+
+Aula 107 - Usando DIretivas pra cnfigurar o Firewall do Windows nas Esta��es.
+
+Aula 108 - Group Policy Preferences
+
+Aula 109 - Distribuindo software atrav�s de diretivas.
+
+Aula 110 - Personalizando e controlando a �rea de Trabalho atrav�s de diretivas.
+
+Aula 111 - Diretivas de usu�rio.
+
+AUla 112 - Diretivas de Seguran�a e Armazenamento
+
+Aula 113 - Diretivas de Sistema e Logon
+
+Aula 114 - WDS Parte 1
+
+Aula 115 - WDS Parte 2
+
+Aula 116 - WDS Parte 3
+
+Aula 117 - Windows como Roteador de Internet.
+
+Aula 118 - Agrupamentode Rede
+
+Aula 119 - Roteamento e Acesso Remoto
+
+Aula 120 - Incus�o de rotas no Sistema.
+
+Aula 121 - Utilizando o Console para criar rotas
+
+Aula 122 - Protocolos de Roteamento - RIP
+
+Aula 123 - NAT
+
+Aula 124 - Redirecionamento de Portas no NAT
+
+Aula 125 - VPN
+
+Aula 126 - Diretivas de VPN
+
+Aula 127 - Regras de Acesso Remoto.
+
+Aula 128 - NAP
+
+Aula 129 - Configurando Diretivas do NAP
+
+Aula 130 - Configurando o cliente NAP
+
+Aula 131 - Direct Access
+
+Aula 132 - Configurando os clientes Direct Access.
+
+Aula 133 - Direct Access: Infra-estrutura de Certificados - Parte 1.
+
+Aula 134 - Direct Access: Infra-estrutura de Certificados - Parte 2.
+
+Aula 135 - Direct Access: Administra��o.
+
+Aula 136 - Direct Access - Aplicando as Configura��es na m�quina cliente
+
+Aula 137 - WSUS - Parte 1.
+
+Aula 138 - WSUS - Parte 2.
+
+Aula 139 - WSUS - Parte 3.
+
+Aula 140 - WSUS - Parte 4.
+
+Aula 141 - WSUS - Parte 5.
+
+Aula 142 - Clonagem de Controladores de Dom�nio.
+
+Aula 143 - DNS - Parte 1
+
+Aula 144 - DNS - Parte 2.
+
+Aula 145 - DNS - Parte 3
+
+Aula 146 - DNS - Parte 4.
+
+Aula 147 - DNS - Parte 5.
+
+Aula 148 - DNS - Parte 6
+
+Aula 149 - DNS - Parte 7
+
+Aula 150 - DNS - Parte 8.
+
+Aula 151 - DNS - Parte 9.
+
+Aula 152 - DNS - Parte 10.
+
+Aula 153 - DNS - Parte 11.
+
+Aula 154 - DNS - Parte 12
+
+Aula 155 - DNS - Parte 13.
+
+Aula 156 - DHCP - Parte 1.
+
+Aula 157 - DHCP - Parte 2.
+
+Aula 158 - DHCP - Parte 3.
+
+Aula 159 - DHCP - Parte 4
+
+Aula 160 - DHCP - Parte 5
+
+Aula 161 - DHCP - Parte 6.
+
+Aula 162 - DHCP - Parte 7.
+
+Aula 163 - DHCP - Parte 8.
+
+Aula 164 - DHCP - Parte 9.
+
+Aula 165 - DHCP - Parte 10.
+
+Aula 166 - DHCP - Parte 11
+
+Aula 167 - Load Balance - Parte 1
+
+Aula 168 - Load Balance - Parte 2
+
+Aula 169 - iSCSI - Aula 1.
+
+Aula 170 - iSCSI - Parte 2.
+
+Aula 171 - Cluster - Parte 1
+
+Aula 172 - Cluster - Parte 2.
+
+Aula 173 - Cluster - Parte 3
+
+Aula 174 - Backup - Parte 1.
+
+Aula 175 - Backup - Parte 2.
+
+Aula 176 - Backup - Parte 3. URL
+
+Aula 177 - Backup - Parte 4.
+
+Aula 178 - Backup - Parte 5
+
+Aula 179 - Moniitor de Performance - Aula 1.
+
+Aula 180 - Monitor de Performance - Aula 2.
+
+Aula 181 - Visualizador de Eventos

@@ -1,0 +1,56 @@
+# Espelho local gerado por scripts/jarvis/sync_state_duality.py.
+# Fonte canônica: ../../state/knowledge/tech/ESTUDOS T 3.I/BIG DATA/introducao-a-machine-learning-com-classificacao/sumario.txt
+# Não edite manualmente aqui sem promover no STATE.
+
+Machine Learning: Introdu��o a classifica��o
+
+
+1	1. Classificando emails, animais e muito mais
+1.1	V�deo 1.1
+1.2	V�deo 1.2
+1.3	V�deo 1.3
+1.4	V�deo 1.4
+1.5	V�deo 1.5
+1.6	V�deo 1.6
+1.7	V�deo 1.7
+1.8	Acesso aos arquivos
+
+2	2. Importando, classificando e validando um modelo
+2.1	V�deo 2.1
+2.2	V�deo 2.2
+2.3	V�deo 2.3
+2.4	V�deo 2.4
+2.5	V�deo 2.5
+2.6	V�deo 2.6
+
+3	3. Classifica��o de vari�veis categ�ricas
+3.1	V�deo 3.1
+3.2	V�deo 3.2
+3.3	V�deo 3.3
+3.4	V�deo 3.4
+3.5	V�deo 3.5
+3.6	V�deo 3.6
+3.7	V�deo 3.7
+3.8	V�deo 3.8
+
+4	4. O problema do sucesso e o algoritmo burro
+4.1	V�deo 4.1
+4.2	V�deo 4.2
+4.3	V�deo 4.3
+4.4	V�deo 4.4
+4.5	V�deo 4.5
+4.6	V�deo 4.6
+4.7	V�deo 4.7
+4.8	V�deo 4.8
+
+5	5. Naive bayes e maxium a posteriori por tr�s dos panos
+5.1	V�deo 5.1
+5.2	V�deo 5.2
+5.3	V�deo 5.3
+
+6	6. Testando diferentes modelos e validando o vencedor
+6.1	V�deo 6.1
+6.2	V�deo 6.2
+6.3	V�deo 6.3
+6.4	V�deo 6.4
+6.5	V�deo 6.5

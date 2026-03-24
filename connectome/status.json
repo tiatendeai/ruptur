@@ -4,6 +4,54 @@
   "activation_menu_ref": "../../state/knowledge/jarvis-activation-menu.md",
   "active_sessions": [
     {
+      "session_id": "OMEGA-20260323-193628-a1b2c3d4-jarvis-001",
+      "soul_id": "RUPTUR-AGENT-0001",
+      "agent": "jarvis",
+      "status": "active",
+      "state": "full_mode_ativo",
+      "lifecycle_stage": "EXECUTION",
+      "mode": "full_performance_audit",
+      "started_at": "2026-03-23T19:36:28-03:00",
+      "local_session_ref": "sessions/OMEGA-20260323-193628-a1b2c3d4-jarvis-001.json",
+      "omega_session_ref": "../../omega/sessions/OMEGA-20260323-193628-a1b2c3d4-jarvis-001.json",
+      "performance_profile": "elevated",
+      "capabilities_active": [
+        "maestro_orchestration",
+        "multi_agent_debate_guided",
+        "profile_ops",
+        "profile_vcfo",
+        "profile_vcvo",
+        "profile_eggs",
+        "state_capitalization_required",
+        "rag_context7_reference_required",
+        "documentation_and_comment_coverage_required",
+        "session_telemetry_basic",
+        "github_projects_backlog_linkage",
+        "multi_agent_expert_skills"
+      ],
+      "last_activity_at": "2026-03-23T19:36:28-03:00",
+      "last_heartbeat_at": "2026-03-23T19:36:28-03:00",
+      "agent_multiverse_state": "active",
+      "engaged_agents": [
+        "jarvis",
+        "ops",
+        "vcfo",
+        "vcvo",
+        "eggs",
+        "iazinha",
+        "alice",
+        "gabriel",
+        "joao",
+        "rafael",
+        "orchestrator",
+        "devops-engineer",
+        "project-planner",
+        "product-owner",
+        "security-auditor"
+      ],
+      "hot_standby_agents_count": 20
+    },
+    {
       "session_id": "OMEGA-20260323-001002-8fcbcf98-jarvis-001",
       "soul_id": "RUPTUR-AGENT-0001",
       "agent": "jarvis",
@@ -94,7 +142,15 @@
         "nota": "Análise operacional, técnica, documental e de backlog usando as capacidades full mode ativas na sessão."
       }
     ],
-    "pendente": [],
+    "pendente": [
+      {
+        "id": "TASK-RAG-001",
+        "titulo": "Implementar Pipeline RAG Avançado (Pinecone + Supabase)",
+        "responsavel": "jarvis",
+        "env": "architecture",
+        "nota": "Stack definida: Voyage AI (Embeddings), Cohere Command R+ (LLM RAG), Supabase (Relacional/Metadados), Pinecone (VectorDB). Necessário ingerir arquivos do Conselho de Guerra após normalização Kebab-case."
+      }
+    ],
     "bloqueado": [],
     "concluido": [
       {
@@ -127,5 +183,53 @@
     "app": "https://app.ruptur.cloud",
     "status_app": "online",
     "ultimo_incidente": "erro-400-server-action"
+  },
+  "agent_multiverse": {
+    "status": "active",
+    "recorded_on": "2026-03-24",
+    "session_id": "OMEGA-20260323-193628-a1b2c3d4-jarvis-001",
+    "state_registry_ref": "../../state/registry/agent_multiverse.yaml",
+    "state_memory_ref": "../../state/memory/agent_multiverse.memory.md",
+    "state_activation_ref": "../../state/knowledge/2026-03-24-agent-multiverse-activation-current-session.md",
+    "playbook_ref": "../../state/playbooks/agent-multiverse-activation.md",
+    "engaged_agents": [
+      "jarvis",
+      "ops",
+      "vcfo",
+      "vcvo",
+      "eggs",
+      "iazinha",
+      "alice",
+      "gabriel",
+      "joao",
+      "rafael",
+      "orchestrator",
+      "devops-engineer",
+      "project-planner",
+      "product-owner",
+      "security-auditor"
+    ],
+    "hot_standby_agents": [
+      "vchro",
+      "vaudit",
+      "vlegal",
+      "backend-specialist",
+      "frontend-specialist",
+      "database-architect",
+      "debugger",
+      "documentation-writer",
+      "explorer-agent",
+      "mobile-developer",
+      "penetration-tester",
+      "performance-optimizer",
+      "product-manager",
+      "qa-automation-engineer",
+      "ruptur",
+      "seo-specialist",
+      "test-engineer",
+      "code-archaeologist",
+      "game-developer",
+      "maria"
+    ]
   }
 }

@@ -1,0 +1,73 @@
+# Espelho local gerado por scripts/jarvis/sync_state_duality.py.
+# Fonte canônica: ../../state/registry/manifestations.yaml
+# Não edite manualmente aqui sem promover no STATE.
+
+# Espelho local gerado por scripts/jarvis/sync_state_duality.py.
+# Fonte canônica: ../../state/registry/manifestations.yaml
+# Não edite manualmente aqui sem promover no STATE.
+
+version: 1
+audited_at: 2026-03-23
+
+principles:
+  - cada_manifestacao_tem_responsavel_explicito
+  - autoridade_e_definida_por_escopo
+  - sessoes_efemeras_nao_sao_manifestacoes_canonicas
+  - conflito_entre_manifestacoes_vira_decisao_ou_debito
+
+layer_contract:
+  - "Alpha ancora `entity_id`, `uid` e `soulid_public` do Jarvis."
+  - "State governa guardrails, memória curada, reconciliação e o catálogo canônico de manifestações."
+  - "Omega governa lifecycle de sessão, replay, recovery e persistência de `session_id`."
+  - "`codex/ruptur` materializa a manifestação operacional ativa."
+
+notes:
+  - "`jarvis.canonical` representa a camada canônica de governança no State."
+  - "`jarvis.canonical` não substitui a identidade raiz formalizada no Alpha."
+
+manifestations:
+  - id: jarvis.canonical
+    entity: jarvis
+    class: canonical_identity
+    repository: state
+    status: active
+    responsible: diego
+    authority_scope:
+      - governanca
+      - guardrails
+      - memoria_curada
+      - backlog_de_consolidacao
+      - reconciliacao_institucional
+    source_refs:
+      - README.md
+      - constitution/jarvis.guardrails.md
+      - constitution/ruptur.sources-and-queries.md
+      - memory/jarvis.state-model.md
+      - playbooks/jarvis.abort-policy.md
+    sync_contract:
+      - Diretrizes duráveis do Jarvis devem nascer no STATE ou ser promovidas para o STATE.
+      - Nenhuma manifestação operacional pode sobrescrever esta camada fora do seu escopo técnico.
+      - Esta manifestação não substitui a identidade raiz documentada no Alpha.
+
+  - id: jarvis.ruptur.control_plane
+    entity: jarvis
+    class: execution_manifestation
+    repository: codex/ruptur
+    status: active
+    responsible: diego
+    authority_scope:
+      - orquestracao
+      - coordenacao
+      - execucao_tecnica
+      - connectome_operacional
+      - automacoes_ops
+    source_refs:
+      - JARVIS.md
+      - CONSELHO-DE-GUERRA.md
+      - .agent/agents/jarvis.md
+      - ops/jarvis/
+      - connectome/
+    parent_manifestation: jarvis.canonical
+    sync_contract:
+      - Implementa o Jarvis no tronco operacional sem redefinir a governança canônica.
+      - Divergências com o STATE devem ser registradas como decisão ou débito antes de harmonização.

@@ -1,0 +1,148 @@
+# Espelho local gerado por scripts/jarvis/sync_state_duality.py.
+# Fonte canônica: ../../state/registry/virtual_team_taxonomy.yaml
+# Não edite manualmente aqui sem promover no STATE.
+
+version: 1
+updated_at: 2026-03-24
+owner: diego
+status: active
+
+principles:
+  - perfis_virtuais_executivos_usam_prefixo_v
+  - nomes_canonicos_prevalecem_sobre_codenames
+  - codenames_so_sobrevivem_como_alias_explicito
+  - um_perfil_so_escala_para_active_quando_tiver_escopo_trigger_runbook_metrica_e_backlog
+  - toda_decisao_de_mesa_precisa_virar_backlog_regra_runbook_ou_adr
+
+naming_rules:
+  c_level_virtual:
+    prefix: "vC"
+    examples: ["vCEO", "vCFO", "vCVO", "vCHRO"]
+    rule: "todo C-Level operado por agente virtual deve carregar prefixo `v`."
+  governance_virtual:
+    prefix: "v"
+    examples: ["vAudit", "vLegal"]
+    rule: "perfis de governanca podem usar `v` + dominio quando o nome funcional for mais util do que um cargo corporativo classico."
+  operations_virtual:
+    patterns: ["vOps", "vAdminOps", "vFinOps", "vSalesOps", "vSecOps"]
+    rule: "perfis taticos e operacionais seguem a convencao `v` + dominio ou `v` + dominio + `Ops`."
+  codename_alias:
+    rule: "apelidos sao permitidos apenas como alias operacional; backlog, governanca, metricas e projetos devem usar o nome canonico."
+    examples:
+      - canonical: "vCEO"
+        aliases: ["Eggs"]
+      - canonical: "vCVO"
+        aliases: ["VisionCO", "Vision CO"]
+
+active_team:
+  - canonical_name: "Maestro"
+    aliases: ["Jarvis"]
+    class: orchestration
+    status: active
+    objective: "coordena a malha, resolve conflitos e materializa decisoes."
+    activation_requirements: ["session", "trace", "backlog_linkage"]
+
+  - canonical_name: "vCEO"
+    aliases: ["Eggs"]
+    class: executive_virtual
+    status: active
+    objective: "disciplina de execucao, missoes, cadencia, SLA e desfecho."
+    activation_requirements: ["mission_tracking", "acceptance_criteria", "delivery_update"]
+
+  - canonical_name: "vCFO"
+    class: executive_virtual
+    status: active
+    objective: "ROI, custo real, viabilidade e custo de erro/retrabalho."
+    activation_requirements: ["cost_review", "risk_review"]
+
+  - canonical_name: "vCVO"
+    aliases: ["VisionCO", "Vision CO"]
+    class: executive_virtual
+    status: active
+    objective: "visao, aderencia ao modelo Ruptur, valor percebido e decisao de aposta."
+    activation_requirements: ["tradeoff_review", "value_hypothesis"]
+
+  - canonical_name: "vOps"
+    class: operations_virtual
+    status: active
+    objective: "infra, telemetria, confiabilidade, automacao e performance."
+    activation_requirements: ["runbook", "fallback", "telemetry"]
+
+  - canonical_name: "vAudit"
+    class: governance_virtual
+    status: active
+    objective: "falso positivo, criterio de aceite, scorecard e gate de promocao."
+    activation_requirements: ["eval_plan", "trace_grading", "gate_policy"]
+
+  - canonical_name: "vLegal"
+    class: governance_virtual
+    status: active
+    objective: "compliance, LGPD, risco juridico e fronteiras de uso."
+    activation_requirements: ["policy_ref", "risk_boundary"]
+
+  - canonical_name: "vCHRO"
+    class: executive_virtual
+    status: active
+    objective: "arquitetura de time, competencias, capacidade e alocacao."
+    activation_requirements: ["team_design", "capacity_review"]
+
+should_have:
+  - canonical_name: "vController"
+    class: finance_virtual
+    status: recommended
+    objective: "controle financeiro, variancia, budget, unit economics e custo por entrega aceita."
+    rationale: "fecha o gap entre estrategia financeira do vCFO e controle operacional do dia a dia."
+
+  - canonical_name: "vAdminOps"
+    class: operations_virtual
+    status: recommended
+    objective: "processos administrativos, SOPs, handoffs, filas, governanca de rotina e eliminacao de retrabalho."
+    rationale: "formaliza a lente administrativa/processual hoje representada por Joao Mendes."
+
+conditional_splits:
+  - canonical_name: "vFinOps"
+    parent: "vOps"
+    status: conditional
+    activate_when: "custo de infraestrutura e custo de IA exigirem dono dedicado."
+
+  - canonical_name: "vSecOps"
+    parent: "vOps"
+    status: conditional
+    activate_when: "superficie de risco ou compliance exigirem segregacao explicita."
+
+  - canonical_name: "vSalesOps"
+    parent: "vAdminOps"
+    status: conditional
+    activate_when: "pipeline comercial e cadencia de follow-up exigirem operacao propria."
+
+  - canonical_name: "vCMO"
+    status: conditional
+    activate_when: "growth e aquisicao virarem frente separada de produto e operacao."
+
+  - canonical_name: "vCTO"
+    status: conditional
+    activate_when: "arquitetura de produto e plataforma exigirem separacao do guarda-chuva vOps."
+
+metrics_required_for_activation:
+  - "taxa de aceitacao na primeira passada"
+  - "percentual de falso positivo"
+  - "percentual de falso negativo"
+  - "retrabalho por entrega aceita"
+  - "tempo ate primeira entrega util"
+  - "custo por entrega aceita"
+
+materialization_contract:
+  - "decisao de mesa vira nota canonica e atualizacao de backlog."
+  - "mudanca duravel vira playbook, regra, runbook, adr ou registry."
+  - "execucao com efeito pratico precisa aparecer em trace, commit ou project item."
+  - "gatilho automatico so entra em producao com owner, metrica, rollback e criterio de aborto."
+
+source_refs:
+  - "constitution/constituicao_organizacional_ruptur.md"
+  - "registry/agents.yaml"
+  - "registry/intelligence_triggers.yaml"
+  - "playbooks/auto_intelligence_hook.md"
+  - "playbooks/governanca/matriz-acionamento-perfis-virtuais.md"
+  - "playbooks/governanca/matriz-no-go-bloqueio-aborto-e-uso-ativo.md"
+  - "knowledge/2026-03-24-mesa-perfis-virtuais-governanca-e-enforcement.md"
+  - "knowledge/2026-03-24-mesa-paralela-a-b-vcontroller-adminops-finops.md"
