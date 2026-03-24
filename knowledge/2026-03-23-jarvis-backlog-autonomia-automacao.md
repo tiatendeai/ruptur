@@ -70,6 +70,8 @@ Mas ainda não possui, de ponta a ponta, uma malha fechada de:
 | JARVIS-AUT-015 | P0 | Formalização de `vController`, `vAdminOps` e `vFinOps` com taxonomia, gatilhos e runtime mínimo | `state` + `codex/ruptur` | `Ruptur Delivery OS` | frentes financeira/administrativa/finops passam a ter perfis canônicos, contrato de saída e acionamento |
 | JARVIS-AUT-016 | P0 | Enforcement runtime da matriz de acionamento, `não fazer`, bloqueio, aborto e uso ativo | `state` + `codex/ruptur` | `Ruptur Delivery OS` | o runtime passa a auto-injetar guardrails e saídas mínimas com trilha de adoção |
 | JARVIS-AUT-017 | P0 | Telemetria mínima de governança: triggers, contagem e score de aderência ao no-go | `codex/ruptur` | `Ruptur Delivery OS` | fica visível quantas vezes os gatilhos disparam, com que perfil e qual a aderência ao padrão de não fazer |
+| JARVIS-AUT-018 | P0 | Modelo canônico do operador Diego | `state` | `Ruptur Delivery OS` | o ecossistema passa a ter memória curada útil sobre qualificações, estilos, preferências e vetores de desenvolvimento do operador |
+| JARVIS-AUT-019 | P0 | Learning loop Diego ↔ Jarvis ↔ State | `state` + `codex/ruptur` | `Ruptur Delivery OS` | Jarvis deixa de só lembrar e passa a intervir para desenvolvimento contínuo com revisões e experimentos |
 
 ---
 
@@ -230,6 +232,8 @@ Em 2026-03-23, os itens deste backlog foram publicados nos boards ativos do ecos
 | JARVIS-AUT-015 | `Ruptur Delivery OS` | `PVTI_lAHODOO6r84BRgVSzgoNTTM` |
 | JARVIS-AUT-016 | `Ruptur Delivery OS` | `PVTI_lAHODOO6r84BRgVSzgoNTTc` |
 | JARVIS-AUT-017 | `Ruptur Delivery OS` | `PVTI_lAHODOO6r84BRgVSzgoObuM` |
+| JARVIS-AUT-018 | `Ruptur Delivery OS` | `PVTI_lAHODOO6r84BRgVSzgoOhww` |
+| JARVIS-AUT-019 | `Ruptur Delivery OS` | `PVTI_lAHODOO6r84BRgVSzgoOhws` |
 
 Critério aplicado na publicação:
 
