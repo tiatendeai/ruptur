@@ -69,6 +69,7 @@ Mas ainda não possui, de ponta a ponta, uma malha fechada de:
 | JARVIS-AUT-014 | P1 | Gatilhos automáticos com garantia de uso ativo | `state` + `codex/ruptur` | `Ruptur Delivery OS` | conhecimento acionado automaticamente só entra se tiver owner, métrica e trilha real de uso |
 | JARVIS-AUT-015 | P0 | Formalização de `vController`, `vAdminOps` e `vFinOps` com taxonomia, gatilhos e runtime mínimo | `state` + `codex/ruptur` | `Ruptur Delivery OS` | frentes financeira/administrativa/finops passam a ter perfis canônicos, contrato de saída e acionamento |
 | JARVIS-AUT-016 | P0 | Enforcement runtime da matriz de acionamento, `não fazer`, bloqueio, aborto e uso ativo | `state` + `codex/ruptur` | `Ruptur Delivery OS` | o runtime passa a auto-injetar guardrails e saídas mínimas com trilha de adoção |
+| JARVIS-AUT-017 | P0 | Telemetria mínima de governança: triggers, contagem e score de aderência ao no-go | `codex/ruptur` | `Ruptur Delivery OS` | fica visível quantas vezes os gatilhos disparam, com que perfil e qual a aderência ao padrão de não fazer |
 
 ---
 
@@ -173,6 +174,13 @@ Mas ainda não possui, de ponta a ponta, uma malha fechada de:
 - existe trilha mínima de uso ativo para a auto-injeção
 - o enforcement preserva qualidade, velocidade e capacidade de negar
 
+## JARVIS-AUT-017 — Telemetria mínima de governança
+
+- o runtime conta triggers disparados por grupo
+- o runtime conta uso por perfil
+- existe score mínimo de aderência ao no-go por resposta
+- existe buffer recente de eventos acessível por API
+
 ---
 
 ## 5. Riscos que este backlog tenta reduzir
@@ -221,6 +229,7 @@ Em 2026-03-23, os itens deste backlog foram publicados nos boards ativos do ecos
 | JARVIS-AUT-014 | `Ruptur Delivery OS` | `PVTI_lAHODOO6r84BRgVSzgoMv48` |
 | JARVIS-AUT-015 | `Ruptur Delivery OS` | `PVTI_lAHODOO6r84BRgVSzgoNTTM` |
 | JARVIS-AUT-016 | `Ruptur Delivery OS` | `PVTI_lAHODOO6r84BRgVSzgoNTTc` |
+| JARVIS-AUT-017 | `Ruptur Delivery OS` | `PVTI_lAHODOO6r84BRgVSzgoObuM` |
 
 Critério aplicado na publicação:
 

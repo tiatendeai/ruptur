@@ -33,6 +33,8 @@ Jarvis vCEO Weekly Close: `POST http://localhost:8000/jarvis/vceo/weekly-close` 
 Jarvis vController: `POST http://localhost:8000/jarvis/ask/vcontroller`
 Jarvis vAdminOps: `POST http://localhost:8000/jarvis/ask/vadminops`
 Jarvis vFinOps: `POST http://localhost:8000/jarvis/ask/vfinops`
+Jarvis Governance Telemetry: `GET http://localhost:8000/jarvis/governance/telemetry`
+Jarvis Governance Events: `GET http://localhost:8000/jarvis/governance/events`
 Jarvis Command (missões): `POST http://localhost:8000/jarvis/command`
 Jarvis Missões: `GET http://localhost:8000/jarvis/missions` e `PATCH http://localhost:8000/jarvis/missions/{id}`
 Jarvis Updates de missão: `GET/POST http://localhost:8000/jarvis/missions/{id}/updates`
@@ -56,6 +58,13 @@ Saída mínima esperada nesses casos:
 - estado recomendado (`seguir`, `bloqueado`, `abortado`, `reenquadrar`)
 - evidência faltante
 - condição de retomada
+
+Telemetria mínima exposta:
+
+- contagem de triggers disparados
+- contagem por perfil
+- média de `no_go_score`
+- buffer recente de eventos de governança
 
 CFO API (dados financeiros):
 

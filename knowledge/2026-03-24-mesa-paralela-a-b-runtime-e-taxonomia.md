@@ -18,6 +18,7 @@
 - auto-injeção de contexto de governança
 - novas rotas para os perfis
 - saídas mínimas obrigatórias para temas críticos
+- telemetria mínima de triggers e aderência ao no-go
 
 ---
 
@@ -27,6 +28,8 @@
   - `POST /jarvis/ask/vcontroller`
   - `POST /jarvis/ask/vadminops`
   - `POST /jarvis/ask/vfinops`
+  - `GET /jarvis/governance/telemetry`
+  - `GET /jarvis/governance/events`
 - auto-injeção de guardrails para temas de:
   - no-go / risco / bloqueio / aborto
   - lean / hipótese / experimento
@@ -45,3 +48,16 @@ Para perfis críticos, o runtime passa a empurrar a estrutura:
 3. estado recomendado
 4. evidência faltante
 5. condição de retomada
+
+---
+
+## 4. Telemetria mínima adicionada
+
+O runtime agora registra:
+
+- `trigger_groups`
+- `trigger_count`
+- `guardrail_blocks_added`
+- `no_go_expected`
+- `no_go_score`
+- flags de aderência ao no-go

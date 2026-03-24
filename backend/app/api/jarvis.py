@@ -11,7 +11,12 @@ from app.db import DatabaseNotConfiguredError, connect
 from app.repositories import jarvis_ops_repo
 from app.services.agent_service import agent_service
 from app.services.jarvis_daily_brief_service import build_executive_daily_brief
-from app.services.jarvis_governance_context import build_governance_context
+from app.services.jarvis_governance_context import build_governance_context, infer_trigger_groups
+from app.services.jarvis_governance_telemetry import (
+    get_governance_summary,
+    list_governance_events,
+    record_governance_event,
+)
 from app.services.jarvis_skill_runtime import SkillContext, get_skill
 
 # garante registro da skill no runtime
@@ -66,8 +71,30 @@ def _to_history(items: list[JarvisHistoryItem]) -> list[dict[str, str]]:
     return [{"role": i.role, "content": i.content} for i in items]
 
 
-def _governed_context(profile: str, message: str, context_blocks: list[str]) -> list[str]:
-    return build_governance_context(profile=profile, message=message, context_blocks=context_blocks)
+def _governed_context(profile: str, message: str, context_blocks: list[str]) -> tuple[list[str], list[str], int]:
+    trigger_groups = infer_trigger_groups(message, context_blocks)
+    governed = build_governance_context(profile=profile, message=message, context_blocks=context_blocks)
+    added_blocks = max(0, len(governed) - len(context_blocks))
+    return governed, trigger_groups, added_blocks
+
+
+def _governance_event(
+    *,
+    profile: str,
+    principal_name: str,
+    message: str,
+    trigger_groups: list[str],
+    guardrail_blocks_added: int,
+    response_text: str,
+) -> dict[str, Any]:
+    return record_governance_event(
+        profile=profile,
+        principal_name=principal_name,
+        message=message,
+        trigger_groups=trigger_groups,
+        guardrail_blocks_added=guardrail_blocks_added,
+        response_text=response_text,
+    )
 
 
 def _load_skill_context(skill_key: str) -> SkillContext:
@@ -103,11 +130,13 @@ def _load_vcvo_context() -> SkillContext:
 def ask(req: JarvisAskRequest) -> dict[str, Any]:
     history = _to_history(req.history)
     context_blocks = [c for c in req.context if isinstance(c, str) and c.strip()]
+    trigger_groups: list[str] = []
+    guardrail_blocks_added = 0
 
     if req.profile == "cfo":
         cfo_ctx = _load_cfo_context()
         context_blocks.extend(cfo_ctx.context_blocks)
-        context_blocks = _governed_context("vcfo", req.message, context_blocks)
+        context_blocks, trigger_groups, guardrail_blocks_added = _governed_context("vcfo", req.message, context_blocks)
         response = agent_service.get_jarvis_cfo_response(
             principal_name=req.principal_name,
             user_message=req.message,
@@ -117,7 +146,7 @@ def ask(req: JarvisAskRequest) -> dict[str, Any]:
     elif req.profile == "vcfo":
         cfo_ctx = _load_cfo_context()
         context_blocks.extend(cfo_ctx.context_blocks)
-        context_blocks = _governed_context("vcfo", req.message, context_blocks)
+        context_blocks, trigger_groups, guardrail_blocks_added = _governed_context("vcfo", req.message, context_blocks)
         response = agent_service.get_jarvis_cfo_response(
             principal_name=req.principal_name,
             user_message=req.message,
@@ -127,7 +156,7 @@ def ask(req: JarvisAskRequest) -> dict[str, Any]:
     elif req.profile == "vcvo":
         vcvo_ctx = _load_vcvo_context()
         context_blocks.extend(vcvo_ctx.context_blocks)
-        context_blocks = _governed_context("vcvo", req.message, context_blocks)
+        context_blocks, trigger_groups, guardrail_blocks_added = _governed_context("vcvo", req.message, context_blocks)
         response = agent_service.get_jarvis_vcvo_response(
             principal_name=req.principal_name,
             user_message=req.message,
@@ -137,7 +166,7 @@ def ask(req: JarvisAskRequest) -> dict[str, Any]:
     elif req.profile == "vcontroller":
         cfo_ctx = _load_cfo_context()
         context_blocks.extend(cfo_ctx.context_blocks)
-        context_blocks = _governed_context("vcontroller", req.message, context_blocks)
+        context_blocks, trigger_groups, guardrail_blocks_added = _governed_context("vcontroller", req.message, context_blocks)
         response = agent_service.get_profile_response(
             profile="vcontroller",
             principal_name=req.principal_name,
@@ -148,7 +177,7 @@ def ask(req: JarvisAskRequest) -> dict[str, Any]:
     elif req.profile == "vadminops":
         eggs_ctx = _load_eggs_context()
         context_blocks.extend(eggs_ctx.context_blocks)
-        context_blocks = _governed_context("vadminops", req.message, context_blocks)
+        context_blocks, trigger_groups, guardrail_blocks_added = _governed_context("vadminops", req.message, context_blocks)
         response = agent_service.get_profile_response(
             profile="vadminops",
             principal_name=req.principal_name,
@@ -161,7 +190,7 @@ def ask(req: JarvisAskRequest) -> dict[str, Any]:
         eggs_ctx = _load_eggs_context()
         context_blocks.extend(cfo_ctx.context_blocks)
         context_blocks.extend(eggs_ctx.context_blocks)
-        context_blocks = _governed_context("vfinops", req.message, context_blocks)
+        context_blocks, trigger_groups, guardrail_blocks_added = _governed_context("vfinops", req.message, context_blocks)
         response = agent_service.get_profile_response(
             profile="vfinops",
             principal_name=req.principal_name,
@@ -172,7 +201,7 @@ def ask(req: JarvisAskRequest) -> dict[str, Any]:
     elif req.profile in {"eggs", "vceo"}:
         eggs_ctx = _load_eggs_context()
         context_blocks.extend(eggs_ctx.context_blocks)
-        context_blocks = _governed_context("vceo", req.message, context_blocks)
+        context_blocks, trigger_groups, guardrail_blocks_added = _governed_context("vceo", req.message, context_blocks)
         response = agent_service.get_jarvis_eggs_response(
             principal_name=req.principal_name,
             user_message=req.message,
@@ -180,7 +209,7 @@ def ask(req: JarvisAskRequest) -> dict[str, Any]:
             context_blocks=context_blocks,
         )
     else:
-        context_blocks = _governed_context("ops", req.message, context_blocks)
+        context_blocks, trigger_groups, guardrail_blocks_added = _governed_context("ops", req.message, context_blocks)
         response = agent_service.get_response(
             profile="ops",
             principal_name=req.principal_name,
@@ -189,7 +218,16 @@ def ask(req: JarvisAskRequest) -> dict[str, Any]:
             context_blocks=context_blocks,
         )
 
-    return {"ok": True, "profile": req.profile, "response": response}
+    governance = _governance_event(
+        profile=req.profile,
+        principal_name=req.principal_name,
+        message=req.message,
+        trigger_groups=trigger_groups,
+        guardrail_blocks_added=guardrail_blocks_added,
+        response_text=response,
+    )
+
+    return {"ok": True, "profile": req.profile, "response": response, "governance": governance}
 
 
 @router.post("/ask/cfo")
@@ -200,7 +238,7 @@ def ask_cfo(req: JarvisCfoAskRequest) -> dict[str, Any]:
     cfo_ctx = _load_cfo_context()
     if req.include_snapshot:
         context_blocks.extend(cfo_ctx.context_blocks)
-    context_blocks = _governed_context("vcfo", req.message, context_blocks)
+    context_blocks, trigger_groups, guardrail_blocks_added = _governed_context("vcfo", req.message, context_blocks)
 
     response = agent_service.get_jarvis_cfo_response(
         principal_name=req.principal_name,
@@ -210,7 +248,21 @@ def ask_cfo(req: JarvisCfoAskRequest) -> dict[str, Any]:
         context_blocks=context_blocks,
     )
 
-    return {"ok": True, "profile": "vcfo", "response": response, "snapshot": cfo_ctx.snapshot if req.include_snapshot else None}
+    governance = _governance_event(
+        profile="vcfo",
+        principal_name=req.principal_name,
+        message=req.message,
+        trigger_groups=trigger_groups,
+        guardrail_blocks_added=guardrail_blocks_added,
+        response_text=response,
+    )
+    return {
+        "ok": True,
+        "profile": "vcfo",
+        "response": response,
+        "snapshot": cfo_ctx.snapshot if req.include_snapshot else None,
+        "governance": governance,
+    }
 
 
 @router.post("/ask/vcfo")
@@ -227,7 +279,7 @@ def ask_vcvo(req: JarvisVcvoAskRequest) -> dict[str, Any]:
         context_blocks.extend(vcvo_ctx.context_blocks)
     if req.focus and req.focus.strip():
         context_blocks.append(f"Foco atual do vCVO: {req.focus.strip()}.")
-    context_blocks = _governed_context("vcvo", req.message, context_blocks)
+    context_blocks, trigger_groups, guardrail_blocks_added = _governed_context("vcvo", req.message, context_blocks)
 
     response = agent_service.get_jarvis_vcvo_response(
         principal_name=req.principal_name,
@@ -235,7 +287,21 @@ def ask_vcvo(req: JarvisVcvoAskRequest) -> dict[str, Any]:
         history=history,
         context_blocks=context_blocks,
     )
-    return {"ok": True, "profile": "vcvo", "response": response, "snapshot": vcvo_ctx.snapshot if req.include_snapshot else None}
+    governance = _governance_event(
+        profile="vcvo",
+        principal_name=req.principal_name,
+        message=req.message,
+        trigger_groups=trigger_groups,
+        guardrail_blocks_added=guardrail_blocks_added,
+        response_text=response,
+    )
+    return {
+        "ok": True,
+        "profile": "vcvo",
+        "response": response,
+        "snapshot": vcvo_ctx.snapshot if req.include_snapshot else None,
+        "governance": governance,
+    }
 
 
 @router.post("/ask/eggs")
@@ -245,7 +311,7 @@ def ask_eggs(req: JarvisEggsAskRequest) -> dict[str, Any]:
     eggs_ctx = _load_eggs_context()
     if req.include_snapshot:
         context_blocks.extend(eggs_ctx.context_blocks)
-    context_blocks = _governed_context("vceo", req.message, context_blocks)
+    context_blocks, trigger_groups, guardrail_blocks_added = _governed_context("vceo", req.message, context_blocks)
 
     response = agent_service.get_jarvis_eggs_response(
         principal_name=req.principal_name,
@@ -254,7 +320,21 @@ def ask_eggs(req: JarvisEggsAskRequest) -> dict[str, Any]:
         context_blocks=context_blocks,
     )
 
-    return {"ok": True, "profile": "eggs", "response": response, "snapshot": eggs_ctx.snapshot if req.include_snapshot else None}
+    governance = _governance_event(
+        profile="vceo",
+        principal_name=req.principal_name,
+        message=req.message,
+        trigger_groups=trigger_groups,
+        guardrail_blocks_added=guardrail_blocks_added,
+        response_text=response,
+    )
+    return {
+        "ok": True,
+        "profile": "eggs",
+        "response": response,
+        "snapshot": eggs_ctx.snapshot if req.include_snapshot else None,
+        "governance": governance,
+    }
 
 
 @router.post("/ask/vceo")
@@ -273,7 +353,7 @@ def ask_vcontroller(req: JarvisCfoAskRequest) -> dict[str, Any]:
         context_blocks.extend(cfo_ctx.context_blocks)
     if req.focus and req.focus.strip():
         context_blocks.append(f"Foco atual do vController: {req.focus.strip()}.")
-    context_blocks = _governed_context("vcontroller", req.message, context_blocks)
+    context_blocks, trigger_groups, guardrail_blocks_added = _governed_context("vcontroller", req.message, context_blocks)
     response = agent_service.get_profile_response(
         profile="vcontroller",
         principal_name=req.principal_name,
@@ -281,7 +361,21 @@ def ask_vcontroller(req: JarvisCfoAskRequest) -> dict[str, Any]:
         history=history,
         context_blocks=context_blocks,
     )
-    return {"ok": True, "profile": "vcontroller", "response": response, "snapshot": cfo_ctx.snapshot if req.include_snapshot else None}
+    governance = _governance_event(
+        profile="vcontroller",
+        principal_name=req.principal_name,
+        message=req.message,
+        trigger_groups=trigger_groups,
+        guardrail_blocks_added=guardrail_blocks_added,
+        response_text=response,
+    )
+    return {
+        "ok": True,
+        "profile": "vcontroller",
+        "response": response,
+        "snapshot": cfo_ctx.snapshot if req.include_snapshot else None,
+        "governance": governance,
+    }
 
 
 @router.post("/ask/vadminops")
@@ -291,7 +385,7 @@ def ask_vadminops(req: JarvisEggsAskRequest) -> dict[str, Any]:
     eggs_ctx = _load_eggs_context()
     if req.include_snapshot:
         context_blocks.extend(eggs_ctx.context_blocks)
-    context_blocks = _governed_context("vadminops", req.message, context_blocks)
+    context_blocks, trigger_groups, guardrail_blocks_added = _governed_context("vadminops", req.message, context_blocks)
     response = agent_service.get_profile_response(
         profile="vadminops",
         principal_name=req.principal_name,
@@ -299,7 +393,21 @@ def ask_vadminops(req: JarvisEggsAskRequest) -> dict[str, Any]:
         history=history,
         context_blocks=context_blocks,
     )
-    return {"ok": True, "profile": "vadminops", "response": response, "snapshot": eggs_ctx.snapshot if req.include_snapshot else None}
+    governance = _governance_event(
+        profile="vadminops",
+        principal_name=req.principal_name,
+        message=req.message,
+        trigger_groups=trigger_groups,
+        guardrail_blocks_added=guardrail_blocks_added,
+        response_text=response,
+    )
+    return {
+        "ok": True,
+        "profile": "vadminops",
+        "response": response,
+        "snapshot": eggs_ctx.snapshot if req.include_snapshot else None,
+        "governance": governance,
+    }
 
 
 @router.post("/ask/vfinops")
@@ -313,7 +421,7 @@ def ask_vfinops(req: JarvisCfoAskRequest) -> dict[str, Any]:
         context_blocks.extend(eggs_ctx.context_blocks)
     if req.focus and req.focus.strip():
         context_blocks.append(f"Foco atual do vFinOps: {req.focus.strip()}.")
-    context_blocks = _governed_context("vfinops", req.message, context_blocks)
+    context_blocks, trigger_groups, guardrail_blocks_added = _governed_context("vfinops", req.message, context_blocks)
     response = agent_service.get_profile_response(
         profile="vfinops",
         principal_name=req.principal_name,
@@ -321,12 +429,31 @@ def ask_vfinops(req: JarvisCfoAskRequest) -> dict[str, Any]:
         history=history,
         context_blocks=context_blocks,
     )
+    governance = _governance_event(
+        profile="vfinops",
+        principal_name=req.principal_name,
+        message=req.message,
+        trigger_groups=trigger_groups,
+        guardrail_blocks_added=guardrail_blocks_added,
+        response_text=response,
+    )
     return {
         "ok": True,
         "profile": "vfinops",
         "response": response,
         "snapshot": {"vcfo": cfo_ctx.snapshot, "vceo": eggs_ctx.snapshot} if req.include_snapshot else None,
+        "governance": governance,
     }
+
+
+@router.get("/governance/telemetry")
+def jarvis_governance_telemetry() -> dict[str, Any]:
+    return {"ok": True, "summary": get_governance_summary()}
+
+
+@router.get("/governance/events")
+def jarvis_governance_events(limit: int = Query(default=20, ge=1, le=200)) -> dict[str, Any]:
+    return {"ok": True, "items": list_governance_events(limit=limit)}
 
 
 class JarvisCfoWeeklyCloseRequest(BaseModel):

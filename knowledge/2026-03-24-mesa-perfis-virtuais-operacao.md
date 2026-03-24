@@ -43,6 +43,8 @@ Para não quebrar o runtime atual:
 - `POST /jarvis/ask/vcontroller`
 - `POST /jarvis/ask/vadminops`
 - `POST /jarvis/ask/vfinops`
+- `GET /jarvis/governance/telemetry`
+- `GET /jarvis/governance/events`
 
 Ambas mantêm compatibilidade com os endpoints legados:
 
@@ -64,6 +66,7 @@ Ambas mantêm compatibilidade com os endpoints legados:
 - `JARVIS-AUT-014` — gatilhos automáticos com uso ativo garantido
 - `JARVIS-AUT-015` — formalização de `vController`, `vAdminOps` e `vFinOps`
 - `JARVIS-AUT-016` — enforcement runtime da matriz de acionamento / no-go
+- `JARVIS-AUT-017` — telemetria mínima de governança e no-go
 
 ---
 
