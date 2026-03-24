@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Literal
 
 
-JarvisProfile = Literal["ops", "cfo", "vcvo", "eggs"]
+JarvisProfile = Literal["ops", "cfo", "vcvo", "eggs", "vceo"]
 AssistantPersona = Literal["jarvis", "iazinha"]
 
 
@@ -56,8 +56,8 @@ def build_system_prompt(
     )
 
     eggs_block = (
-        "## EGGS MODE\n\n"
-        "Primary goal: act as an operational CEO (vCEO) for execution discipline.\n"
+        "## VCEO MODE\n\n"
+        "Primary goal: act as an operational CEO (vCEO). Runtime alias: eggs.\n"
         "Break demands into missions with owner, SLA, blockers, and acceptance criteria.\n"
         "Always report: (1) what was done, (2) what is blocked, (3) what is next.\n"
         "Prefer objective status language: planned, in_progress, blocked, done.\n"
@@ -82,7 +82,7 @@ def build_system_prompt(
         profile_block = cfo_block
     elif profile == "vcvo":
         profile_block = vcvo_block
-    elif profile == "eggs":
+    elif profile in {"eggs", "vceo"}:
         profile_block = eggs_block
     else:
         profile_block = ops_block

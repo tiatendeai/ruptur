@@ -13,11 +13,7 @@ Backend mínimo para iniciar o core do Ruptur.
 cd backend
 python -m venv .venv
 source .venv/bin/activate
-<<<<<<< HEAD
-pip install -r requirements.txt
-=======
 pip install -r requirements-dev.txt
->>>>>>> work
 cp .env.example .env
 uvicorn app.main:app --reload --port 8000
 ```
@@ -27,15 +23,13 @@ Healthcheck: `GET http://localhost:8000/health`
 Webhook (uazapi): `POST http://localhost:8000/webhook/uazapi`
 Enviar texto (via uazapi): `POST http://localhost:8000/send/text`
 Próximo passo (heurístico): `POST http://localhost:8000/actions/next-step`
-<<<<<<< HEAD
-=======
 Jarvis (geral): `POST http://localhost:8000/jarvis/ask`
 Jarvis vCFO: `POST http://localhost:8000/jarvis/ask/vcfo` (compatível com `/jarvis/ask/cfo`)
 Jarvis vCFO Weekly Close: `POST http://localhost:8000/jarvis/vcfo/weekly-close` (compatível com `/jarvis/cfo/weekly-close`)
 Jarvis vCVO: `POST http://localhost:8000/jarvis/ask/vcvo`
 Jarvis vCVO Weekly Brief: `POST http://localhost:8000/jarvis/vcvo/weekly-brief`
-Jarvis Eggs (vCEO): `POST http://localhost:8000/jarvis/ask/eggs`
-Jarvis Eggs Weekly Close: `POST http://localhost:8000/jarvis/eggs/weekly-close`
+Jarvis vCEO: `POST http://localhost:8000/jarvis/ask/vceo` (compatível com `/jarvis/ask/eggs`)
+Jarvis vCEO Weekly Close: `POST http://localhost:8000/jarvis/vceo/weekly-close` (compatível com `/jarvis/eggs/weekly-close`)
 Jarvis Command (missões): `POST http://localhost:8000/jarvis/command`
 Jarvis Missões: `GET http://localhost:8000/jarvis/missions` e `PATCH http://localhost:8000/jarvis/missions/{id}`
 Jarvis Updates de missão: `GET/POST http://localhost:8000/jarvis/missions/{id}/updates`
@@ -82,8 +76,6 @@ Obs:
 
 - os testes de fluxo com banco exigem `RUPTUR_DATABASE_URL`
 - sem banco, o teste de health continua sendo executado
->>>>>>> work
-
 ## Subir Postgres local (opcional)
 
 ```bash
@@ -108,8 +100,6 @@ RUPTUR_UAZAPI_BASE_URL=https://free.uazapi.com
 RUPTUR_UAZAPI_TOKEN=...
 ```
 
-<<<<<<< HEAD
-=======
 Opcional para proteger rotas Jarvis/CFO por header:
 
 ```bash
@@ -117,8 +107,6 @@ RUPTUR_JARVIS_ADMIN_TOKEN=seu_token_forte
 ```
 
 Se definido, enviar `x-jarvis-token: seu_token_forte` nas chamadas de `/jarvis/*` e `/cfo/*`.
-
->>>>>>> work
 ## Follow-up (Sprint 2)
 
 Lista (dry-run):

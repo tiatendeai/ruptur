@@ -30,7 +30,7 @@ class JarvisHistoryItem(BaseModel):
 class JarvisAskRequest(BaseModel):
     message: str = Field(min_length=1)
     principal_name: str = Field(default="Diego", min_length=1)
-    profile: Literal["ops", "cfo", "vcfo", "vcvo", "eggs"] = "ops"
+    profile: Literal["ops", "cfo", "vcfo", "vcvo", "eggs", "vceo"] = "ops"
     history: list[JarvisHistoryItem] = Field(default_factory=list)
     context: list[str] = Field(default_factory=list)
 
@@ -126,7 +126,7 @@ def ask(req: JarvisAskRequest) -> dict[str, Any]:
             history=history,
             context_blocks=context_blocks,
         )
-    elif req.profile == "eggs":
+    elif req.profile in {"eggs", "vceo"}:
         eggs_ctx = _load_eggs_context()
         context_blocks.extend(eggs_ctx.context_blocks)
         response = agent_service.get_jarvis_eggs_response(
@@ -207,6 +207,13 @@ def ask_eggs(req: JarvisEggsAskRequest) -> dict[str, Any]:
     )
 
     return {"ok": True, "profile": "eggs", "response": response, "snapshot": eggs_ctx.snapshot if req.include_snapshot else None}
+
+
+@router.post("/ask/vceo")
+def ask_vceo(req: JarvisEggsAskRequest) -> dict[str, Any]:
+    result = ask_eggs(req)
+    result["profile"] = "vceo"
+    return result
 
 
 class JarvisCfoWeeklyCloseRequest(BaseModel):
@@ -346,6 +353,13 @@ def jarvis_eggs_weekly_close(req: JarvisEggsWeeklyCloseRequest) -> dict[str, Any
         )
 
     return {"ok": True, "profile": "eggs", "weekly_close": close_result, "ai_summary": ai_summary}
+
+
+@router.post("/vceo/weekly-close")
+def jarvis_vceo_weekly_close(req: JarvisEggsWeeklyCloseRequest) -> dict[str, Any]:
+    result = jarvis_eggs_weekly_close(req)
+    result["profile"] = "vceo"
+    return result
 
 
 class JarvisCommandRequest(BaseModel):

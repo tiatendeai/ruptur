@@ -63,6 +63,10 @@ Mas ainda não possui, de ponta a ponta, uma malha fechada de:
 | JARVIS-AUT-008 | P1 | Formalização de `vOps`, `pairs` e eventual conselho/Matusas | `state` | `Ruptur Delivery OS` | expansão de papéis sem colapso ontológico |
 | JARVIS-AUT-009 | P1 | Telemetria de eficácia por skill / perfil / tipo de missão | `codex/ruptur` | `Ruptur Delivery OS` | melhoria contínua deixa de ser só percepção subjetiva |
 | JARVIS-AUT-010 | P1 | Cobertura mínima de documentação, comentários e trilha auditável para mudanças críticas | `state` + `codex/ruptur` | `Ruptur Delivery OS` | mudanças frágeis passam a sair com contexto e reversibilidade |
+| JARVIS-AUT-011 | P0 | Taxonomia canônica dos perfis virtuais, aliases e regras de nomenclatura | `state` | `Ruptur Delivery OS` | elimina drift entre `vCVO`/`VisionCO`, `vCEO`/`Eggs` e futuras expansões |
+| JARVIS-AUT-012 | P0 | Gate explícito de `não fazer`, falso positivo, bloqueio e aborto | `state` + `codex/ruptur` | `Ruptur Delivery OS` | o sistema aumenta a capacidade de negar e parar cedo com motivo auditável |
+| JARVIS-AUT-013 | P0 | Pipeline de materialização pós-mesa para backlog, regra, runbook, trace e GitHub Projects | `state` + `codex/ruptur` | `Ruptur Delivery OS` | decisões deixam de morrer em conversa e passam a gerar artefato acionável |
+| JARVIS-AUT-014 | P1 | Gatilhos automáticos com garantia de uso ativo | `state` + `codex/ruptur` | `Ruptur Delivery OS` | conhecimento acionado automaticamente só entra se tiver owner, métrica e trilha real de uso |
 
 ---
 
@@ -129,6 +133,30 @@ Mas ainda não possui, de ponta a ponta, uma malha fechada de:
 - mudanças críticas exigem comentário, runbook ou doc vinculada
 - ativações frágeis saem com reversão clara
 
+## JARVIS-AUT-011 — Taxonomia canônica dos perfis virtuais
+
+- existe regra formal para nomes canônicos e aliases
+- backlog, governança e projetos usam o nome canônico
+- expansão de perfis passa a exigir owner, trigger, runbook e métrica
+
+## JARVIS-AUT-012 — Gate de `não fazer` / falso positivo
+
+- toda execução relevante explicita caminhos proibidos
+- existe distinção operacional clara entre `bloqueado` e `abortado`
+- o custo de erro entra na decisão antes da ação
+
+## JARVIS-AUT-013 — Materialização pós-mesa
+
+- saída de mesa sempre gera backlog, regra, runbook, ADR, trace ou project item
+- existe checklist de fechamento para impedir perda de decisão
+- fica rastreável o vínculo entre conversa, artefato e execução
+
+## JARVIS-AUT-014 — Gatilhos com uso ativo garantido
+
+- nenhum gatilho entra como ativo sem owner, métrica, rollback e condição de desligamento
+- gatilhos passam a registrar trilha mínima de uso
+- fica visível o que foi acionado automaticamente e com qual efeito
+
 ---
 
 ## 5. Riscos que este backlog tenta reduzir
@@ -171,6 +199,10 @@ Em 2026-03-23, os itens deste backlog foram publicados nos boards ativos do ecos
 | JARVIS-AUT-008 | `Ruptur Delivery OS` | `PVTI_lAHODOO6r84BRgVSzgoDfnY` |
 | JARVIS-AUT-009 | `Ruptur Delivery OS` | `PVTI_lAHODOO6r84BRgVSzgoDfnw` |
 | JARVIS-AUT-010 | `Ruptur Delivery OS` | `PVTI_lAHODOO6r84BRgVSzgoDfoI` |
+| JARVIS-AUT-011 | `Ruptur Delivery OS` | `PVTI_lAHODOO6r84BRgVSzgoMv4Y` |
+| JARVIS-AUT-012 | `Ruptur Delivery OS` | `PVTI_lAHODOO6r84BRgVSzgoMv4g` |
+| JARVIS-AUT-013 | `Ruptur Delivery OS` | `PVTI_lAHODOO6r84BRgVSzgoMv40` |
+| JARVIS-AUT-014 | `Ruptur Delivery OS` | `PVTI_lAHODOO6r84BRgVSzgoMv48` |
 
 Critério aplicado na publicação:
 
