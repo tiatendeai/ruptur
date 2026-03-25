@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "start": "node runtime/server.mjs",
-    "runtime": "node runtime/server.mjs"
+    "runtime": "node runtime/server.mjs",
+    "jarvis:ativar": "node scripts/jarvis/resolve-activation.mjs",
+    "jarvis:ativar:json": "node scripts/jarvis/resolve-activation.mjs --json"
   }
 }

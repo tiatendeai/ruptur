@@ -31,6 +31,31 @@ cd saas
 npm run runtime
 ```
 
+## Ativação rápida do Jarvis neste projeto
+
+Para a próxima rodada não depender de busca longa, este pacote agora tem um ponto de entrada local de ativação:
+
+- `AGENTS.md`
+- `.jarvis-activation.md`
+- `scripts/jarvis/resolve-activation.mjs`
+
+Comandos rápidos:
+
+```bash
+npm run jarvis:ativar
+npm run jarvis:ativar:json
+```
+
+Triggers locais tratados como ativação operacional:
+
+- `Jarvis`
+- `Jarvis ativar`
+- `Jarvis Iniciar`
+- `Jarvis Start`
+- `Modo Full`
+
+O objetivo aqui não é criar nova gênese, e sim reconciliar rapidamente esta superfície com a sessão oficial do ecossistema.
+
 ## Rotas principais
 
 - `/`
