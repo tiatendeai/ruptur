@@ -81,7 +81,7 @@ const WARMUP_MANAGER_BUTTON_HTML = `
       }
     }
   </style>
-  <a class="${WARMUP_MANAGER_BUTTON_MARKER}" href="${WARMUP_BASE_PATH}/settings">
+  <a class="${WARMUP_MANAGER_BUTTON_MARKER}" href="${WARMUP_BASE_PATH}/">
     <span>
       Warmup Manager
       <small>instâncias, regras e saúde</small>
@@ -1727,6 +1727,16 @@ function stripRoutePrefix(pathname, prefix) {
   return pathname;
 }
 
+function normalizeApiPath(pathname) {
+  if (pathname.startsWith(`${WARMUP_BASE_PATH}/api/local/`)) {
+    return pathname.slice(WARMUP_BASE_PATH.length);
+  }
+  if (pathname === `${WARMUP_BASE_PATH}/api/local`) {
+    return "/api/local";
+  }
+  return pathname;
+}
+
 function injectWarmupManagerButton(html) {
   if (html.includes(WARMUP_MANAGER_BUTTON_MARKER)) return html;
   if (html.includes("</body>")) {
@@ -1800,26 +1810,30 @@ const server = http.createServer(async (req, res) => {
   }
 
   const url = new URL(req.url, `http://${req.headers.host ?? "localhost"}`);
+  const normalizedPathname = normalizeApiPath(url.pathname);
   try {
-    if (url.pathname === "/api/local/health") return createResponse(res, 200, { ok: true, port: PORT, scheduler: state.scheduler });
-    if (url.pathname === "/api/local/app/config") {
+    if (normalizedPathname === "/api/local/health") return createResponse(res, 200, { ok: true, port: PORT, scheduler: state.scheduler });
+    if (normalizedPathname === "/api/local/app/config") {
       return createResponse(res, 200, {
         settings: buildPublicSettings(state.config.settings),
         runtime: buildRuntimeSecretMeta(state.config.settings),
       });
     }
-    if (url.pathname === "/api/local/warmup/webhook" && req.method === "POST") {
+    if (normalizedPathname === "/api/local/warmup/webhook" && req.method === "POST") {
       const payload = await parseBody(req);
       processWebhookPayload(payload);
       return createResponse(res, 200, { received: true });
     }
-    if (url.pathname === "/api/local/uazapi/instance/all") {
+    if (normalizedPathname === "/api/local/uazapi/instance/all") {
+      if (!state.config.settings.adminToken?.trim()) {
+        return createResponse(res, 200, []);
+      }
       const instances = await fetchAllInstances();
       return createResponse(res, 200, instances);
     }
-    if (url.pathname === "/api/local/warmup/state") return createResponse(res, 200, buildSnapshot());
-    if (url.pathname === "/api/local/warmup/config") return createResponse(res, 200, buildRuntimeConfigResponse());
-    if (url.pathname === "/api/local/warmup/sync") {
+    if (normalizedPathname === "/api/local/warmup/state") return createResponse(res, 200, buildSnapshot());
+    if (normalizedPathname === "/api/local/warmup/config") return createResponse(res, 200, buildRuntimeConfigResponse());
+    if (normalizedPathname === "/api/local/warmup/sync") {
       const payload = await parseBody(req);
       const previousSettings = state.config.settings ?? {};
       const nextSettings = mergeRuntimeSettings(state.config.settings, payload.settings ?? {});
@@ -1857,7 +1871,7 @@ const server = http.createServer(async (req, res) => {
       await saveState();
       return createResponse(res, 200, buildSnapshot());
     }
-    if (url.pathname === "/api/local/warmup/start") {
+    if (normalizedPathname === "/api/local/warmup/start") {
       const payload = await parseBody(req);
       const actor = resolveManualActor(payload);
       state.scheduler.enabled = true;
@@ -1884,7 +1898,7 @@ const server = http.createServer(async (req, res) => {
       startLoop();
       return createResponse(res, 200, await tick("manual-start"));
     }
-    if (url.pathname === "/api/local/warmup/pause") {
+    if (normalizedPathname === "/api/local/warmup/pause") {
       const payload = await parseBody(req);
       const actor = resolveManualActor(payload);
       state.scheduler.enabled = false;
@@ -1915,7 +1929,7 @@ const server = http.createServer(async (req, res) => {
       await saveState();
       return createResponse(res, 200, buildSnapshot());
     }
-    if (url.pathname === "/api/local/warmup/stop") {
+    if (normalizedPathname === "/api/local/warmup/stop") {
       const payload = await parseBody(req);
       const actor = resolveManualActor(payload);
       state.scheduler.enabled = false;
@@ -1945,7 +1959,7 @@ const server = http.createServer(async (req, res) => {
       await saveState();
       return createResponse(res, 200, buildSnapshot());
     }
-    if (url.pathname === "/api/local/warmup/restart") {
+    if (normalizedPathname === "/api/local/warmup/restart") {
       const payload = await parseBody(req);
       const actor = resolveManualActor(payload);
       state.scheduler.enabled = true;
@@ -1973,7 +1987,7 @@ const server = http.createServer(async (req, res) => {
       startLoop();
       return createResponse(res, 200, await tick("manual-restart"));
     }
-    if (url.pathname === "/api/local/warmup/tick") return createResponse(res, 200, await tick("manual"));
+    if (normalizedPathname === "/api/local/warmup/tick") return createResponse(res, 200, await tick("manual"));
 
     if (url.pathname === WARMUP_BASE_PATH || url.pathname.startsWith(`${WARMUP_BASE_PATH}/`)) {
       if (await serveStaticFromDir(req, res, {
