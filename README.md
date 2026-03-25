@@ -1,42 +1,59 @@
 # Ruptur
 
-Sistema e biblioteca (Markdown-first) para estruturar e automatizar operação comercial (leads, conversas, follow-up, qualificação e pipeline).
+Ecossistema de operacao comercial, aquecimento de instancias e console web.
 
-Referência principal de produto e domínio:
+## Estrutura principal
 
-- `ruptur.cloud`
-
-## Estrutura
-
-<<<<<<< HEAD
-- `docs/`: visão, literatura, jornada, blueprint e arquitetura
-- `backend/`: backend do produto
-- `agents/`: agentes (prompts, specs, implementações)
-=======
-- `backend/`: API e núcleo operacional
+- `backend/`: API e nucleo operacional
 - `web/`: console do produto
-- `supabase/`: migrations e operação de banco
-- `deploy/`: artefatos de deploy
-- `docs/`: visão, jornada, blueprint, governança e consolidação
+- `saas/`: pacote temporariamente desacoplado com front principal + Warmup Manager
+- `deploy/`: artefatos de deploy para host2/KVM2
+- `supabase/`: migrations e operacao de banco
+- `docs/`: visao, jornada, blueprint, governanca e consolidacao
+- `playbooks/`: runbooks e processos operacionais
+- `knowledge/`: trilha institucional e governanca local
 - `.agent/`: kit de agentes e workflows locais
->>>>>>> work
-- `experiments/`: scripts e protótipos
-- `archive/`: satélites, referências históricas e backups fora do núcleo
+- `experiments/`: scripts e prototipos
 
-<<<<<<< HEAD
+## Estado operacional atual
 
-=======
->>>>>>> work
-## Próximos passos
+Em **25/03/2026**, a entrega publica mais recente do front/warmup esta concentrada em:
 
-- Blueprint oficial do projeto: `docs/blueprint/ruptur-blueprint.md`
-- Plano de execução fase 1: `docs/jornada/proximos_passos_fase1.md`
-<<<<<<< HEAD
-=======
-- Consolidação de contexto e genealogia: `docs/jornada/consolidacao-mestra-2026-03-12.md`
+- `saas/`
+- branch: `lindona-front-e-warmup-manager`
 
-## Preview local (Console + API)
+Esse pacote serve:
 
-- Backend: `backend/README-PREVIEW.md`
-- Console: `web/README-RUPTUR.md`
->>>>>>> work
+- front principal em `/`
+- Warmup Manager em `/warmup/*`
+- runtime local/producao em `saas/runtime/server.mjs`
+
+## Leitura recomendada
+
+- blueprint oficial: `docs/blueprint/ruptur-blueprint.md`
+- setup do warmup: `docs/WARMUP_MANAGER_SETUP.md`
+- runbook de cutover KVM2: `playbooks/governanca/runbooks/runbook-warmup-kvm2-cutover-2026-03-23.md`
+- README operacional do pacote atual: `saas/README.md`
+
+## Preview local
+
+### Pacote `saas`
+
+```bash
+cd saas
+npm run runtime
+```
+
+URLs:
+
+- front: `http://127.0.0.1:8787/`
+- Warmup Manager: `http://127.0.0.1:8787/warmup/`
+
+## Observacao
+
+Logs como:
+
+- `jamToggleDumpStore`
+- `Unchecked runtime.lastError: The page keeping the extension port...`
+
+foram classificados como **ruido de extensao/navegador**, nao como erro nativo do app.

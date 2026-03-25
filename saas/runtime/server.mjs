@@ -31,6 +31,7 @@ const MIME_TYPES = {
 };
 
 const WARMUP_MANAGER_BUTTON_MARKER = "codex-warmup-manager-link";
+const WARMUP_TOKEN_CLEAR_MARKER = "codex-runtime-token-clear-action";
 const WARMUP_MANAGER_BUTTON_HTML = `
   <style>
     nav button.bg-primary.text-primary-foreground.px-5.py-2.rounded-full.font-mono.text-xs.font-bold {
@@ -87,6 +88,99 @@ const WARMUP_MANAGER_BUTTON_HTML = `
       <small>instâncias, regras e saúde</small>
     </span>
   </a>
+`;
+
+const WARMUP_MANAGER_SETTINGS_ACTIONS_HTML = `
+  <style>
+    .${WARMUP_TOKEN_CLEAR_MARKER} {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-right: 10px;
+      padding: 4px 10px;
+      border: 1px solid rgba(239, 68, 68, 0.35);
+      border-radius: 999px;
+      background: rgba(239, 68, 68, 0.12);
+      color: rgb(248, 113, 113);
+      font: 600 11px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      cursor: pointer;
+      vertical-align: middle;
+    }
+
+    .${WARMUP_TOKEN_CLEAR_MARKER}:hover {
+      background: rgba(239, 68, 68, 0.18);
+      filter: brightness(1.04);
+    }
+
+    .${WARMUP_TOKEN_CLEAR_MARKER}:disabled {
+      opacity: 0.65;
+      cursor: wait;
+    }
+  </style>
+  <script>
+    (() => {
+      const marker = "${WARMUP_TOKEN_CLEAR_MARKER}";
+      const endpoint = "${WARMUP_BASE_PATH}/api/local/warmup/clear-token";
+
+      async function clearToken(button) {
+        const confirmed = window.confirm("Remover o token ativo do runtime e zerar o painel operacional?");
+        if (!confirmed) return;
+
+        const originalLabel = button.textContent;
+        button.disabled = true;
+        button.textContent = "Removendo...";
+
+        try {
+          const response = await fetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ actor: "Operador local", reason: "Token removido manualmente pela interface" }),
+          });
+
+          if (!response.ok) {
+            let message = "Nao foi possivel remover o token do runtime.";
+            try {
+              const payload = await response.json();
+              if (payload && typeof payload.error === "string" && payload.error.trim()) {
+                message = payload.error.trim();
+              }
+            } catch {}
+            throw new Error(message);
+          }
+
+          window.location.reload();
+        } catch (error) {
+          window.alert(error instanceof Error ? error.message : "Falha ao remover o token do runtime.");
+          button.disabled = false;
+          button.textContent = originalLabel;
+        }
+      }
+
+      function wireTokenClearAction() {
+        const notes = Array.from(document.querySelectorAll("p"))
+          .filter((element) => (element.textContent || "").includes("Token ativo no runtime"));
+
+        for (const note of notes) {
+          if (note.querySelector("." + marker)) continue;
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = marker;
+          button.textContent = "Remover token";
+          button.addEventListener("click", () => clearToken(button));
+          note.prepend(button);
+        }
+      }
+
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", wireTokenClearAction, { once: true });
+      } else {
+        wireTokenClearAction();
+      }
+
+      const observer = new MutationObserver(() => wireTokenClearAction());
+      observer.observe(document.documentElement, { childList: true, subtree: true });
+    })();
+  </script>
 `;
 
 let state = await loadState();
@@ -1745,6 +1839,26 @@ function injectWarmupManagerButton(html) {
   return `${html}\n${WARMUP_MANAGER_BUTTON_HTML}`;
 }
 
+function injectWarmupManagerSettingsActions(html) {
+  if (html.includes(WARMUP_TOKEN_CLEAR_MARKER)) return html;
+  if (html.includes("</body>")) {
+    return html.replace("</body>", `${WARMUP_MANAGER_SETTINGS_ACTIONS_HTML}\n</body>`);
+  }
+  return `${html}\n${WARMUP_MANAGER_SETTINGS_ACTIONS_HTML}`;
+}
+
+function resetOperationalRuntimeState(reason = "Token do runtime removido manualmente.") {
+  stopLoop();
+
+  state.scheduler.enabled = false;
+  state.scheduler.status = "paused";
+  state.scheduler.lastError = reason;
+  state.summary = createDefaultState().summary;
+  state.currentPool = createEmptyPoolState();
+  state.instanceStates = {};
+  state.lastSyncedAt = new Date().toISOString();
+}
+
 async function serveFile(res, filePath, htmlTransform) {
   const ext = path.extname(filePath).toLowerCase();
   if (ext === ".html" && typeof htmlTransform === "function") {
@@ -1871,6 +1985,30 @@ const server = http.createServer(async (req, res) => {
       await saveState();
       return createResponse(res, 200, buildSnapshot());
     }
+    if (normalizedPathname === "/api/local/warmup/clear-token" && req.method === "POST") {
+      const payload = await parseBody(req);
+      const actor = resolveManualActor(payload);
+      state.config.settings = normalizeSettings({
+        ...state.config.settings,
+        adminToken: "",
+      });
+      resetOperationalRuntimeState(`Token removido manualmente por ${actor}.`);
+      addAuditEntry({
+        type: "manual_control",
+        actor,
+        action: "warmup_clear_admin_token",
+        details: payload.reason || "Token ativo removido pela interface",
+      });
+      addRuntimeLog({
+        type: "scheduler",
+        status: "info",
+        message: `Token do runtime removido manualmente por ${actor}.`,
+        details: payload.reason || "Painel operacional zerado pela interface.",
+        instanceName: "Warmup Runtime",
+      });
+      await saveState();
+      return createResponse(res, 200, buildRuntimeConfigResponse());
+    }
     if (normalizedPathname === "/api/local/warmup/start") {
       const payload = await parseBody(req);
       const actor = resolveManualActor(payload);
@@ -1993,6 +2131,7 @@ const server = http.createServer(async (req, res) => {
       if (await serveStaticFromDir(req, res, {
         distDir: MANAGER_DIST_DIR,
         stripPrefix: WARMUP_BASE_PATH,
+        htmlTransform: injectWarmupManagerSettingsActions,
       })) return;
     }
 
