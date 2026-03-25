@@ -17,7 +17,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/pipeline", label: "Pipeline", kicker: "CRM" },
   { href: "/broadcasts", label: "Campanhas", kicker: "Disparos" },
   { href: "/connections", label: "Conexoes", kicker: "Canais" },
-  { href: "http://localhost:8787/dashboard", label: "Warmup", kicker: "Maturacao", external: true },
+   { href: "/warmup", label: "Warmup", kicker: "Maturacao" },
   { href: "/sendflow", label: "Sendflow", kicker: "Fluxos" },
   { href: "/metrics", label: "Metricas", kicker: "Saude" },
   { href: "/billing", label: "Planos", kicker: "Receita" },

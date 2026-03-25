@@ -26,7 +26,7 @@ Os aliases abaixo devem redirecionar para o host canonico:
 
 - `app.ruptur.cloud` esta servindo pela **KVM2**
 - `ruptur.cloud`, `www.ruptur.cloud`, `studio.ruptur.cloud`, `showcase.ruptur.cloud`, `site.ruptur.cloud`, `lp.ruptur.cloud` e `web.ruptur.cloud` ainda resolvem para a **Oracle/host2**, que agora responde com redirect para `https://app.ruptur.cloud`
-- `warmup.ruptur.cloud` e `aquecimento.ruptur.cloud` estao previstos na politica de redirect, mas ainda dependem de publicacao de DNS para funcionarem publicamente
+- `warmup.ruptur.cloud` e `aquecimento.ruptur.cloud` agora possuem DNS publico e entram por redirect seguro para `https://app.ruptur.cloud`
 
 ## Onde isso e controlado
 

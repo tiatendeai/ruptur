@@ -15,7 +15,21 @@ http:
       tls:
         certResolver: le
     canonical-app-redirect:
-      rule: Host(`ruptur.cloud`) || Host(`www.ruptur.cloud`) || Host(`studio.ruptur.cloud`) || Host(`showcase.ruptur.cloud`) || Host(`site.ruptur.cloud`) || Host(`lp.ruptur.cloud`) || Host(`web.ruptur.cloud`) || Host(`warmup.ruptur.cloud`) || Host(`aquecimento.ruptur.cloud`)
+      rule: Host(`ruptur.cloud`) || Host(`www.ruptur.cloud`) || Host(`studio.ruptur.cloud`) || Host(`showcase.ruptur.cloud`) || Host(`site.ruptur.cloud`) || Host(`lp.ruptur.cloud`) || Host(`web.ruptur.cloud`)
+      entryPoints:
+        - websecure
+      service: canonical-redirect
+      tls:
+        certResolver: le
+    canonical-warmup-redirect:
+      rule: Host(`warmup.ruptur.cloud`)
+      entryPoints:
+        - websecure
+      service: canonical-redirect
+      tls:
+        certResolver: le
+    canonical-aquecimento-redirect:
+      rule: Host(`aquecimento.ruptur.cloud`)
       entryPoints:
         - websecure
       service: canonical-redirect

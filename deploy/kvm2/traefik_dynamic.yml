@@ -25,7 +25,7 @@ http:
         certResolver: le
 
     app-warmup:
-      priority: 1000
+      priority: 2000
       rule: Host(`app.ruptur.cloud`) && PathPrefix(`/warmup`)
       entryPoints:
         - websecure
