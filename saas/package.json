@@ -1,0 +1,10 @@
+{
+  "name": "saas-front-e-warmup-manager",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "start": "node runtime/server.mjs",
+    "runtime": "node runtime/server.mjs"
+  }
+}
