@@ -65,6 +65,51 @@ backlog:
     data: null
     blockers: []
 
+  - id: BACK-008
+    titulo: "Migrar código Terraform (IaC) do vps-oracle para infrastructure-state/iac/"
+    status: pending
+    responsavel: vOps-Dev + J.A.R.V.I.S.
+    entregavel: "infrastructure-state/iac/ com Terraform funcional para Oracle Cloud"
+    data: null
+    blockers: ["Acesso ao workspace vps-oracle via Diego"]
+    origem_sessao: "2026-03-24 | Conversa sobre renomeação da pasta infra"
+
+  - id: BACK-009
+    titulo: "Migrar Stacks Docker Swarm para infrastructure-state/swarm/"
+    status: pending
+    responsavel: vOps-Dev + J.A.R.V.I.S.
+    entregavel: "infrastructure-state/swarm/ com manifests operacionais Oracle+KVM2"
+    data: null
+    blockers: ["BACK-008"]
+    origem_sessao: "2026-03-24 | Auditoria da pasta infrastructure-state"
+
+  - id: BACK-010
+    titulo: "Manifesto de Observabilidade (Prometheus/Grafana) declarativo em infrastructure-state"
+    status: pending
+    responsavel: vOps-Dev
+    entregavel: "infrastructure-state/swarm/observability/ com limites de retenção e exporters KVM2"
+    data: null
+    blockers: ["BACK-009"]
+    origem_sessao: "2026-03-24 | Debate sobre Matriz Why (Observabilidade Ruptur Farm)"
+
+  - id: BACK-011
+    titulo: "Migrar Playbooks/SOPs de infra para infrastructure-state/playbooks/"
+    status: pending
+    responsavel: J.A.R.V.I.S.
+    entregavel: "infrastructure-state/playbooks/ com SOPs de recuperação autônoma do servidor"
+    data: null
+    blockers: []
+    origem_sessao: "2026-03-24 | Auditoria da pasta infrastructure-state"
+
+  - id: BACK-012
+    titulo: "Automação: Captura e registro automático de tarefas emergentes em sessão"
+    status: pending
+    responsavel: vOps-Dev + J.A.R.V.I.S.
+    entregavel: "Script session_task_extractor.py que identifica e registra tarefas geradas em sessão no backlog_governanca.yaml e GitHub Projects via API"
+    data: null
+    blockers: []
+    origem_sessao: "2026-03-24 | Auditoria do gap de backlog (tarefas de infra não registradas)"
+
 decisoes:
   - id: DEC-001
     titulo: "Nomenclatura v-prefix é canônica para todos os agentes"
