@@ -32,8 +32,19 @@ Esse pacote serve:
 
 - blueprint oficial: `docs/blueprint/ruptur-blueprint.md`
 - setup do warmup: `docs/WARMUP_MANAGER_SETUP.md`
+- dominios canonicos: `docs/DOMINIOS_CANONICOS.md`
 - runbook de cutover KVM2: `playbooks/governanca/runbooks/runbook-warmup-kvm2-cutover-2026-03-23.md`
 - README operacional do pacote atual: `saas/README.md`
+
+## Dominio canonico atual
+
+O host canonico do front atual e:
+
+- `https://app.ruptur.cloud`
+
+Aliases publicos devem redirecionar para esse host. A politica completa esta em:
+
+- `docs/DOMINIOS_CANONICOS.md`
 
 ## Preview local
 

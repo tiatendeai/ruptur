@@ -64,6 +64,12 @@ services:
       - ruptur-db
     restart: unless-stopped
 
+  canonical-redirect:
+    image: nginx:1.27-alpine
+    volumes:
+      - ./redirect/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    restart: unless-stopped
+
   ruptur-web:
     build:
       context: ../../web

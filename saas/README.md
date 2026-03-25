@@ -14,6 +14,16 @@ Servir como pacote operacional temporario para:
 - expor o Warmup Manager real em rota separada
 - publicar a mesma experiencia na KVM2 antes de um novo ciclo de consolidacao
 
+## Host canonico
+
+O pacote `saas` deve ser servido publicamente em:
+
+- `https://app.ruptur.cloud`
+
+Aliases antigos nao devem entregar conteudo proprio; eles devem redirecionar para o host canonico. A referencia publica dessa politica esta em:
+
+- `docs/DOMINIOS_CANONICOS.md`
+
 ## Rodar localmente
 
 ```bash

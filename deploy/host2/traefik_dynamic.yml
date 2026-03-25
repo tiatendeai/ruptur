@@ -14,8 +14,15 @@ http:
       service: ruptur-backend
       tls:
         certResolver: le
+    canonical-app-redirect:
+      rule: Host(`ruptur.cloud`) || Host(`www.ruptur.cloud`) || Host(`studio.ruptur.cloud`) || Host(`showcase.ruptur.cloud`) || Host(`site.ruptur.cloud`) || Host(`lp.ruptur.cloud`) || Host(`web.ruptur.cloud`) || Host(`warmup.ruptur.cloud`) || Host(`aquecimento.ruptur.cloud`)
+      entryPoints:
+        - websecure
+      service: canonical-redirect
+      tls:
+        certResolver: le
     ruptur-web:
-      rule: Host(`app.ruptur.cloud`) || Host(`studio.ruptur.cloud`) || Host(`showcase.ruptur.cloud`) || Host(`site.ruptur.cloud`) || Host(`lp.ruptur.cloud`) || Host(`web.ruptur.cloud`) || Host(`ruptur.cloud`) || Host(`www.ruptur.cloud`)
+      rule: Host(`app.ruptur.cloud`)
       entryPoints:
         - websecure
       service: ruptur-web
@@ -47,6 +54,10 @@ http:
       loadBalancer:
         servers:
           - url: http://ruptur-backend:8000
+    canonical-redirect:
+      loadBalancer:
+        servers:
+          - url: http://canonical-redirect:8080
     ruptur-web:
       loadBalancer:
         servers:
