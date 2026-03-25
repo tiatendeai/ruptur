@@ -15,6 +15,8 @@ services:
     labels:
       traefik.enable: "true"
       traefik.docker.network: "kvm2_default"
+      traefik.http.routers.saas-web-http.entrypoints: web
+      traefik.http.routers.saas-web-http.rule: "Host(`app.ruptur.cloud`) || Host(`studio.ruptur.cloud`) || Host(`showcase.ruptur.cloud`) || Host(`site.ruptur.cloud`) || Host(`lp.ruptur.cloud`) || Host(`web.ruptur.cloud`) || Host(`ruptur.cloud`) || Host(`www.ruptur.cloud`)"
       traefik.http.routers.saas-web.entrypoints: websecure
       traefik.http.routers.saas-web.rule: "Host(`app.ruptur.cloud`) || Host(`studio.ruptur.cloud`) || Host(`showcase.ruptur.cloud`) || Host(`site.ruptur.cloud`) || Host(`lp.ruptur.cloud`) || Host(`web.ruptur.cloud`) || Host(`ruptur.cloud`) || Host(`www.ruptur.cloud`)"
       traefik.http.routers.saas-web.tls.certresolver: le
