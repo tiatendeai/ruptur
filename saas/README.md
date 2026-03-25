@@ -72,6 +72,7 @@ O runtime agora:
 - abre o botao **Warmup Manager** diretamente no dashboard em `/warmup/`
 - retorna lista vazia em `instance/all` quando ainda nao existe `adminToken`, evitando erro visual desnecessario
 - adiciona o botao **Remover token** ao lado do aviso `Token ativo no runtime`, limpando o token ativo e zerando o painel operacional sem precisar editar segredo manualmente
+- reidrata automaticamente a rotina protegida **Warmup 24/7**, que nao pode ser removida e pode apenas ser desativada para dar lugar a outra rotina especifica
 
 ## Logs que nao sao bug do app
 
@@ -94,7 +95,7 @@ Ambiente auditado:
 | Front principal | `/` | OK | carrega landing/front e exibe botao `Warmup Manager` |
 | Dashboard | `/warmup/` | OK | abre direto no dashboard, sem erro de JSON no console |
 | Instancias | `/warmup/instances` | OK | lista instancias e cards operacionais |
-| Warmup / Rotinas | `/warmup/routines` | Parcial | tela abre e navega; hoje nao ha rotinas cadastradas |
+| Warmup / Rotinas | `/warmup/routines` | OK com ressalva | tela abre, navega e sempre materializa a rotina protegida `Warmup 24/7`; se o runtime estiver sem token/mensagens carregadas, ela pode aparecer zerada |
 | Telemetria | `/warmup/telemetry` | OK | tela abre com cards e atalhos |
 | Device Lab | `/warmup/device-lab` | OK | tela abre e renderiza a superficie operacional |
 | Auto-regeneracao | `/warmup/auto-regeneration` | OK | tela abre e renderiza a leitura da fila de cura |
@@ -109,7 +110,7 @@ Ambiente auditado:
 - O dashboard agora e a tela de entrada do manager.
 - A ausencia de `adminToken` ainda limita a operacao real do warmup, mas nao derruba mais a interface.
 - Quando existir token ativo mascarado no runtime, a tela de configuracoes agora oferece um caminho explicito para limpeza do segredo.
-- A tela de `routines` esta funcional como rota, mas segue sem dados quando o runtime nao possui rotinas salvas.
+- A rotina `Warmup 24/7 Padrão` agora e protegida no runtime: nao pode sumir da UI por sincronizacao e nao deve ser excluida.
 
 ## URLs uteis
 

@@ -808,20 +808,11 @@ function pickRoutineMessage(routine, options = {}) {
 
 function buildDefaultRoutine(instances) {
   const allTokens = Array.from(new Set(instances.map((instance) => instance.token)));
-
-  if (allTokens.length < 2) {
-    return null;
-  }
-
   const directMessageIds = state.config.messages
     .filter((message) => String(message.category ?? "").trim().toLowerCase() !== "grupo")
     .map((message) => message.id);
   const fallbackMessageIds = state.config.messages.map((message) => message.id);
   const selectedMessages = directMessageIds.length ? directMessageIds : fallbackMessageIds;
-
-  if (!selectedMessages.length) {
-    return null;
-  }
 
   return {
     id: DEFAULT_WARMUP_24X7_ID,
@@ -838,10 +829,10 @@ function buildDefaultRoutine(instances) {
   };
 }
 
-function refreshProtectedRoutines(instances) {
+function refreshProtectedRoutines(routines, instances) {
   const allTokens = Array.from(new Set(instances.map((instance) => instance.token)));
 
-  for (const routine of state.config.routines) {
+  for (const routine of routines) {
     if (!isProtectedRoutine(routine)) {
       continue;
     }
@@ -851,29 +842,68 @@ function refreshProtectedRoutines(instances) {
   }
 }
 
+function reconcileProtectedRoutines({ currentRoutines = [], incomingRoutines = [], instances = [] } = {}) {
+  const nonProtectedRoutines = incomingRoutines.filter((routine) => !isProtectedRoutine(routine));
+  const protectedIncoming = incomingRoutines.find((routine) => isProtectedRoutine(routine));
+  const protectedCurrent = currentRoutines.find((routine) => isProtectedRoutine(routine));
+
+  let protectedRoutine = protectedIncoming ?? protectedCurrent;
+  let createdProtectedRoutine = false;
+
+  if (!protectedRoutine) {
+    const defaultRoutine = buildDefaultRoutine(instances);
+    if (defaultRoutine) {
+      if (nonProtectedRoutines.some((routine) => routine?.isActive)) {
+        defaultRoutine.isActive = false;
+      }
+      protectedRoutine = defaultRoutine;
+      createdProtectedRoutine = true;
+    }
+  }
+
+  const nextRoutines = protectedRoutine
+    ? [protectedRoutine, ...nonProtectedRoutines]
+    : [...nonProtectedRoutines];
+
+  refreshProtectedRoutines(nextRoutines, instances);
+
+  return {
+    routines: nextRoutines,
+    createdProtectedRoutine,
+  };
+}
+
 function ensureDefaultRoutine(instances) {
-  refreshProtectedRoutines(instances);
-
-  if (state.config.routines.length > 0) {
-    return;
-  }
-
-  const defaultRoutine = buildDefaultRoutine(instances);
-  if (!defaultRoutine) {
-    return;
-  }
-
-  state.config.routines = [defaultRoutine];
-  state.summary.activeRoutines = 1;
-  addRuntimeLog({
-    type: "warmup",
-    instanceName: "runtime",
-    message: "Rotina padrão 24/7 criada automaticamente",
-    status: "info",
-    routineId: defaultRoutine.id,
-    routineName: defaultRoutine.name,
-    mode: defaultRoutine.mode,
+  const beforeRoutines = JSON.stringify(state.config.routines);
+  const { routines, createdProtectedRoutine } = reconcileProtectedRoutines({
+    currentRoutines: state.config.routines,
+    incomingRoutines: state.config.routines,
+    instances,
   });
+
+  state.config.routines = routines;
+  state.summary.activeRoutines = state.config.routines.filter((routine) => routine.isActive).length;
+
+  if (createdProtectedRoutine && JSON.stringify(state.config.routines) !== beforeRoutines) {
+    const defaultRoutine = state.config.routines.find((routine) => isProtectedRoutine(routine));
+    addRuntimeLog({
+      type: "warmup",
+      instanceName: "runtime",
+      message: "Rotina padrão 24/7 criada automaticamente",
+      status: "info",
+      routineId: defaultRoutine?.id,
+      routineName: defaultRoutine?.name,
+      mode: defaultRoutine?.mode,
+    });
+  }
+}
+
+async function bootstrapProtectedRoutine() {
+  const beforeRoutines = JSON.stringify(state.config.routines);
+  ensureDefaultRoutine([]);
+  if (JSON.stringify(state.config.routines) !== beforeRoutines) {
+    await saveState();
+  }
 }
 
 function getRandomDelayMs(routine) {
@@ -906,6 +936,18 @@ async function fetchAllInstances() {
   return fetchJson(`${state.config.settings.serverUrl}/instance/all`, {
     headers: {
       admintoken: state.config.settings.adminToken,
+    },
+  }, "Erro ao buscar instâncias");
+}
+
+async function fetchAllInstancesForSettings(settings = {}) {
+  if (!settings?.adminToken?.trim()) {
+    throw new Error("Admin token não configurado no runtime.");
+  }
+
+  return fetchJson(`${settings.serverUrl}/instance/all`, {
+    headers: {
+      admintoken: settings.adminToken,
     },
   }, "Erro ao buscar instâncias");
 }
@@ -1910,6 +1952,8 @@ function resolveManualActor(payload = {}) {
   return actor || "Operador local";
 }
 
+await bootstrapProtectedRoutine();
+
 const server = http.createServer(async (req, res) => {
   if (!req.url || !req.method) return createResponse(res, 400, { error: "Requisição inválida" });
 
@@ -1946,16 +1990,55 @@ const server = http.createServer(async (req, res) => {
       return createResponse(res, 200, instances);
     }
     if (normalizedPathname === "/api/local/warmup/state") return createResponse(res, 200, buildSnapshot());
-    if (normalizedPathname === "/api/local/warmup/config") return createResponse(res, 200, buildRuntimeConfigResponse());
+    if (normalizedPathname === "/api/local/warmup/config") {
+      if (!state.config.routines.some((routine) => isProtectedRoutine(routine))) {
+        const previousRoutines = JSON.stringify(state.config.routines);
+        ensureDefaultRoutine([]);
+        if (state.config.settings.adminToken?.trim()) {
+          try {
+            const instances = await fetchAllInstances();
+            ensureDefaultRoutine(instances);
+          } catch {}
+        }
+        if (JSON.stringify(state.config.routines) !== previousRoutines) {
+          await saveState();
+        }
+      }
+      return createResponse(res, 200, buildRuntimeConfigResponse());
+    }
     if (normalizedPathname === "/api/local/warmup/sync") {
       const payload = await parseBody(req);
       const previousSettings = state.config.settings ?? {};
       const nextSettings = mergeRuntimeSettings(state.config.settings, payload.settings ?? {});
+      let resolvedInstances = [];
+      if (nextSettings.adminToken?.trim()) {
+        try {
+          resolvedInstances = await fetchAllInstancesForSettings(nextSettings);
+        } catch {}
+      }
+      const { routines, createdProtectedRoutine } = reconcileProtectedRoutines({
+        currentRoutines: state.config.routines,
+        incomingRoutines: Array.isArray(payload.routines) ? payload.routines : [],
+        instances: resolvedInstances,
+      });
       state.config = {
         settings: nextSettings,
-        routines: Array.isArray(payload.routines) ? payload.routines : [],
+        routines,
         messages: Array.isArray(payload.messages) ? payload.messages : [],
       };
+      state.summary.activeRoutines = state.config.routines.filter((routine) => routine.isActive).length;
+      if (createdProtectedRoutine) {
+        const protectedRoutine = state.config.routines.find((routine) => isProtectedRoutine(routine));
+        addRuntimeLog({
+          type: "warmup",
+          instanceName: "runtime",
+          message: "Rotina padrão 24/7 reidratada automaticamente após sincronização",
+          status: "info",
+          routineId: protectedRoutine?.id,
+          routineName: protectedRoutine?.name,
+          mode: protectedRoutine?.mode,
+        });
+      }
       const previousOverride = previousSettings.riskOverride;
       const nextOverride = nextSettings.riskOverride;
       if (nextOverride?.active && nextOverride.fingerprint !== previousOverride?.fingerprint) {
