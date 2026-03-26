@@ -5,7 +5,7 @@ app_root=""
 release_id=""
 shared_env_file=""
 profiles=""
-default_profiles="core,channels,warmup"
+default_profiles="edge,core,channels,warmup"
 
 while (($#)); do
   case "$1" in
