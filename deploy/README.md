@@ -1,27 +1,25 @@
-# Deploy (VPS Oracle)
+# Deploy
 
-Target: Oracle Always Free micro nodes.
+Este diretório concentra os artefatos de deploy dos ambientes principais do ecossistema.
 
-## Hostnames (Cloudflare)
+## Superfícies ativas
 
-Exemplo para `statuspersianas.com.br`:
+- `deploy/host2/` — Oracle/host2
+- `deploy/kvm2/` — KVM2 / borda pública atual
 
-- `api.statuspersianas.com.br` → VPS Host 1
-- `webhook.statuspersianas.com.br` → VPS Host 1 (opcional; pode apontar para `api`)
+## Leituras recomendadas
 
-## Serviços (Host 1)
+- `deploy/kvm2/README.md`
+- `playbooks/governanca/runbooks/runbook-cicd-kvm2.md`
+- `playbooks/governanca/runbooks/runbook-warmup-kvm2-cutover-2026-03-23.md`
+- `docs/DOMINIOS_CANONICOS.md`
 
-- Traefik (TLS + reverse proxy)
-- Ruptur backend (FastAPI)
+## Regra operacional
 
-## Secrets / env
+Para a KVM2, a fonte da verdade do deploy deve ser:
 
-Crie um arquivo `.env` no servidor (não versionado) com:
+- `/opt/ruptur/current`
 
-```bash
-RUPTUR_DATABASE_URL=...
-RUPTUR_UAZAPI_BASE_URL=https://tiatendeai.uazapi.com
-RUPTUR_UAZAPI_TOKEN=...
-TRAEFIK_ACME_EMAIL=contato@2dlcompany.com.br
-```
+Evitar qualquer operação por clone lateral em:
 
+- `/tmp/ruptur-clone`

@@ -9,10 +9,10 @@ services:
       - --entrypoints.websecure.address=:443
       - --entrypoints.web.http.redirections.entrypoint.to=websecure
       - --entrypoints.web.http.redirections.entrypoint.scheme=https
-      - --certificatesresolvers.le.acme.httpchallenge=true
-      - --certificatesresolvers.le.acme.httpchallenge.entrypoint=web
-      - --certificatesresolvers.le.acme.email=${TRAEFIK_ACME_EMAIL}
-      - --certificatesresolvers.le.acme.storage=/letsencrypt/acme.json
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge=true
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
+      - --certificatesresolvers.letsencrypt.acme.email=${TRAEFIK_ACME_EMAIL}
+      - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
     ports:
       - "80:80"
       - "443:443"
@@ -90,10 +90,13 @@ services:
       timeout: 5s
       retries: 10
     restart: unless-stopped
-  # --- INFRAESTRUTURA SOBERANA (OMEGA) ---
+  # --- INFRAESTRUTURA EXPERIMENTAL (NAO CANONICA) ---
+  # Estes servicos pertencem a experimentos/labs e nao devem subir no deploy
+  # padrao da KVM2. So habilitar com o profile `lab-omega`.
 
   nats:
     image: nats:latest
+    profiles: ["lab-omega"]
     container_name: ruptur-nats
     command: "-js" # Enable JetStream
     ports:
@@ -107,6 +110,7 @@ services:
 
   prometheus:
     image: prom/prometheus:latest
+    profiles: ["lab-omega"]
     container_name: ruptur-prometheus
     volumes:
       - ./infra/prometheus.yml:/etc/prometheus/prometheus.yml
@@ -114,6 +118,7 @@ services:
       - ruptur-net
 
   ras-worker:
+    profiles: ["lab-omega"]
     build:
       context: .
       dockerfile: ./infra/ras.Dockerfile

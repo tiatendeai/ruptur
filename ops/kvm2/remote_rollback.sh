@@ -5,6 +5,7 @@ app_root=""
 release_id=""
 shared_env_file=""
 profiles=""
+default_profiles="core,channels,warmup"
 
 while (($#)); do
   case "$1" in
@@ -70,6 +71,7 @@ if [[ -z "${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:-}" && -n "${NEXT_PUBLIC_SUPABA
 fi
 
 export NEXT_PUBLIC_WARMUP_MANAGER_URL="${NEXT_PUBLIC_WARMUP_MANAGER_URL:-/warmup}"
+export RUPTUR_COMPOSE_PROJECT_NAME="${RUPTUR_COMPOSE_PROJECT_NAME:-kvm2}"
 
 if [[ -z "${WARMUP_TICK_INTERVAL_MS:-}" && -n "${WARMUP_RUNTIME_TICK_INTERVAL_MS:-}" ]]; then
   export WARMUP_TICK_INTERVAL_MS="${WARMUP_RUNTIME_TICK_INTERVAL_MS}"
@@ -87,15 +89,21 @@ if [[ ! -f "${RUPTUR_BACKEND_ENV_FILE}" ]]; then
   exit 1
 fi
 
+if [[ -z "$profiles" ]]; then
+  profiles="${default_profiles}"
+fi
+
 export COMPOSE_PROFILES="${profiles}"
 
 ln -sfn "$target_dir" "$current_link"
 
 cd "${current_link}/deploy/kvm2"
 
-docker compose --project-name "${RUPTUR_COMPOSE_PROJECT_NAME:-ruptur-kvm2}" up -d --build --remove-orphans
+docker compose --project-name "${RUPTUR_COMPOSE_PROJECT_NAME}" up -d --build --remove-orphans
 
 echo "$release_id" > "${app_root}/shared/last_rollback_release"
 date -u +"%Y-%m-%dT%H:%M:%SZ" > "${app_root}/shared/last_rollback_at"
 
 echo "Rollback remoto concluido. Release atual: $release_id"
+echo "Projeto Compose: ${RUPTUR_COMPOSE_PROJECT_NAME}"
+echo "Profiles ativos: ${COMPOSE_PROFILES}"

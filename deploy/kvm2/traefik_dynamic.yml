@@ -6,7 +6,7 @@ http:
         - websecure
       service: baileys
       tls:
-        certResolver: le
+        certResolver: letsencrypt
 
     ruptur-backend:
       rule: Host(`api.ruptur.cloud`) || Host(`webhook.ruptur.cloud`)
@@ -14,7 +14,7 @@ http:
         - websecure
       service: ruptur-backend
       tls:
-        certResolver: le
+        certResolver: letsencrypt
 
     ruptur-web:
       rule: Host(`app.ruptur.cloud`) || Host(`studio.ruptur.cloud`) || Host(`showcase.ruptur.cloud`) || Host(`site.ruptur.cloud`) || Host(`lp.ruptur.cloud`) || Host(`web.ruptur.cloud`) || Host(`ruptur.cloud`) || Host(`www.ruptur.cloud`)
@@ -22,7 +22,7 @@ http:
         - websecure
       service: ruptur-web
       tls:
-        certResolver: le
+        certResolver: letsencrypt
 
     app-warmup:
       priority: 2000
@@ -33,7 +33,7 @@ http:
         - warmup-strip
       service: warmup
       tls:
-        certResolver: le
+        certResolver: letsencrypt
 
   middlewares:
     warmup-strip:
