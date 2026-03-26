@@ -38,3 +38,6 @@ n8n/
 
 # Relatorios locais gerados pelo conselho/maestro
 saas/docs/*maestro-compilado*.md
+
+# Rascunhos temporarios gerados por automacoes de issues
+saas/.tmp_gh/

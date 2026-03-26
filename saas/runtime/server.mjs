@@ -252,6 +252,20 @@ function mergeRuntimeSettings(currentSettings = {}, incomingSettings = {}) {
   });
 }
 
+function hasRuntimeCredentialChange(currentSettings = {}, nextSettings = {}) {
+  const currentServerUrl = String(currentSettings?.serverUrl ?? "").trim();
+  const nextServerUrl = String(nextSettings?.serverUrl ?? "").trim();
+  const currentAdminToken = String(currentSettings?.adminToken ?? "").trim();
+  const nextAdminToken = String(nextSettings?.adminToken ?? "").trim();
+
+  return currentServerUrl !== nextServerUrl || currentAdminToken !== nextAdminToken;
+}
+
+function isDemoServerValidationError(error) {
+  const message = String(error instanceof Error ? error.message : error ?? "").toLowerCase();
+  return message.includes("public demo server") || message.includes("endpoint has been disabled");
+}
+
 function createEmptyPoolState() {
   return {
     persistent: {
@@ -2014,7 +2028,22 @@ const server = http.createServer(async (req, res) => {
       if (nextSettings.adminToken?.trim()) {
         try {
           resolvedInstances = await fetchAllInstancesForSettings(nextSettings);
-        } catch {}
+        } catch (error) {
+          if (isDemoServerValidationError(error)) {
+            resolvedInstances = [];
+          } else
+          if (hasRuntimeCredentialChange(previousSettings, nextSettings)) {
+            return createResponse(res, 400, {
+              error: error instanceof Error ? error.message : "Falha ao validar admin token na API remota.",
+              validation: {
+                persisted: false,
+                remoteValidated: false,
+              },
+            });
+          }
+        }
+      } else if (hasRuntimeCredentialChange(previousSettings, nextSettings)) {
+        resolvedInstances = [];
       }
       const { routines, createdProtectedRoutine } = reconcileProtectedRoutines({
         currentRoutines: state.config.routines,
