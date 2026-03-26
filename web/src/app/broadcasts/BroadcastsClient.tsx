@@ -80,7 +80,7 @@ export default function BroadcastsClient() {
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-2xl">
             <div className="text-xs uppercase tracking-[0.35em] text-amber-200/70">Campanhas</div>
-            <h1 className="mt-2 text-3xl font-semibold tracking-tight">Disparos estilo Mlabs, mas no fluxo do Ruptur.</h1>
+            <h1 className="mt-2 text-3xl font-semibold tracking-tight">{"Disparos estilo Mlabs, mas no fluxo do <🛟Ruptur />."}</h1>
             <p className="mt-2 text-sm text-zinc-300">
               Cadastre campanhas 1:1 ou de grupo, acompanhe a fila de comunicação e mantenha a operação perto do
               CRM, do warmup e da intervenção manual.

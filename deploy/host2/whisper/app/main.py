@@ -34,7 +34,7 @@ def get_model() -> WhisperModel:
     return _model
 
 
-app = FastAPI(title="Ruptur Whisper (local)", version="0.0.0")
+app = FastAPI(title="<🛟Ruptur /> Whisper (local)", version="0.0.0")
 
 LOUDNORM = "loudnorm=I=-16:TP=-1.5:LRA=11"
 

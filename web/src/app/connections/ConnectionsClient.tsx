@@ -1121,7 +1121,7 @@ export default function ConnectionsClient() {
     if (
       chatbotEnabled &&
       !window.confirm(
-        "Habilitar chatbot nativo da UAZAPI nesta instancia? Isso pode competir com o assistente da Ruptur se a ownership nao estiver isolada.",
+        "Habilitar chatbot nativo da UAZAPI nesta instancia? Isso pode competir com o assistente da <🛟Ruptur /> se a ownership nao estiver isolada.",
       )
     ) {
       return;
@@ -1708,7 +1708,7 @@ export default function ConnectionsClient() {
                       Salvar delay de fila
                     </button>
                     <div className="rounded-xl border border-amber-300/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
-                      Ownership: se a Ruptur for a dona do assistente nesta instancia, mantenha o chatbot nativo da UAZAPI desligado ou isolado. Nao deixe os dois responderem no mesmo fluxo.
+                      {"Ownership: se a <🛟Ruptur /> for a dona do assistente nesta instancia, mantenha o chatbot nativo da UAZAPI desligado ou isolado. Nao deixe os dois responderem no mesmo fluxo."}
                     </div>
                     <label className="flex items-center gap-2 text-sm text-zinc-200"><input type="checkbox" checked={chatbotEnabled} onChange={(e) => setChatbotEnabled(e.target.checked)} />Chatbot habilitado</label>
                     <label className="flex items-center gap-2 text-sm text-zinc-200"><input type="checkbox" checked={chatbotIgnoreGroups} onChange={(e) => setChatbotIgnoreGroups(e.target.checked)} />Ignorar grupos</label>
@@ -1860,7 +1860,7 @@ export default function ConnectionsClient() {
               <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-zinc-300">
                 {createProvider === "uazapi" ? (
                   <div>
-                    O numero do WhatsApp entra depois do QR. Antes disso, a Ruptur trabalha so com o identificador interno e com os metadados operacionais minimos.
+                    {"O numero do WhatsApp entra depois do QR. Antes disso, a <🛟Ruptur /> trabalha so com o identificador interno e com os metadados operacionais minimos."}
                   </div>
                 ) : (
                   <div>
