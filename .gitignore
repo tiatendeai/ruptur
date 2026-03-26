@@ -3,13 +3,9 @@ __pycache__/
 
 .DS_Store
 
-<<<<<<< HEAD
-=======
 # Audio samples (do not commit)
 *.opus
 /local/
-
->>>>>>> work
 # Local env / venvs
 .env
 .venv/
@@ -18,8 +14,6 @@ __pycache__/
 backend/.env
 backend/.venv/
 
-<<<<<<< HEAD
-=======
 # Scratch / exports
 /archive/
 
@@ -35,4 +29,9 @@ Captura de Tela*.png
 0WbsZjA4yKfY.br/
 backend/uvicorn.log
 
->>>>>>> work
+# Warmup local artifacts
+deploy/host2/warmup/runtime-data/
+deploy/host2/warmup/manager-dist/
+
+# n8n local exports
+n8n/
