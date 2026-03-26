@@ -2,7 +2,7 @@ export default function ShowcasePage() {
   return (
     <iframe
       src="/connectome/showcase.html"
-      title="Ruptur Showcase"
+      title="<🛟Ruptur /> Showcase"
       style={{
         border: "0",
         width: "100%",

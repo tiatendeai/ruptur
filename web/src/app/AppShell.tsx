@@ -44,7 +44,7 @@ export default function AppShell({
           <div className="border-b border-black/10 px-4 py-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <div className="text-[10px] uppercase tracking-[0.34em] text-[#9d4e31]">Ruptur Ops</div>
+                <div className="text-[10px] uppercase tracking-[0.34em] text-[#9d4e31]">{"<🛟Ruptur />"}</div>
                 <div className="mt-2 text-2xl font-semibold tracking-[-0.06em] text-zinc-950">{currentItem.label}</div>
               </div>
               <div className="rounded-full border border-[#9d4e31]/20 bg-[#fffaf2] px-2.5 py-1 text-[10px] uppercase tracking-[0.24em] text-[#9d4e31]">
@@ -80,7 +80,7 @@ export default function AppShell({
           <aside className="hidden min-h-0 flex-col overflow-hidden rounded-[32px] border border-black/10 bg-[#f8f4ec]/95 shadow-[0_24px_80px_rgba(70,43,31,0.12)] backdrop-blur lg:flex">
             <div className="border-b border-black/10 px-5 pb-5 pt-6">
               <div className="flex items-center justify-between gap-3">
-                <div className="text-[11px] uppercase tracking-[0.42em] text-[#9d4e31]">Ruptur Ops</div>
+                <div className="text-[11px] uppercase tracking-[0.42em] text-[#9d4e31]">{"<🛟Ruptur />"}</div>
                 <div className="flex items-center gap-2">
                   <div className="rounded-full border border-[#9d4e31]/20 bg-[#fffaf2] px-2.5 py-1 text-[10px] uppercase tracking-[0.24em] text-[#9d4e31]">
                     live

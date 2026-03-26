@@ -65,7 +65,7 @@ export default function LoginForm() {
       <div className="mx-auto flex min-h-[calc(100dvh-4rem)] max-w-6xl items-center justify-center">
         <div className="grid w-full gap-4 rounded-[32px] border border-white/10 bg-[#141210] p-4 shadow-[0_28px_90px_rgba(0,0,0,0.45)] lg:grid-cols-[1.1fr_0.9fr] lg:p-6">
           <section className="rounded-[28px] border border-white/10 bg-[linear-gradient(135deg,rgba(157,78,49,0.35),rgba(10,9,8,0.95))] p-6 lg:p-8">
-            <div className="text-[11px] uppercase tracking-[0.36em] text-[#ffd9c9]/75">Ruptur Access</div>
+            <div className="text-[11px] uppercase tracking-[0.36em] text-[#ffd9c9]/75">{"<🛟Ruptur />"}</div>
             <h1 className="mt-4 max-w-xl text-4xl font-semibold tracking-[-0.07em] text-white">
               {isSignUp ? "Crie sua conta para acessar o Control Deck." : "Entrar com conta segura para abrir o Control Deck."}
             </h1>

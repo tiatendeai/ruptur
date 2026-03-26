@@ -2,7 +2,7 @@ export default function StudioPage() {
   return (
     <iframe
       src="/connectome/studio.html"
-      title="Ruptur Studio"
+      title="<🛟Ruptur /> Studio"
       style={{
         border: "0",
         width: "100%",

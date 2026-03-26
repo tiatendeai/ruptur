@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Space_Grotesk, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import AppShell from "./AppShell";
+import ResponsiveTitle from "./ResponsiveTitle";
 
 const spaceGrotesk = Space_Grotesk({
   variable: "--font-space-grotesk",
@@ -15,7 +16,7 @@ const ibmPlexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Ruptur Console",
+  title: "<🛟Ruptur />",
   description: "Inbox, CRM e operação de canais",
 };
 
@@ -27,6 +28,7 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <body className={`${spaceGrotesk.variable} ${ibmPlexMono.variable} antialiased`}>
+        <ResponsiveTitle />
         <AppShell>{children}</AppShell>
       </body>
     </html>
