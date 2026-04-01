@@ -10,9 +10,9 @@ const TICK_INTERVAL_MS = Number(process.env.WARMUP_TICK_INTERVAL_MS || 60_000);
 const DATA_DIR = path.resolve(process.cwd(), "runtime-data");
 const STATE_FILE = path.join(DATA_DIR, "warmup-state.json");
 const DNA_DIR = path.join(DATA_DIR, "instance-dna");
-const FRONT_DIST_DIR = path.resolve(process.cwd(), "dist");
+const FRONT_DIST_DIR = path.resolve(process.cwd(), "landing-dist"); // Landing Page limpa / Redirect
 const MANAGER_DIST_DIR = path.resolve(process.cwd(), "manager-dist"); // Warmup Manager (Standalone)
-const STATE_RUPTUR_DIST_DIR = path.resolve(process.cwd(), "state-ruptur-dist"); // Dashboard Legado (Inbox/CRM)
+const STATE_RUPTUR_DIST_DIR = path.resolve(process.cwd(), "dist"); // Dashboard Legado (Inbox/CRM) pegando do build original
 
 /**
  * Estratégia de Isolamento Triple-Path:
