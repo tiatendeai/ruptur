@@ -10,15 +10,16 @@ const TICK_INTERVAL_MS = Number(process.env.WARMUP_TICK_INTERVAL_MS || 60_000);
 const DATA_DIR = path.resolve(process.cwd(), "runtime-data");
 const STATE_FILE = path.join(DATA_DIR, "warmup-state.json");
 const DNA_DIR = path.join(DATA_DIR, "instance-dna");
-const FRONT_DIST_DIR = path.resolve(process.cwd(), "landing-dist"); // Landing Page limpa / Redirect
-const MANAGER_DIST_DIR = path.resolve(process.cwd(), "manager-dist"); // Warmup Manager (Standalone)
-const STATE_RUPTUR_DIST_DIR = path.resolve(process.cwd(), "dist"); // Dashboard Legado (Inbox/CRM) pegando do build original
+const FRONT_DIST_DIR = path.resolve(process.cwd(), "dist"); // Landing Page (ou Redirect temporário)
+const MANAGER_DIST_DIR = path.resolve(process.cwd(), "manager-dist"); // Cockpit de Aquecimento (Warmup Manager)
+const STATE_RUPTUR_DIST_DIR = path.resolve(process.cwd(), "state-ruptur-dist"); // Dashboard Legado (Inbox/CRM)
 
 /**
- * Estratégia de Isolamento Triple-Path:
- * - /               -> Landing Page (dist/)
- * - /warmup/        -> Warmup Manager (manager-dist/)
- * - /state/ruptur/  -> Dashboard Legado (state-ruptur-dist/)
+ * Estratégia de Isolamento Triple-Path (Conforme SITEMAP.md v2.0):
+ * 1.  /               -> Servido via FRONT_DIST_DIR (Landing Page / Redirect)
+ * 2.  /warmup/        -> Servido via MANAGER_DIST_DIR (Standalone Assets)
+ * 3.  /state/ruptur/  -> Iframe Bridge (Bridge de Isolamento de Roteamento)
+ * 4.  /state/ruptur/portal/ -> Servido via STATE_RUPTUR_DIST_DIR (Dashboard Real)
  */
 const BRANDING_CONFIG_PATH = path.resolve(process.cwd(), "shared", "ecosystem-branding.json");
 const WARMUP_BASE_PATH = "/warmup";
@@ -2560,6 +2561,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     // Roteamento para o Dashboard Legado (State/Ruptur) - Ponte de Iframe para Isolamento de Roteamento
+    // Esta camada garante que o Dashboard v2 com React Router v6 não vazem rotas para a Landing Page
     const STATE_RUPTUR_APP_PATH = `${STATE_RUPTUR_BASE_PATH}/portal`;
     
     // 1. Se acessar o caminho base /state/ruptur, servimos o Iframe Bridge
