@@ -3,6 +3,8 @@ import { Space_Grotesk, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import AppShell from "./AppShell";
 import ResponsiveTitle from "./ResponsiveTitle";
+import GlobalWhatsAppFab from "@/components/ecosystem/GlobalWhatsAppFab";
+import { ecosystemBranding } from "@/lib/ecosystem";
 
 const spaceGrotesk = Space_Grotesk({
   variable: "--font-space-grotesk",
@@ -16,8 +18,8 @@ const ibmPlexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "<🛟Ruptur />",
-  description: "Inbox, CRM e operação de canais",
+  title: ecosystemBranding.browser.defaultTitle,
+  description: ecosystemBranding.browser.defaultDescription,
 };
 
 export default function RootLayout({
@@ -30,6 +32,7 @@ export default function RootLayout({
       <body className={`${spaceGrotesk.variable} ${ibmPlexMono.variable} antialiased`}>
         <ResponsiveTitle />
         <AppShell>{children}</AppShell>
+        <GlobalWhatsAppFab />
       </body>
     </html>
   );

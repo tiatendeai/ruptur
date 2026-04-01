@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import LogoutButton from "@/components/auth/LogoutButton";
+import GlobalFooter from "@/components/ecosystem/GlobalFooter";
 
 type NavItem = {
   href: string;
@@ -32,7 +33,12 @@ export default function AppShell({
   const pathname = usePathname();
 
   if (pathname === "/" || pathname.startsWith("/showcase") || pathname.startsWith("/login")) {
-    return <>{children}</>;
+    return (
+      <div className="flex min-h-dvh flex-col">
+        <div className="flex-1">{children}</div>
+        <GlobalFooter />
+      </div>
+    );
   }
 
   const currentItem = NAV_ITEMS.find((item) => pathname.startsWith(item.href)) ?? NAV_ITEMS[0];
@@ -186,6 +192,10 @@ export default function AppShell({
               </div>
             </main>
           </div>
+        </div>
+
+        <div className="mt-3">
+          <GlobalFooter />
         </div>
       </div>
     </div>

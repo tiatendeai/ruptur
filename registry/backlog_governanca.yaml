@@ -15,15 +15,12 @@ backlog:
     status: done
     responsavel: J.A.R.V.I.S.
     entregavel: "state/constitution/jarvis_protocol.md (Seção de Assinatura com Selo 🧬🧠🦾⌬∞)"
-    data: "2026-03-24"
-
   - id: BACK-002B
     titulo: "Auditoria Visual OMEGA (Caça a Sessões Fantasmas)"
     status: pending
     responsavel: vAudit + J.A.R.V.I.S.
-    entregavel: "Monitoramento contínuo: detectar comunicações ou execuções sem o Selo Visual completo, catalogando-as como corrompidas ou órfãs."
+    entregavel: "Monitoramento contínuo: detectar comunicações ou execuções sem o Selo Visual completo."
     data: null
-    blockers: []
 
   - id: BACK-003
     titulo: "Integração OMEGA: Fase de Capitalização"
@@ -31,7 +28,6 @@ backlog:
     responsavel: J.A.R.V.I.S. + vOps-Dev
     entregavel: "Atualizar jarvis_protocol.md com Protocolo Replay e Memória OMEGA"
     data: null
-    blockers: []
 
   - id: BACK-004
     titulo: "Automação do catalog.yaml (Indexação das 2.642 obras)"
@@ -39,7 +35,6 @@ backlog:
     responsavel: vOps-Dev + vAudit
     entregavel: "state/registry/catalog.yaml com todas as obras classificadas"
     data: null
-    blockers: ["BACK-003 (OMEGA deve estar ativo para capitalização automática)"]
 
   - id: BACK-005
     titulo: "Gatilhos de Ativação Automática de Agentes"
@@ -47,15 +42,18 @@ backlog:
     responsavel: J.A.R.V.I.S. + vOps-Dev
     entregavel: "state/registry/intelligence_triggers.yaml atualizado com v-prefix"
     data: null
-    blockers: []
 
   - id: BACK-006
     titulo: "Configurar GitHub Projects para Rastreio de Decisões"
-    status: pending
+    status: in_progress
     responsavel: vCTO + vOps-Dev
     entregavel: "GitHub Projects Board vinculado ao STATE"
+    criterio_de_aceite: "Itens críticos do backlog vinculados ao board com `project_item_id` registrado no trace e no state"
+    origem_sessao: "OMEGA-20260323-193628-a1b2c3d4-jarvis-001 | saneamento RAG ponta a ponta"
+    project_board: "Ruptur Delivery OS"
+    project_board_id: "PVT_kwHODOO6r84BRgVS"
+    project_item_id: "PVTI_lAHODOO6r84BRgVSzgoQz_0"
     data: null
-    blockers: []
 
   - id: BACK-007
     titulo: "Customer Success Protocol (Gap identificado na Mesa)"
@@ -63,52 +61,91 @@ backlog:
     responsavel: vCVO + vCMO
     entregavel: "Protocolo de Retenção pós-venda para o SaaS Ruptur"
     data: null
-    blockers: []
 
   - id: BACK-008
-    titulo: "Migrar código Terraform (IaC) do vps-oracle para infrastructure-state/iac/"
-    status: pending
-    responsavel: vOps-Dev + J.A.R.V.I.S.
-    entregavel: "infrastructure-state/iac/ com Terraform funcional para Oracle Cloud"
-    data: null
-    blockers: ["Acesso ao workspace vps-oracle via Diego"]
-    origem_sessao: "2026-03-24 | Conversa sobre renomeação da pasta infra"
+    titulo: "Materialização RAG: Consolidação de Ativos adk/automations"
+    status: in_progress
+    responsavel: vOps + vAudit
+    entregavel: "Pipeline canônico Google Drive + Voyage AI + Supabase pgvector materializado no core do codex/ruptur"
+    criterio_de_aceite: "Ingestão de arquivo real do Drive, vetorização no storage canônico, retrieval no runtime do Ruptur e evidência auditável publicada"
+    origem_sessao: "OMEGA-20260323-193628-a1b2c3d4-jarvis-001 | auditoria RAG 2026-03-25"
+    project_board: "Ruptur Delivery OS"
+    project_board_id: "PVT_kwHODOO6r84BRgVS"
+    project_item_id: "PVTI_lAHODOO6r84BRgVSzgoQ0zg"
+    data: "2026-03-25"
 
   - id: BACK-009
-    titulo: "Migrar Stacks Docker Swarm para infrastructure-state/swarm/"
+    titulo: "Materialização Observabilidade: Execução Swarm Prom/Grafana"
     status: pending
-    responsavel: vOps-Dev + J.A.R.V.I.S.
-    entregavel: "infrastructure-state/swarm/ com manifests operacionais Oracle+KVM2"
-    data: null
-    blockers: ["BACK-008"]
-    origem_sessao: "2026-03-24 | Auditoria da pasta infrastructure-state"
+    responsavel: vOps
+    entregavel: "Arquivos swarm/ e iac/ devidamente populados no vps-oracle"
+    data: "2026-03-25"
 
   - id: BACK-010
-    titulo: "Manifesto de Observabilidade (Prometheus/Grafana) declarativo em infrastructure-state"
-    status: pending
-    responsavel: vOps-Dev
-    entregavel: "infrastructure-state/swarm/observability/ com limites de retenção e exporters KVM2"
-    data: null
-    blockers: ["BACK-009"]
-    origem_sessao: "2026-03-24 | Debate sobre Matriz Why (Observabilidade Ruptur Farm)"
+    titulo: "Warmup: Revisão de Blocos Funcionais e Operacionais"
+    status: in_progress
+    responsavel: vOps + vAudit
+    entregavel: "Validação final de Dashboard.tsx, server.mjs e ANTI_BAN_PROTOCOL.md"
+    data: "2026-03-25"
 
   - id: BACK-011
-    titulo: "Migrar Playbooks/SOPs de infra para infrastructure-state/playbooks/"
+    titulo: "Warmup: Integração AppShell e Rotas no Ruptur"
     status: pending
-    responsavel: J.A.R.V.I.S.
-    entregavel: "infrastructure-state/playbooks/ com SOPs de recuperação autônoma do servidor"
-    data: null
-    blockers: []
-    origem_sessao: "2026-03-24 | Auditoria da pasta infrastructure-state"
+    responsavel: vOps
+    entregavel: "Menu Warmup funcional no AppShell.tsx do Ruptur"
+    data: "2026-03-25"
 
   - id: BACK-012
-    titulo: "Automação: Captura e registro automático de tarefas emergentes em sessão"
+    titulo: "Roadmap: Gestão Granular de Proxies e Saúde de IP"
     status: pending
-    responsavel: vOps-Dev + J.A.R.V.I.S.
-    entregavel: "Script session_task_extractor.py que identifica e registra tarefas geradas em sessão no backlog_governanca.yaml e GitHub Projects via API"
+    responsavel: vOps + vCVO
+    entregavel: "Funcionalidade de proxy per-instance no Warmup Manager"
     data: null
-    blockers: []
-    origem_sessao: "2026-03-24 | Auditoria do gap de backlog (tarefas de infra não registradas)"
+
+  - id: BACK-013
+    titulo: "Roadmap: IAzinha Analyst (DNA Forense)"
+    status: pending
+    responsavel: vAudit + vCVO
+    entregavel: "IA analisando padrões de banimento no Instance DNA"
+    data: null
+
+  - id: BACK-014
+    titulo: "Materialização: Sincronização de Fluxos Jarvis (n8n)"
+    status: in_progress
+    responsavel: vOps + vAudit
+    entregavel: "Fluxo funcional extraído de `automations_migrated` e convertido em runtime/documentação canônicos no codex/ruptur"
+    criterio_de_aceite: "Nenhum fluxo crítico de RAG depende exclusivamente de `automations_migrated`; contrato operacional publicado no tronco principal"
+    origem_sessao: "OMEGA-20260323-193628-a1b2c3d4-jarvis-001 | auditoria RAG 2026-03-25"
+    project_board: "Ruptur Delivery OS"
+    project_board_id: "PVT_kwHODOO6r84BRgVS"
+    project_item_id: "PVTI_lAHODOO6r84BRgVSzgoQ00g"
+    data: "2026-03-25"
+
+  - id: BACK-015
+    titulo: "Auditoria SaaS: Lista de 100 tarefas – do Zero ao SaaS"
+    status: pending
+    responsavel: vCVO + vAudit
+    entregavel: "Conversão do .xlsx em items no GitHub Projects"
+    data: "2026-03-25"
+
+  - id: BACK-016
+    titulo: "Segurança: Rotação de adminToken (TD-001)"
+    status: open
+    responsavel: vOps
+    entregavel: "adminToken UAZAPI rotacionado e blindado"
+    data: "2026-03-25"
+
+  - id: BACK-017
+    titulo: "Drive-only: Cutover com quarentena reversível e eliminação do acervo local"
+    status: pending
+    responsavel: vOps + vAudit
+    entregavel: "Manifesto de corte, quarentena reversível e remoção segura do acervo local redundante do RAG"
+    criterio_de_aceite: "Inventário fechado, presença validada no Google Drive, quarentena executada e remoção local aprovada após evidência do runtime canônico"
+    origem_sessao: "OMEGA-20260323-193628-a1b2c3d4-jarvis-001 | saneamento RAG drive-only"
+    project_board: "Ruptur Delivery OS"
+    project_board_id: "PVT_kwHODOO6r84BRgVS"
+    project_item_id: "PVTI_lAHODOO6r84BRgVSzgoQ01Q"
+    data: "2026-03-25"
 
 decisoes:
   - id: DEC-001
@@ -128,6 +165,30 @@ decisoes:
     data: "2026-03-24"
     fonte: "Mesa de Revisão Estratégica"
     aplicacao: ["catalog.yaml", "analise_foguete_enterprise.md", "agents.yaml"]
+
+  - id: DEC-004
+    titulo: "Google Drive é a fonte canônica para o RAG (Abandono do LFS)"
+    data: "2026-03-24"
+    fonte: "Auditoria de Austeridade OMEGA"
+    aplicacao: ["RAG/drive_sync_worker.py", "topology.md"]
+
+  - id: DEC-005
+    titulo: "Stack canônica do RAG Fase 1: Google Drive + Voyage AI + Supabase pgvector no codex/ruptur"
+    data: "2026-03-25"
+    fonte: "Conselho de Guerra + auditoria RAG ponta a ponta"
+    aplicacao: ["codex/ruptur", "registry/backlog_governanca.yaml", "knowledge/2026-03-25-plano-executivo-rag-drive-only-ponta-a-ponta.md"]
+
+  - id: DEC-006
+    titulo: "Pinecone e Cohere saem do gate crítico da materialização inicial do RAG"
+    data: "2026-03-25"
+    fonte: "Mesa executiva de saneamento do pseudo-campo RAG"
+    aplicacao: ["BACK-008", "TASK-RAG-001", "cutover drive-only", "critérios de aceite da Fase 1"]
+
+  - id: DEC-007
+    titulo: "Nenhum conteúdo local do acervo RAG pode ser removido sem manifesto, quarentena reversível e evidência de cutover"
+    data: "2026-03-25"
+    fonte: "POP de quarentena + auditoria RAG"
+    aplicacao: ["BACK-017", "playbooks/pop_quarentena_artefatos.md", "operações de limpeza local"]
 
 gatilhos:
   - trigger: "vRH|vHRO|vOps-HR|CHRO"

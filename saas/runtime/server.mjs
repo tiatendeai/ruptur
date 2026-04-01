@@ -11,8 +11,18 @@ const DATA_DIR = path.resolve(process.cwd(), "runtime-data");
 const STATE_FILE = path.join(DATA_DIR, "warmup-state.json");
 const DNA_DIR = path.join(DATA_DIR, "instance-dna");
 const FRONT_DIST_DIR = path.resolve(process.cwd(), "dist");
-const MANAGER_DIST_DIR = path.resolve(process.cwd(), "manager-dist");
+const MANAGER_DIST_DIR = path.resolve(process.cwd(), "manager-dist"); // Warmup Manager (Standalone)
+const STATE_RUPTUR_DIST_DIR = path.resolve(process.cwd(), "state-ruptur-dist"); // Dashboard Legado (Inbox/CRM)
+
+/**
+ * Estratégia de Isolamento Triple-Path:
+ * - /               -> Landing Page (dist/)
+ * - /warmup/        -> Warmup Manager (manager-dist/)
+ * - /state/ruptur/  -> Dashboard Legado (state-ruptur-dist/)
+ */
+const BRANDING_CONFIG_PATH = path.resolve(process.cwd(), "shared", "ecosystem-branding.json");
 const WARMUP_BASE_PATH = "/warmup";
+const STATE_RUPTUR_BASE_PATH = "/state/ruptur";
 const WARMUP_TRACK_SOURCE = "warmup_manager";
 const DEFAULT_WARMUP_24X7_ID = "warmup-default-24x7";
 const ACTIVITY_WINDOW_VERSION = 1;
@@ -32,10 +42,64 @@ const MIME_TYPES = {
 
 const WARMUP_MANAGER_BUTTON_MARKER = "codex-warmup-manager-link";
 const WARMUP_TOKEN_CLEAR_MARKER = "codex-runtime-token-clear-action";
+const ECOSYSTEM_CHROME_MARKER = "codex-ecosystem-global-chrome";
+const ECOSYSTEM_SUPPORT_MARKER = "codex-ecosystem-support-link";
+const DEFAULT_ECOSYSTEM_BRANDING = {
+  product: {
+    shortName: "Ruptur",
+    frontName: "Front Lindona",
+    warmupName: "Warmup Manager",
+  },
+  browser: {
+    defaultTitle: "Ruptur",
+    defaultDescription: "Ecossistema Ruptur com front principal, operação comercial e Warmup Manager.",
+  },
+  domains: {
+    canonicalAppUrl: "https://app.ruptur.cloud",
+    canonicalLandingUrl: "https://ruptur.cloud",
+    warmupPath: "/warmup/",
+  },
+  footer: {
+    copyrightText: "© 2025 All Rights Reserved. Status Persianas",
+    madeWithText: "Feito com 💙 por",
+  },
+  company: {
+    name: "2DL Company",
+    instagramUrl: "https://instagram.com/2dlcompany.oficial",
+  },
+  support: {
+    whatsappNumber: "5531989131980",
+    whatsappBaseUrl: "https://wa.me/5531989131980",
+    defaultIntent: "Preciso de ajuda",
+  },
+};
+
+async function loadEcosystemBranding() {
+  try {
+    const raw = await readFile(BRANDING_CONFIG_PATH, "utf8");
+    const parsed = JSON.parse(raw);
+    return {
+      ...DEFAULT_ECOSYSTEM_BRANDING,
+      ...parsed,
+      product: { ...DEFAULT_ECOSYSTEM_BRANDING.product, ...(parsed.product ?? {}) },
+      browser: { ...DEFAULT_ECOSYSTEM_BRANDING.browser, ...(parsed.browser ?? {}) },
+      domains: { ...DEFAULT_ECOSYSTEM_BRANDING.domains, ...(parsed.domains ?? {}) },
+      footer: { ...DEFAULT_ECOSYSTEM_BRANDING.footer, ...(parsed.footer ?? {}) },
+      company: { ...DEFAULT_ECOSYSTEM_BRANDING.company, ...(parsed.company ?? {}) },
+      support: { ...DEFAULT_ECOSYSTEM_BRANDING.support, ...(parsed.support ?? {}) },
+    };
+  } catch {
+    return DEFAULT_ECOSYSTEM_BRANDING;
+  }
+}
+
+const ECOSYSTEM_BRANDING = await loadEcosystemBranding();
+
 const WARMUP_MANAGER_BUTTON_HTML = `
   <style>
+    /* Ajuste para evitar sobreposição no header original */
     nav button.bg-primary.text-primary-foreground.px-5.py-2.rounded-full.font-mono.text-xs.font-bold {
-      margin-right: 196px;
+      margin-right: 220px; /* Espaço aumentado para acomodar o novo botão sem sobreposição */
     }
 
     .${WARMUP_MANAGER_BUTTON_MARKER} {
@@ -82,10 +146,10 @@ const WARMUP_MANAGER_BUTTON_HTML = `
       }
     }
   </style>
-  <a class="${WARMUP_MANAGER_BUTTON_MARKER}" href="${WARMUP_BASE_PATH}/">
+  <a class="${WARMUP_MANAGER_BUTTON_MARKER}" href="${WARMUP_BASE_PATH}/" target="_blank" rel="noopener noreferrer">
     <span>
-      Warmup Manager
-      <small>instâncias, regras e saúde</small>
+      ${ECOSYSTEM_BRANDING.product.warmupName}
+      <small>abre em nova aba • instâncias, regras e saúde</small>
     </span>
   </a>
 `;
@@ -1513,9 +1577,13 @@ async function executeRoundPool(roundPool, instancesByToken, round, maxExecution
   const executionLimit = Math.min(MAX_QUEUE_EXECUTIONS_PER_TICK, Math.max(0, maxExecutionsAllowed));
 
   while (executedCount < executionLimit) {
+    if (!state.scheduler.enabled) break;
+
     let progressed = false;
 
     for (const queue of groupedQueues) {
+      if (!state.scheduler.enabled) break;
+
       const entry = queue.shift();
       if (!entry) continue;
 
@@ -1895,12 +1963,237 @@ function injectWarmupManagerButton(html) {
   return `${html}\n${WARMUP_MANAGER_BUTTON_HTML}`;
 }
 
+function getEcosystemPageLabel(pathname = "/") {
+  if (pathname.startsWith(WARMUP_BASE_PATH)) return ECOSYSTEM_BRANDING.product.warmupName;
+  if (pathname === "/" || pathname === "/app") return ECOSYSTEM_BRANDING.product.frontName;
+  if (pathname.startsWith("/dashboard")) return "Dashboard";
+  if (pathname.startsWith("/ruptur")) return ECOSYSTEM_BRANDING.product.shortName;
+  return ECOSYSTEM_BRANDING.product.shortName;
+}
+
+function buildEcosystemBrowserTitle(pathname = "/") {
+  const pageLabel = getEcosystemPageLabel(pathname);
+  if (pageLabel === ECOSYSTEM_BRANDING.product.shortName) {
+    return ECOSYSTEM_BRANDING.browser.defaultTitle;
+  }
+  return `${ECOSYSTEM_BRANDING.product.shortName} — ${pageLabel}`;
+}
+
+function buildEcosystemSupportMessage(pathname = "/") {
+  const pageLabel = getEcosystemPageLabel(pathname);
+  return `Olá! Vim do módulo ${pageLabel} na página ${pathname || "/"} do projeto ${ECOSYSTEM_BRANDING.product.shortName} e preciso de ajuda.`;
+}
+
+function buildEcosystemSupportHref(pathname = "/") {
+  return `${ECOSYSTEM_BRANDING.support.whatsappBaseUrl}?text=${encodeURIComponent(buildEcosystemSupportMessage(pathname))}`;
+}
+
+function buildEcosystemChromeHtml({ includeWarmupButton = false } = {}) {
+  const warmupButtonHtml = includeWarmupButton ? WARMUP_MANAGER_BUTTON_HTML : "";
+  const brandingJson = JSON.stringify(ECOSYSTEM_BRANDING);
+  return `
+  <style>
+    .${ECOSYSTEM_CHROME_MARKER}-footer {
+      position: fixed;
+      left: 16px;
+      right: 16px;
+      bottom: 12px;
+      z-index: 9997;
+      display: flex;
+      justify-content: center;
+      pointer-events: none;
+    }
+
+    .${ECOSYSTEM_CHROME_MARKER}-footer > div {
+      pointer-events: auto;
+      display: inline-flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      max-width: calc(100vw - 120px);
+      padding: 10px 16px;
+      border-radius: 999px;
+      border: 1px solid rgba(15, 23, 42, 0.08);
+      background: rgba(255, 250, 242, 0.96);
+      color: #4b5563;
+      font: 500 12px/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      box-shadow: 0 16px 36px rgba(15, 23, 42, 0.1);
+      backdrop-filter: blur(10px);
+      text-align: center;
+    }
+
+    .${ECOSYSTEM_CHROME_MARKER}-footer a {
+      color: #9d4e31;
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    .${ECOSYSTEM_SUPPORT_MARKER} {
+      position: fixed;
+      right: 18px;
+      bottom: 84px;
+      z-index: 9998;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 16px;
+      border-radius: 999px;
+      border: 1px solid rgba(37, 211, 102, 0.22);
+      background: #25d366;
+      color: #ffffff;
+      font: 700 14px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      text-decoration: none;
+      box-shadow: 0 16px 40px rgba(37, 211, 102, 0.32);
+    }
+
+    .${ECOSYSTEM_SUPPORT_MARKER}:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.04);
+    }
+
+    body {
+      padding-bottom: 92px !important;
+    }
+
+    @media (max-width: 900px) {
+      .${ECOSYSTEM_SUPPORT_MARKER} {
+        right: 12px;
+        bottom: 96px;
+        padding: 12px 14px;
+      }
+
+      .${ECOSYSTEM_CHROME_MARKER}-footer {
+        left: 10px;
+        right: 10px;
+        bottom: 10px;
+      }
+
+      .${ECOSYSTEM_CHROME_MARKER}-footer > div {
+        max-width: calc(100vw - 20px);
+        font-size: 11px;
+      }
+    }
+  </style>
+  ${warmupButtonHtml}
+  <a class="${ECOSYSTEM_SUPPORT_MARKER}" data-ecosystem-support="true" href="${buildEcosystemSupportHref("/")}" target="_blank" rel="noopener noreferrer">
+    <span>💬</span>
+    <span>Precisa de ajuda?</span>
+  </a>
+  <div class="${ECOSYSTEM_CHROME_MARKER}-footer" data-ecosystem-footer="true">
+    <div>
+      <span>${ECOSYSTEM_BRANDING.footer.copyrightText}</span>
+      <span>•</span>
+      <span>${ECOSYSTEM_BRANDING.footer.madeWithText}</span>
+      <a href="${ECOSYSTEM_BRANDING.company.instagramUrl}" target="_blank" rel="noopener noreferrer">${ECOSYSTEM_BRANDING.company.name}</a>
+    </div>
+  </div>
+  <script>
+    (() => {
+      const branding = ${brandingJson};
+      const supportLink = document.querySelector('[data-ecosystem-support="true"]');
+
+      function getLabel(pathname) {
+        if (pathname.startsWith("${WARMUP_BASE_PATH}")) return branding.product.warmupName;
+        if (pathname === "/" || pathname === "/app") return branding.product.frontName;
+        if (pathname.startsWith("/dashboard")) return "Dashboard";
+        if (pathname.startsWith("/ruptur")) return branding.product.shortName;
+        return branding.product.shortName;
+      }
+
+      function buildTitle(pathname) {
+        const label = getLabel(pathname);
+        if (label === branding.product.shortName) return branding.browser.defaultTitle;
+        return branding.product.shortName + " — " + label;
+      }
+
+      function buildSupportHref(pathname) {
+        const label = getLabel(pathname);
+        const message = "Olá! Vim do módulo " + label + " na página " + pathname + " do projeto " + branding.product.shortName + " e preciso de ajuda.";
+        return branding.support.whatsappBaseUrl + "?text=" + encodeURIComponent(message);
+      }
+
+      function syncChrome() {
+        const pathname = window.location.pathname || "/";
+        document.title = buildTitle(pathname);
+
+        let description = document.querySelector('meta[name="description"]');
+        if (!description) {
+          description = document.createElement("meta");
+          description.setAttribute("name", "description");
+          document.head.appendChild(description);
+        }
+        description.setAttribute("content", branding.browser.defaultDescription);
+
+        if (supportLink) {
+          supportLink.setAttribute("href", buildSupportHref(pathname));
+          supportLink.setAttribute("aria-label", "Falar no WhatsApp com contexto da página " + pathname);
+        }
+      }
+
+      const wrapHistory = (method) => {
+        const original = history[method];
+        history[method] = function (...args) {
+          const result = original.apply(this, args);
+          window.dispatchEvent(new Event("ecosystem:locationchange"));
+          return result;
+        };
+      };
+
+      wrapHistory("pushState");
+      wrapHistory("replaceState");
+      window.addEventListener("popstate", () => window.dispatchEvent(new Event("ecosystem:locationchange")));
+      window.addEventListener("ecosystem:locationchange", syncChrome);
+      syncChrome();
+    })();
+  </script>
+  `;
+}
+
+function injectEcosystemChrome(html, options = {}) {
+  if (html.includes(ECOSYSTEM_CHROME_MARKER)) return html;
+  const chromeHtml = buildEcosystemChromeHtml(options);
+  if (html.includes("</body>")) {
+    return html.replace("</body>", `${chromeHtml}\n</body>`);
+  }
+  return `${html}\n${chromeHtml}`;
+}
+
 function injectWarmupManagerSettingsActions(html) {
   if (html.includes(WARMUP_TOKEN_CLEAR_MARKER)) return html;
   if (html.includes("</body>")) {
     return html.replace("</body>", `${WARMUP_MANAGER_SETTINGS_ACTIONS_HTML}\n</body>`);
   }
   return `${html}\n${WARMUP_MANAGER_SETTINGS_ACTIONS_HTML}`;
+}
+
+function injectDashboardLegacyFix(html, customBasePath) {
+  const basePath = customBasePath || STATE_RUPTUR_BASE_PATH;
+  
+  // Script de Virtual Root Injection (Meta-informação para o SPA)
+  const virtualRootScript = `
+    <script>
+      (function() {
+        const base = "${basePath}";
+        console.log("[Ruptur] Injetando metadados de roteamento para:", base);
+        window.__BASENAME__ = base;
+        window.__REACT_ROUTER_BASENAME__ = base;
+        window.__VITE_BASE__ = base;
+        window.process = { env: { PUBLIC_URL: base, BASE_URL: base } };
+      })();
+    </script>
+  `;
+
+  let transformed = html;
+  
+  // Inserir base href e metadados no INÍCIO do head para maior prioridade
+  const headInjections = `\n    <base href="${basePath}/">\n${virtualRootScript}`;
+  transformed = transformed.replace(/<head\b[^>]*>/i, `$&${headInjections}`);
+
+  // 2. Corrigir caminhos absolutos de assets (src="/assets/..." -> src="assets/...")
+  transformed = transformed.replace(/src="\/assets\//g, 'src="assets/');
+  transformed = transformed.replace(/href="\/assets\//g, 'href="assets/');
+  return transformed;
 }
 
 function resetOperationalRuntimeState(reason = "Token do runtime removido manualmente.") {
@@ -1915,8 +2208,10 @@ function resetOperationalRuntimeState(reason = "Token do runtime removido manual
   state.lastSyncedAt = new Date().toISOString();
 }
 
-async function serveFile(res, filePath, htmlTransform) {
+async function serveFile(res, filePath, { htmlTransform, jsTransform } = {}) {
   const ext = path.extname(filePath).toLowerCase();
+  
+  // Transformação HTML (Existente)
   if (ext === ".html" && typeof htmlTransform === "function") {
     const html = await readFile(filePath, "utf8");
     res.writeHead(200, {
@@ -1924,6 +2219,23 @@ async function serveFile(res, filePath, htmlTransform) {
       "Access-Control-Allow-Origin": "*",
     });
     res.end(htmlTransform(html));
+    return true;
+  }
+
+  // Transformação JS (Novo - Runtime Patch)
+  if (ext === ".js" && typeof jsTransform === "function") {
+    let js = await readFile(filePath, "utf8");
+    const originalJs = js;
+    js = jsTransform(js);
+    
+    const patchApplied = js !== originalJs;
+    
+    res.writeHead(200, {
+      "Content-Type": MIME_TYPES[ext] ?? "application/javascript; charset=utf-8",
+      "Access-Control-Allow-Origin": "*",
+      "X-Ruptur-Patch-Applied": patchApplied ? "true" : "false"
+    });
+    res.end(js);
     return true;
   }
 
@@ -1935,7 +2247,7 @@ async function serveFile(res, filePath, htmlTransform) {
   return true;
 }
 
-async function serveStaticFromDir(req, res, { distDir, stripPrefix = "", htmlTransform } = {}) {
+async function serveStaticFromDir(req, res, { distDir, stripPrefix = "", htmlTransform, jsTransform } = {}) {
   if (!existsSync(distDir)) return false;
   const requestUrl = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
   const pathname = stripRoutePrefix(requestUrl.pathname, stripPrefix);
@@ -1952,11 +2264,11 @@ async function serveStaticFromDir(req, res, { distDir, stripPrefix = "", htmlTra
   try {
     const fileStat = await stat(filePath);
     if (!fileStat.isFile()) throw new Error("not a file");
-    return serveFile(res, filePath, htmlTransform);
+    return serveFile(res, filePath, { htmlTransform, jsTransform });
   } catch {
     try {
       const fallbackPath = path.join(distDir, "index.html");
-      return serveFile(res, fallbackPath, htmlTransform);
+      return serveFile(res, fallbackPath, { htmlTransform, jsTransform });
     } catch { return false; }
   }
 }
@@ -2243,14 +2555,65 @@ const server = http.createServer(async (req, res) => {
       if (await serveStaticFromDir(req, res, {
         distDir: MANAGER_DIST_DIR,
         stripPrefix: WARMUP_BASE_PATH,
-        htmlTransform: injectWarmupManagerSettingsActions,
+        htmlTransform: (html) => injectEcosystemChrome(injectWarmupManagerSettingsActions(html)),
       })) return;
     }
 
-    if (await serveStaticFromDir(req, res, {
-      distDir: FRONT_DIST_DIR,
-      htmlTransform: injectWarmupManagerButton,
-    })) return;
+    // Roteamento para o Dashboard Legado (State/Ruptur) - Ponte de Iframe para Isolamento de Roteamento
+    const STATE_RUPTUR_APP_PATH = `${STATE_RUPTUR_BASE_PATH}/portal`;
+    
+    // 1. Se acessar o caminho base /state/ruptur, servimos o Iframe Bridge
+    if (url.pathname === STATE_RUPTUR_BASE_PATH || url.pathname === `${STATE_RUPTUR_BASE_PATH}/`) {
+      const bridgeHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>${ECOSYSTEM_BRANDING.product.shortName} — Dashboard Legado</title>
+          <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+          <style>
+            body, html { margin: 0; padding: 0; height: 100vh; overflow: hidden; background: #0b0f1a; }
+            iframe { width: 100%; height: 100%; border: none; display: block; }
+          </style>
+        </head>
+        <body>
+          <iframe src="${STATE_RUPTUR_APP_PATH}/" name="ruptur_state_portal"></iframe>
+        </body>
+        </html>
+      `;
+      res.writeHead(200, { 
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0"
+      });
+      res.end(bridgeHtml);
+      return;
+    }
+
+    // 2. Se acessar o portal interno, servimos o SPA real
+    if (url.pathname.startsWith(STATE_RUPTUR_APP_PATH)) {
+      if (await serveStaticFromDir(req, res, {
+        distDir: STATE_RUPTUR_DIST_DIR,
+        stripPrefix: STATE_RUPTUR_APP_PATH,
+        htmlTransform: (html) => injectEcosystemChrome(injectDashboardLegacyFix(html, STATE_RUPTUR_APP_PATH)),
+        jsTransform: (js) => {
+          // Patch do React Router v6: substituir o basename estático "/" 
+          // Detectamos o padrão minificado basename:VARNAME="/" e substituímos por window.__BASENAME__
+          return js.replace(/basename:([a-zA-Z0-9_$]+)=("|')\/("|')/g, 'basename:$1=(window.__BASENAME__||"/")');
+        }
+      })) return;
+    }
+
+    // Roteamento para o Front Principal (Landing Page)
+    // EXCEÇÃO: Nunca cair aqui se o caminho começar com um prefixo reservado (Isolamento Terminal)
+    const isReservedPath = url.pathname.startsWith(WARMUP_BASE_PATH) || url.pathname.startsWith(STATE_RUPTUR_BASE_PATH);
+    
+    if (!isReservedPath) {
+      if (await serveStaticFromDir(req, res, {
+        distDir: FRONT_DIST_DIR,
+        htmlTransform: (html) => injectEcosystemChrome(html, { includeWarmupButton: true }),
+      })) return;
+    }
     createResponse(res, 404, { error: "Não encontrado" });
   } catch (err) {
     createResponse(res, 500, { error: err.message });

@@ -81,17 +81,3 @@ triggers:
       - "playbooks/governanca/matriz-acionamento-perfis-virtuais.md"
       - "knowledge/2026-03-24-mesa-paralela-a-b-vcontroller-adminops-finops.md"
     action: "Require cost driver mapping, unit cost, optimization hypothesis, rollback and service-quality protection before cost cuts."
-
-  - keywords: ["infra", "servidor", "vps", "deploy", "terraform", "docker", "swarm", "observabilidade", "prometheus", "grafana", "oracle", "kvm2", "migration"]
-    profiles_activated: ["vOps-Dev", "vAudit"]
-    mandatory_knowledge:
-      - "infrastructure-state/00-INFRA-SOURCE-OF-TRUTH.md"
-      - "registry/backlog_governanca.yaml"
-    action: "Require any new infrastructure decisions or tasks to be IMMEDIATELY registered in registry/backlog_governanca.yaml with origem_sessao field. Never leave infra decisions orphaned."
-
-  - keywords: ["preciso", "falta", "pendente", "não foi feito", "nao foi feito", "backlog", "tarefa", "demanda", "precisamos", "temos que", "vamos fazer", "adicionar", "criar item"]
-    profiles_activated: ["vAdminOps", "vAudit"]
-    mandatory_knowledge:
-      - "registry/backlog_governanca.yaml"
-      - "playbooks/governanca/session-git-bridge.md"
-    action: "MANDATORY: any identified demand, gap, task or decision mentioned in session MUST be registered immediately in backlog_governanca.yaml. Use BACK-{n+1} incrementally. Associate with origem_sessao and responsavel. Do NOT defer this to end of session."

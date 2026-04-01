@@ -37,8 +37,11 @@ Profile dedicado:
 Deploy padrao recomendado:
 
 ```bash
-export COMPOSE_PROFILES="${COMPOSE_PROFILES:-core,channels,warmup,observability-agents}"
-docker compose --project-name "${RUPTUR_COMPOSE_PROJECT_NAME:-kvm2}" \
+docker compose --project-name ruptur-kvm2 \
+  --profile core \
+  --profile channels \
+  --profile warmup \
+  --profile observability-agents \
   up -d --build --remove-orphans
 ```
 

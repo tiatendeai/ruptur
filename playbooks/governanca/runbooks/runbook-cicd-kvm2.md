@@ -138,18 +138,6 @@ No momento atual do `kvm2`, o cenario correto e:
 - `Ruptur` sem Traefik embarcado no profile `core`
 - `n8n` e `Ruptur` compartilhando a mesma borda do host
 
-### Servicos fora da stack canonica
-
-No `deploy/kvm2/docker-compose.yml` existem servicos de laboratorio/experimentacao
-(`nats`, `prometheus`, `ras-worker`), mas eles **nao** fazem parte da stack
-canonica de producao do KVM2.
-
-Eles agora ficam atras do profile:
-
-- `lab-omega`
-
-Nao ligar esse profile no deploy padrao.
-
 ## Observabilidade recomendada para o KVM2
 
 A estrategia recomendada hoje e:
@@ -206,10 +194,6 @@ Campos obrigatorios para o ciclo Warmup Manager:
 - `NEXT_PUBLIC_WARMUP_MANAGER_URL=/warmup`
 - `WARMUP_TICK_INTERVAL_MS=60000`
 - `RUPTUR_COMPOSE_PROJECT_NAME=kvm2` enquanto a migracao estiver absorvendo a stack legada ja publicada com esse nome
-
-Profiles padrao do deploy canônico:
-
-- `core,channels,warmup`
 
 ### 2. Arquivo real de ambiente do backend
 
@@ -291,17 +275,16 @@ cd /opt/ruptur/current/deploy/kvm2
 set -a
 source /opt/ruptur/shared/kvm2.env
 set +a
-export COMPOSE_PROFILES="${COMPOSE_PROFILES:-core,channels,warmup}"
-docker compose --project-name "${RUPTUR_COMPOSE_PROJECT_NAME:-kvm2}" up -d --build --remove-orphans
+docker compose --project-name ruptur-kvm2 up -d --build
 ```
 
 Se o host ja tiver Traefik proprio, subir apenas os profiles de aplicacao, por exemplo:
 
 ```bash
-docker compose --project-name "${RUPTUR_COMPOSE_PROJECT_NAME:-kvm2}" up -d --build --remove-orphans
+docker compose --project-name ruptur-kvm2 --profile core up -d --build --remove-orphans
 ```
 
-> **Ajuste operacional validado em 25/03/2026:** o deploy remoto e o rollback agora assumem `RUPTUR_COMPOSE_PROJECT_NAME=kvm2` como fallback operacional seguro e ativam por padrao `core,channels,warmup`. Isso impede subir servicos experimentais fora da stack canonica e evita abrir uma stack paralela `ruptur-kvm2`.
+> **Ajuste operacional validado em 23/03/2026:** se o host ainda estiver rodando a stack antiga com project name `kvm2`, use temporariamente `RUPTUR_COMPOSE_PROJECT_NAME=kvm2` no env compartilhado para que o deploy canônico absorva os containers existentes em vez de criar uma segunda stack paralela.
 
 ## Gates minimos antes de apertar deploy
 
