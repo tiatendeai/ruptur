@@ -2536,15 +2536,13 @@ const server = http.createServer(async (req, res) => {
       })) return;
     }
 
-    // Roteamento para o Front Principal (Front Lindona)
-    // EXCEÇÃO: Nunca cair aqui se o caminho começar com o prefixo do Warmup (Isolamento Terminal)
-    const isWarmupPath = url.pathname.startsWith(WARMUP_BASE_PATH);
-    
-    if (!isWarmupPath) {
-      if (await serveStaticFromDir(req, res, {
+    // Roteamento para o Front Principal (Landing Page)
+    if (!isWarmupPath || url.pathname === "/") {
+      const served = await serveStaticFromDir(req, res, {
         distDir: FRONT_DIST_DIR,
         htmlTransform: (html) => injectEcosystemChrome(html, { includeWarmupButton: true }),
-      })) return;
+      });
+      if (served) return;
     }
 
     createResponse(res, 404, { error: "Não encontrado" });
