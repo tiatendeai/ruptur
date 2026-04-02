@@ -2246,12 +2246,10 @@ async function serveStaticFromDir(req, res, { distDir, stripPrefix = "", htmlTra
 
 function resolveManualActor(payload = {}) {
   const actor = String(payload.actor ?? "").trim();
-  return actor || "Operador local";
-}
-
 await bootstrapProtectedRoutine();
 
 const server = http.createServer(async (req, res) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.headers.host}${req.url}`);
   if (!req.url || !req.method) return createResponse(res, 400, { error: "Requisição inválida" });
 
   if (req.method === "OPTIONS") {
