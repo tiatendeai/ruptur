@@ -11,7 +11,7 @@ http:
 
     ruptur-landing:
       priority: 1000
-      rule: Host(`ruptur.cloud`) || Host(`www.ruptur.cloud`) || Host(`app.ruptur.cloud`)
+      rule: Host(`ruptur.cloud`) || Host(`www.ruptur.cloud`) || Host(`app.ruptur.cloud`) || Host(`site.ruptur.cloud`) || Host(`aquecimento.ruptur.cloud`)
       entryPoints:
         - websecure
       service: warmup
