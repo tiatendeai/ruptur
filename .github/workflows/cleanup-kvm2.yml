@@ -1,0 +1,62 @@
+name: Cleanup KVM2
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmed:
+        description: "Digite 'sim' para confirmar a limpeza dos containers"
+        required: true
+        default: "nao"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-kvm2-production
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    name: Derrubar containers e limpar imagens antigas
+    runs-on: ubuntu-latest
+    environment: kvm2-production
+    env:
+      KVM2_SSH_HOST: ${{ vars.KVM2_SSH_HOST }}
+      KVM2_SSH_PORT: ${{ vars.KVM2_SSH_PORT }}
+      KVM2_SSH_USER: ${{ vars.KVM2_SSH_USER }}
+      KVM2_SSH_PRIVATE_KEY: ${{ secrets.KVM2_SSH_PRIVATE_KEY }}
+      KVM2_APP_ROOT: ${{ vars.KVM2_APP_ROOT }}
+    steps:
+      - name: Validar confirmacao
+        run: |
+          if [[ "${{ inputs.confirmed }}" != "sim" ]]; then
+            echo "Confirmacao invalida. Digite 'sim' para prosseguir." >&2
+            exit 1
+          fi
+
+      - name: Preparar chave SSH
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$KVM2_SSH_PRIVATE_KEY" > ~/.ssh/kvm2
+          chmod 600 ~/.ssh/kvm2
+          ssh-keyscan -p "${KVM2_SSH_PORT:-22}" "$KVM2_SSH_HOST" >> ~/.ssh/known_hosts
+
+      - name: Derrubar containers e remover imagens/volumes anonimos
+        run: |
+          ssh -i ~/.ssh/kvm2 -p "${KVM2_SSH_PORT:-22}" "${KVM2_SSH_USER}@${KVM2_SSH_HOST}" \
+            "set -a
+            source '${KVM2_APP_ROOT}/shared/kvm2.env' 2>/dev/null || true
+            RUPTUR_COMPOSE_PROJECT_NAME=\${RUPTUR_COMPOSE_PROJECT_NAME:-kvm2}
+            current_dir=\$(readlink -f '${KVM2_APP_ROOT}/current/deploy/kvm2' 2>/dev/null || ls -td ${KVM2_APP_ROOT}/releases/*/deploy/kvm2 | head -1)
+            cd \"\$current_dir\"
+            docker compose --project-name \"\${RUPTUR_COMPOSE_PROJECT_NAME}\" down --remove-orphans
+            docker image prune -f
+            echo 'Limpeza concluida. Containers parados. Imagens dangling removidas.'
+            docker ps -a"
+
+      - name: Resumo
+        run: |
+          echo "## Limpeza KVM2 Concluida" >> "$GITHUB_STEP_SUMMARY"
+          echo "Containers derrubados e imagens dangling removidas." >> "$GITHUB_STEP_SUMMARY"
+          echo "Execute o workflow **Deploy KVM2** para subir a versao nova limpa." >> "$GITHUB_STEP_SUMMARY"
