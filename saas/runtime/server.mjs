@@ -10,9 +10,8 @@ const TICK_INTERVAL_MS = Number(process.env.WARMUP_TICK_INTERVAL_MS || 60_000);
 const DATA_DIR = path.resolve(process.cwd(), "runtime-data");
 const STATE_FILE = path.join(DATA_DIR, "warmup-state.json");
 const DNA_DIR = path.join(DATA_DIR, "instance-dna");
-const FRONT_DIST_DIR = path.resolve(process.cwd(), "dist"); // Landing Page (ou Redirect temporário)
-const MANAGER_DIST_DIR = path.resolve(process.cwd(), "manager-dist"); // Cockpit de Aquecimento (Warmup Manager)
-const STATE_RUPTUR_DIST_DIR = path.resolve(process.cwd(), "state-ruptur-dist"); // Dashboard Legado (Inbox/CRM)
+const FRONT_DIST_DIR = path.resolve(process.cwd(), "dist"); // Front Lindona
+const MANAGER_DIST_DIR = path.resolve(process.cwd(), "manager-dist"); // Warmup Manager
 
 /**
  * Estratégia de Isolamento Triple-Path (Conforme SITEMAP.md v2.0):
@@ -23,7 +22,6 @@ const STATE_RUPTUR_DIST_DIR = path.resolve(process.cwd(), "state-ruptur-dist"); 
  */
 const BRANDING_CONFIG_PATH = path.resolve(process.cwd(), "shared", "ecosystem-branding.json");
 const WARMUP_BASE_PATH = "/warmup";
-const STATE_RUPTUR_BASE_PATH = "/state/ruptur";
 const WARMUP_TRACK_SOURCE = "warmup_manager";
 const DEFAULT_WARMUP_24X7_ID = "warmup-default-24x7";
 const ACTIVITY_WINDOW_VERSION = 1;
@@ -2168,34 +2166,6 @@ function injectWarmupManagerSettingsActions(html) {
   return `${html}\n${WARMUP_MANAGER_SETTINGS_ACTIONS_HTML}`;
 }
 
-function injectDashboardLegacyFix(html, customBasePath) {
-  const basePath = customBasePath || STATE_RUPTUR_BASE_PATH;
-  
-  // Script de Virtual Root Injection (Meta-informação para o SPA)
-  const virtualRootScript = `
-    <script>
-      (function() {
-        const base = "${basePath}";
-        console.log("[Ruptur] Injetando metadados de roteamento para:", base);
-        window.__BASENAME__ = base;
-        window.__REACT_ROUTER_BASENAME__ = base;
-        window.__VITE_BASE__ = base;
-        window.process = { env: { PUBLIC_URL: base, BASE_URL: base } };
-      })();
-    </script>
-  `;
-
-  let transformed = html;
-  
-  // Inserir base href e metadados no INÍCIO do head para maior prioridade
-  const headInjections = `\n    <base href="${basePath}/">\n${virtualRootScript}`;
-  transformed = transformed.replace(/<head\b[^>]*>/i, `$&${headInjections}`);
-
-  // 2. Corrigir caminhos absolutos de assets (src="/assets/..." -> src="assets/...")
-  transformed = transformed.replace(/src="\/assets\//g, 'src="assets/');
-  transformed = transformed.replace(/href="\/assets\//g, 'href="assets/');
-  return transformed;
-}
 
 function resetOperationalRuntimeState(reason = "Token do runtime removido manualmente.") {
   stopLoop();
@@ -2560,62 +2530,25 @@ const server = http.createServer(async (req, res) => {
       })) return;
     }
 
-    // Roteamento para o Dashboard Legado (State/Ruptur) - Ponte de Iframe para Isolamento de Roteamento
-    // Esta camada garante que o Dashboard v2 com React Router v6 não vazem rotas para a Landing Page
-    const STATE_RUPTUR_APP_PATH = `${STATE_RUPTUR_BASE_PATH}/portal`;
-    
-    // 1. Se acessar o caminho base /state/ruptur, servimos o Iframe Bridge
-    if (url.pathname === STATE_RUPTUR_BASE_PATH || url.pathname === `${STATE_RUPTUR_BASE_PATH}/`) {
-      const bridgeHtml = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>${ECOSYSTEM_BRANDING.product.shortName} — Dashboard Legado</title>
-          <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-          <style>
-            body, html { margin: 0; padding: 0; height: 100vh; overflow: hidden; background: #0b0f1a; }
-            iframe { width: 100%; height: 100%; border: none; display: block; }
-          </style>
-        </head>
-        <body>
-          <iframe src="${STATE_RUPTUR_APP_PATH}/" name="ruptur_state_portal"></iframe>
-        </body>
-        </html>
-      `;
-      res.writeHead(200, { 
-        "Content-Type": "text/html; charset=utf-8",
-        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
-        "Pragma": "no-cache",
-        "Expires": "0"
-      });
-      res.end(bridgeHtml);
-      return;
-    }
-
-    // 2. Se acessar o portal interno, servimos o SPA real
-    if (url.pathname.startsWith(STATE_RUPTUR_APP_PATH)) {
+    if (url.pathname === WARMUP_BASE_PATH || url.pathname.startsWith(`${WARMUP_BASE_PATH}/`)) {
       if (await serveStaticFromDir(req, res, {
-        distDir: STATE_RUPTUR_DIST_DIR,
-        stripPrefix: STATE_RUPTUR_APP_PATH,
-        htmlTransform: (html) => injectEcosystemChrome(injectDashboardLegacyFix(html, STATE_RUPTUR_APP_PATH)),
-        jsTransform: (js) => {
-          // Patch do React Router v6: substituir o basename estático "/" 
-          // Detectamos o padrão minificado basename:VARNAME="/" e substituímos por window.__BASENAME__
-          return js.replace(/basename:([a-zA-Z0-9_$]+)=("|')\/("|')/g, 'basename:$1=(window.__BASENAME__||"/")');
-        }
+        distDir: MANAGER_DIST_DIR,
+        stripPrefix: WARMUP_BASE_PATH,
+        htmlTransform: (html) => injectEcosystemChrome(injectWarmupManagerSettingsActions(html)),
       })) return;
     }
 
-    // Roteamento para o Front Principal (Landing Page)
-    // EXCEÇÃO: Nunca cair aqui se o caminho começar com um prefixo reservado (Isolamento Terminal)
-    const isReservedPath = url.pathname.startsWith(WARMUP_BASE_PATH) || url.pathname.startsWith(STATE_RUPTUR_BASE_PATH);
+    // Roteamento para o Front Principal (Front Lindona)
+    // EXCEÇÃO: Nunca cair aqui se o caminho começar com o prefixo do Warmup (Isolamento Terminal)
+    const isWarmupPath = url.pathname.startsWith(WARMUP_BASE_PATH);
     
-    if (!isReservedPath) {
+    if (!isWarmupPath) {
       if (await serveStaticFromDir(req, res, {
         distDir: FRONT_DIST_DIR,
         htmlTransform: (html) => injectEcosystemChrome(html, { includeWarmupButton: true }),
       })) return;
     }
+
     createResponse(res, 404, { error: "Não encontrado" });
   } catch (err) {
     createResponse(res, 500, { error: err.message });
