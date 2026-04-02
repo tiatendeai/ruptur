@@ -17,7 +17,7 @@ retry_curl() {
   local sleep_seconds="${4:-5}"
 
   for ((i = 1; i <= attempts; i++)); do
-    if curl -fk -sS --max-time 10 "$url" >/dev/null; then
+    if curl -fk -sSL --max-time 10 "$url" >/dev/null; then
       echo "Smoke ok: $label"
       return 0
     fi
@@ -37,7 +37,7 @@ retry_json_ok() {
 
   for ((i = 1; i <= attempts; i++)); do
     local body=""
-    if body="$(curl -fk -sS --max-time 10 "$url")" && [[ "$body" == *'"ok":true'* ]]; then
+    if body="$(curl -fk -sSL --max-time 10 "$url")" && [[ "$body" == *'"ok":true'* ]]; then
       echo "Smoke ok: $label"
       return 0
     fi
@@ -58,7 +58,7 @@ retry_html_contains() {
 
   for ((i = 1; i <= attempts; i++)); do
     local body=""
-    if body="$(curl -fk -sS --max-time 10 "$url")" && [[ "$body" == *"$needle"* ]]; then
+    if body="$(curl -fk -sSL --max-time 10 "$url")" && [[ "$body" == *"$needle"* ]]; then
       echo "Smoke ok: $label"
       return 0
     fi
@@ -71,7 +71,7 @@ retry_html_contains() {
 }
 
 retry_curl "$api_url" "API"
-retry_html_contains "$web_url" "WEB_LANDING" "Inteligência contra o Banimento"
+retry_html_contains "$web_url" "WEB_LANDING" "SafeFlow"
 
 if [[ -n "$warmup_url" ]]; then
   warmup_base="${warmup_url%/}"
