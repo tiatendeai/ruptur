@@ -71,11 +71,11 @@ retry_html_contains() {
 }
 
 retry_curl "$api_url" "API"
-retry_curl "$web_url" "WEB"
+retry_html_contains "$web_url" "WEB_LANDING" "Inteligência contra o Banimento"
 
 if [[ -n "$warmup_url" ]]; then
   warmup_base="${warmup_url%/}"
-  retry_html_contains "$warmup_base" "WARMUP_HTML" "Warmup Manager"
+  retry_html_contains "$warmup_base" "WARMUP_HTML" "Business Boost"
   retry_json_ok "${warmup_base}/api/local/health" "WARMUP_HEALTH"
 fi
 
