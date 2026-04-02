@@ -140,7 +140,8 @@ services:
     labels:
       - traefik.enable=true
       # Rota 1: Landing Page (Raiz)
-      - traefik.http.routers.ruptur-landing.rule=Host(`ruptur.cloud`) || Host(`www.ruptur.cloud`)
+      - traefik.http.routers.ruptur-landing.rule=Host(`ruptur.cloud`) || Host(`www.ruptur.cloud`) || Host(`app.ruptur.cloud`)
+      - traefik.http.routers.ruptur-landing.priority=1000
       - traefik.http.routers.ruptur-landing.entrypoints=websecure
       - traefik.http.routers.ruptur-landing.tls.certresolver=letsencrypt
       - traefik.http.routers.ruptur-landing.service=ruptur-warmup-svc
@@ -152,12 +153,6 @@ services:
       - traefik.http.routers.ruptur-warmup.service=ruptur-warmup-svc
       - traefik.http.routers.ruptur-warmup.middlewares=ruptur-warmup-strip
       - traefik.http.middlewares.ruptur-warmup-strip.stripprefix.prefixes=/warmup
-      # Rota 3: State Bridge (Ponte do Dashboard Legado)
-      - traefik.http.routers.ruptur-state.rule=Host(`app.ruptur.cloud`) && PathPrefix(`/state/ruptur`)
-      - traefik.http.routers.ruptur-state.priority=3050
-      - traefik.http.routers.ruptur-state.entrypoints=websecure
-      - traefik.http.routers.ruptur-state.tls.certresolver=letsencrypt
-      - traefik.http.routers.ruptur-state.service=ruptur-warmup-svc
       # Servico comum
       - traefik.http.services.ruptur-warmup-svc.loadbalancer.server.port=4173
     environment:

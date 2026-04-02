@@ -1,13 +1,6 @@
+
 http:
   routers:
-    baileys:
-      rule: Host(`baileys.ruptur.cloud`)
-      entryPoints:
-        - websecure
-      service: baileys
-      tls:
-        certResolver: letsencrypt
-
     ruptur-backend:
       rule: Host(`api.ruptur.cloud`) || Host(`webhook.ruptur.cloud`)
       entryPoints:
@@ -17,6 +10,7 @@ http:
         certResolver: letsencrypt
 
     ruptur-landing:
+      priority: 1000
       rule: Host(`ruptur.cloud`) || Host(`www.ruptur.cloud`) || Host(`app.ruptur.cloud`)
       entryPoints:
         - websecure
