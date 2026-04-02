@@ -41,3 +41,8 @@ saas/docs/*maestro-compilado*.md
 
 # Rascunhos temporarios gerados por automacoes de issues
 saas/.tmp_gh/
+
+# Deploy secrets
+deploy/**/*.env
+deploy/**/backend.env
+deploy/**/n8n.env

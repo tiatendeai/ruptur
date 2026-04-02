@@ -143,7 +143,7 @@ services:
         NEXT_PUBLIC_WARMUP_MANAGER_URL: ${NEXT_PUBLIC_WARMUP_MANAGER_URL:-/warmup}
     labels:
       - traefik.enable=true
-      - traefik.http.routers.ruptur-web.rule=Host(`app.ruptur.cloud`) || Host(`studio.ruptur.cloud`) || Host(`showcase.ruptur.cloud`) || Host(`site.ruptur.cloud`) || Host(`lp.ruptur.cloud`) || Host(`web.ruptur.cloud`) || Host(`ruptur.cloud`) || Host(`www.ruptur.cloud`)
+      - traefik.http.routers.ruptur-web.rule=Host(`app.ruptur.cloud`) || Host(`studio.ruptur.cloud`) || Host(`showcase.ruptur.cloud`) || Host(`site.ruptur.cloud`) || Host(`lp.ruptur.cloud`) || Host(`web.ruptur.cloud`)
       - traefik.http.routers.ruptur-web.entrypoints=websecure
       - traefik.http.routers.ruptur-web.tls.certresolver=letsencrypt
       - traefik.http.services.ruptur-web.loadbalancer.server.port=3000
@@ -155,16 +155,27 @@ services:
   warmup:
     profiles: ["warmup"]
     build:
-      context: ../host2/warmup
+      context: ../../saas
       dockerfile: Dockerfile
     labels:
       - traefik.enable=true
+      # Rota 1: Landing Page (Raiz)
+      - traefik.http.routers.ruptur-landing.rule=Host(`ruptur.cloud`) || Host(`www.ruptur.cloud`)
+      - traefik.http.routers.ruptur-landing.entrypoints=websecure
+      - traefik.http.routers.ruptur-landing.tls.certresolver=letsencrypt
+      # Rota 2: Warmup Manager (Prefixado no domínio app)
       - traefik.http.routers.ruptur-warmup.rule=Host(`app.ruptur.cloud`) && PathPrefix(`/warmup`)
       - traefik.http.routers.ruptur-warmup.priority=2000
       - traefik.http.routers.ruptur-warmup.entrypoints=websecure
       - traefik.http.routers.ruptur-warmup.tls.certresolver=letsencrypt
       - traefik.http.routers.ruptur-warmup.middlewares=ruptur-warmup-strip
       - traefik.http.middlewares.ruptur-warmup-strip.stripprefix.prefixes=/warmup
+      # Rota 3: State Bridge (Ponte do Dashboard Legado)
+      - traefik.http.routers.ruptur-state.rule=Host(`app.ruptur.cloud`) && PathPrefix(`/state/ruptur`)
+      - traefik.http.routers.ruptur-state.priority=2050
+      - traefik.http.routers.ruptur-state.entrypoints=websecure
+      - traefik.http.routers.ruptur-state.tls.certresolver=letsencrypt
+      # Servico comum
       - traefik.http.services.ruptur-warmup.loadbalancer.server.port=4173
     environment:
       NODE_ENV: production
@@ -183,6 +194,26 @@ services:
     depends_on:
       ruptur-backend:
         condition: service_healthy
+    restart: unless-stopped
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    profiles: ["core"]
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.ruptur-n8n.rule=Host(`n8n.ruptur.cloud`)
+      - traefik.http.routers.ruptur-n8n.entrypoints=websecure
+      - traefik.http.routers.ruptur-n8n.tls.certresolver=letsencrypt
+      - traefik.http.services.ruptur-n8n.loadbalancer.server.port=5678
+    environment:
+      - N8N_HOST=n8n.ruptur.cloud
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=https
+      - NODE_ENV=production
+      - WEBHOOK_URL=https://n8n.ruptur.cloud/
+      - GENERIC_TIMEZONE=America/Sao_Paulo
+    volumes:
+      - n8n_data:/home/node/.n8n
     restart: unless-stopped
 
   node-exporter:
@@ -236,6 +267,7 @@ volumes:
   whisper_models:
   ruptur_db_data:
   warmup_runtime_data:
+  n8n_data:
 
 networks:
   ruptur-net:

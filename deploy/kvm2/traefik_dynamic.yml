@@ -16,13 +16,6 @@ http:
       tls:
         certResolver: letsencrypt
 
-    ruptur-web:
-      rule: Host(`app.ruptur.cloud`) || Host(`studio.ruptur.cloud`) || Host(`showcase.ruptur.cloud`) || Host(`site.ruptur.cloud`) || Host(`lp.ruptur.cloud`) || Host(`web.ruptur.cloud`) || Host(`ruptur.cloud`) || Host(`www.ruptur.cloud`)
-      entryPoints:
-        - websecure
-      service: ruptur-web
-      tls:
-        certResolver: letsencrypt
 
     app-warmup:
       priority: 2000

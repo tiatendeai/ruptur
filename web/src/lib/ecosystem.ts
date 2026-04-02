@@ -1,4 +1,4 @@
-import branding from "../../../saas/shared/ecosystem-branding.json";
+import branding from "./branding.json";
 
 export const ecosystemBranding = branding;
 
