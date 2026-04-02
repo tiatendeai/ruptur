@@ -13,6 +13,10 @@ services:
       - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
       - --certificatesresolvers.letsencrypt.acme.email=${TRAEFIK_ACME_EMAIL}
       - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+    networks:
+      - ruptur-net
     ports:
       - "80:80"
       - "443:443"
@@ -155,6 +159,8 @@ services:
       - traefik.http.middlewares.ruptur-warmup-strip.stripprefix.prefixes=/warmup
       # Servico comum
       - traefik.http.services.ruptur-warmup-svc.loadbalancer.server.port=4173
+    networks:
+      - ruptur-net
     environment:
       NODE_ENV: production
       VITE_SUPABASE_URL: ${RUPTUR_SUPABASE_URL}
