@@ -17,8 +17,16 @@ http:
         certResolver: letsencrypt
 
 
+    ruptur-landing:
+      rule: Host(`ruptur.cloud`) || Host(`www.ruptur.cloud`)
+      entryPoints:
+        - websecure
+      service: warmup
+      tls:
+        certResolver: letsencrypt
+
     app-warmup:
-      priority: 2000
+      priority: 3000
       rule: Host(`app.ruptur.cloud`) && PathPrefix(`/warmup`)
       entryPoints:
         - websecure
