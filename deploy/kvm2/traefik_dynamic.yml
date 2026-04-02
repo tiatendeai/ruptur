@@ -16,9 +16,8 @@ http:
       tls:
         certResolver: letsencrypt
 
-
     ruptur-landing:
-      rule: Host(`ruptur.cloud`) || Host(`www.ruptur.cloud`)
+      rule: Host(`ruptur.cloud`) || Host(`www.ruptur.cloud`) || Host(`app.ruptur.cloud`)
       entryPoints:
         - websecure
       service: warmup
@@ -43,20 +42,10 @@ http:
           - /warmup
 
   services:
-    baileys:
-      loadBalancer:
-        servers:
-          - url: http://baileys:3000
-
     ruptur-backend:
       loadBalancer:
         servers:
           - url: http://ruptur-backend:8000
-
-    ruptur-web:
-      loadBalancer:
-        servers:
-          - url: http://ruptur-web:3000
 
     warmup:
       loadBalancer:

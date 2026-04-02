@@ -131,26 +131,6 @@ services:
     environment:
       - NATS_URL=nats://nats:4222
 
-  ruptur-web:
-    profiles: ["core"]
-    build:
-      context: ../../web
-      dockerfile: Dockerfile
-      args:
-        NEXT_PUBLIC_RUPTUR_API_BASE_URL: ${NEXT_PUBLIC_RUPTUR_API_BASE_URL}
-        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
-        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY}
-        NEXT_PUBLIC_WARMUP_MANAGER_URL: ${NEXT_PUBLIC_WARMUP_MANAGER_URL:-/warmup}
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.ruptur-web.rule=Host(`app.ruptur.cloud`) || Host(`studio.ruptur.cloud`) || Host(`showcase.ruptur.cloud`) || Host(`site.ruptur.cloud`) || Host(`lp.ruptur.cloud`) || Host(`web.ruptur.cloud`)
-      - traefik.http.routers.ruptur-web.entrypoints=websecure
-      - traefik.http.routers.ruptur-web.tls.certresolver=letsencrypt
-      - traefik.http.services.ruptur-web.loadbalancer.server.port=3000
-    depends_on:
-      ruptur-backend:
-        condition: service_healthy
-    restart: unless-stopped
 
   warmup:
     profiles: ["warmup"]
