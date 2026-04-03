@@ -105,7 +105,8 @@ ln -sfn "$release_dir" "$current_link"
 
 cd "${current_link}/deploy/kvm2"
 
-docker compose --project-name "${RUPTUR_COMPOSE_PROJECT_NAME}" up -d --build --remove-orphans
+docker compose --project-name "${RUPTUR_COMPOSE_PROJECT_NAME}" build --no-cache warmup
+docker compose --project-name "${RUPTUR_COMPOSE_PROJECT_NAME}" up -d --remove-orphans
 
 echo "$release_id" > "${app_root}/shared/last_deployed_release"
 date -u +"%Y-%m-%dT%H:%M:%SZ" > "${app_root}/shared/last_deployed_at"
