@@ -11,6 +11,7 @@ const DATA_DIR = path.resolve(process.cwd(), "runtime-data");
 const STATE_FILE = path.join(DATA_DIR, "warmup-state.json");
 const DNA_DIR = path.join(DATA_DIR, "instance-dna");
 const FRONT_DIST_DIR = path.resolve(process.cwd(), "dist"); // Front Lindona
+const DASHBOARD_DIST_DIR = path.resolve(process.cwd(), "dashboard-dist"); // Legacy Dashboard SafeFlow
 const MANAGER_DIST_DIR = path.resolve(process.cwd(), "manager-dist"); // Warmup Manager
 
 /**
@@ -2536,13 +2537,22 @@ const server = http.createServer(async (req, res) => {
       })) return;
     }
 
-    // Roteamento para o Front Principal (Landing Page)
-    if (!isWarmupPath || url.pathname === "/") {
+    // Roteamento Triplo para Front Principal (Landing Page) e Dashboard (Legado)
+    const reqHost = (req.headers.host || "").toLowerCase();
+
+    if (reqHost.includes("site.ruptur") || reqHost.includes("aquecimento.ruptur")) {
       const served = await serveStaticFromDir(req, res, {
-        distDir: FRONT_DIST_DIR,
-        htmlTransform: (html) => injectEcosystemChrome(html, { includeWarmupButton: true }),
+        distDir: DASHBOARD_DIST_DIR,
       });
       if (served) return;
+    } else {
+      if (!isWarmupPath || url.pathname === "/") {
+        const served = await serveStaticFromDir(req, res, {
+          distDir: FRONT_DIST_DIR,
+          htmlTransform: (html) => injectEcosystemChrome(html, { includeWarmupButton: true }),
+        });
+        if (served) return;
+      }
     }
 
     createResponse(res, 404, { error: "Não encontrado" });
