@@ -144,13 +144,13 @@ services:
     labels:
       - traefik.enable=true
       # Rota 1: Landing Page (Raiz)
-      - traefik.http.routers.ruptur-landing.rule=Host(`ruptur.cloud`) || Host(`www.ruptur.cloud`) || Host(`app.ruptur.cloud`)
+      - traefik.http.routers.ruptur-landing.rule=Host(`ruptur.cloud`) || Host(`www.ruptur.cloud`) || Host(`app.ruptur.cloud`) || Host(`site.ruptur.cloud`) || Host(`aquecimento.ruptur.cloud`)
       - traefik.http.routers.ruptur-landing.priority=1000
       - traefik.http.routers.ruptur-landing.entrypoints=websecure
       - traefik.http.routers.ruptur-landing.tls.certresolver=letsencrypt
       - traefik.http.routers.ruptur-landing.service=ruptur-warmup-svc
       # Rota 2: Warmup Manager (Prefixado no domínio app)
-      - traefik.http.routers.ruptur-warmup.rule=Host(`app.ruptur.cloud`) && PathPrefix(`/warmup`)
+      - traefik.http.routers.ruptur-warmup.rule=Host(`app.ruptur.cloud`) || Host(`site.ruptur.cloud`) || Host(`aquecimento.ruptur.cloud`) && PathPrefix(`/warmup`)
       - traefik.http.routers.ruptur-warmup.priority=3000
       - traefik.http.routers.ruptur-warmup.entrypoints=websecure
       - traefik.http.routers.ruptur-warmup.tls.certresolver=letsencrypt
